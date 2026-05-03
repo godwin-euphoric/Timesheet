@@ -879,8 +879,11 @@ function renderFmTables(cats, fmLog) {
     const rows = entries.length
       ? entries.map(e => `
           <tr>
-            <td style="font-weight:500">${e.name}</td>
-            <td style="color:var(--muted);font-size:12px">${formatDate(e.date)}</td>
+            <td>
+              <div style="font-weight:500">${e.name}</div>
+              ${e.notes ? `<div style="font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5">${e.notes}</div>` : ''}
+            </td>
+            <td style="color:var(--muted);font-size:12px;white-space:nowrap">${formatDate(e.date)}</td>
             <td><button class="btn-danger" onclick="deleteFmEntry('${e.id}')">✕</button></td>
           </tr>`).join('')
       : `<tr><td colspan="3" class="empty">No ${cat} entries yet</td></tr>`;
@@ -904,19 +907,22 @@ function renderFmTables(cats, fmLog) {
 }
 
 async function addFmEntry() {
-  const type = document.getElementById('fm-type').value.trim();
-  const name = document.getElementById('fm-name').value.trim();
-  const date = document.getElementById('fm-date').value;
+  const type  = document.getElementById('fm-type').value.trim();
+  const name  = document.getElementById('fm-name').value.trim();
+  const date  = document.getElementById('fm-date').value;
+  const notes = document.getElementById('fm-notes').value.trim();
   if (!type) { showToast('Select a category'); return; }
   if (!name) { showToast('Enter a title');     return; }
   if (!date) { showToast('Select a date');     return; }
 
   const userData = await getUserData();
   const entry = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, name, date };
+  if (notes) entry.notes = notes;
   const fmLog = [...(userData.fmLog || []), entry];
   await saveUserData({ fmLog });
 
-  document.getElementById('fm-name').value = '';
+  document.getElementById('fm-name').value  = '';
+  document.getElementById('fm-notes').value = '';
   showToast(`${type} added`);
   renderFmTables(userData.fmCategories || [], fmLog);
 }
@@ -1126,9 +1132,9 @@ async function downloadExcel() {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(leaveRows), 'Leaves');
 
   // FM Log sheet
-  const fmRows = [['Date', 'Category', 'Title']];
+  const fmRows = [['Date', 'Category', 'Title', 'Notes']];
   (userData.fmLog || []).sort((a, b) => a.date.localeCompare(b.date)).forEach(e => {
-    fmRows.push([e.date, e.type, e.name]);
+    fmRows.push([e.date, e.type, e.name, e.notes || '']);
   });
   if (fmRows.length > 1) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fmRows), 'FM Log');

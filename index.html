@@ -50,7 +50,7 @@
       <button class="tab-btn active" data-tab="main">Main</button>
       <button class="tab-btn" data-tab="monthly">Monthly</button>
       <button class="tab-btn" data-tab="yearly">Yearly</button>
-      <button class="tab-btn" data-tab="log">Log</button>
+      <button class="tab-btn" data-tab="log">Journal</button>
       <button class="tab-btn" data-tab="settings">Settings</button>
     </nav>
     <div class="header-right">
@@ -185,7 +185,7 @@
 
   </div>
 
-  <!-- ══ LOG ════════════════════════════════════════════════════════════════ -->
+  <!-- ══ JOURNAL ══════════════════════════════════════════════════════════ -->
   <div id="tab-log" class="tab-content">
 
     <div class="card">
@@ -206,6 +206,10 @@
         <div class="field-group" style="align-self:flex-end">
           <button class="btn-primary" onclick="addFmEntry()">+ Add</button>
         </div>
+      </div>
+      <div style="margin-top:12px">
+        <label class="notes-label">Notes <span style="font-weight:400;font-style:italic">(optional · 2 lines)</span></label>
+        <textarea id="fm-notes" placeholder="Add a short note about this entry..." rows="2"></textarea>
       </div>
     </div>
 
