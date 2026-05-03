@@ -11,9 +11,13 @@
 <!-- ══ Auth Screen ═══════════════════════════════════════════════════════════ -->
 <div id="auth-screen" class="auth-screen">
   <div class="auth-card">
-    <div class="auth-logo">TS</div>
+    <div class="auth-logo">
+      <span class="hg-anim">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2v6l4 4-4 4v6h12v-6l-4-4 4-4V2H6zm10 14.5V20H8v-3.5l4-4 4 4zM8 5.5V4h8v1.5L12 10 8 5.5z"/></svg>
+      </span>
+    </div>
     <h1 class="auth-title">Timesheet</h1>
-    <p class="auth-sub">Track daily work hours · syncs across all devices</p>
+    <p class="auth-sub">Every hour counts · track your time across all devices</p>
     <button class="btn-google" onclick="signInWithGoogle()">
       <svg width="18" height="18" viewBox="0 0 24 24" style="flex-shrink:0">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -31,8 +35,10 @@
 
   <header>
     <div class="header-left">
-      <div class="logo">TS</div>
-      <h1>Timesheet</h1>
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2v6l4 4-4 4v6h12v-6l-4-4 4-4V2H6zm10 14.5V20H8v-3.5l4-4 4 4zM8 5.5V4h8v1.5L12 10 8 5.5z"/></svg>
+      </div>
+      <h1>Time<span>sheet</span></h1>
     </div>
     <nav class="tabs">
       <button class="tab-btn active" data-tab="main">Main</button>
@@ -81,7 +87,7 @@
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+    <div class="summary-grid">
 
       <div class="card">
         <div class="entries-label" id="entries-date-label">Month Summary</div>
