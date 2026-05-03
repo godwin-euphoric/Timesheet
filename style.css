@@ -245,6 +245,27 @@ input:focus, select:focus {
 }
 .stat-chip strong { color: var(--amber); font-size: 17px; font-weight: 800; }
 
+/* ══ Stat chip variants ══════════════════════════════════════════════════════ */
+.stat-chip-green {
+  background: linear-gradient(135deg, #F0FDF4, #DCFCE7) !important;
+  border-color: #BBF7D0 !important; color: #15803D !important;
+  box-shadow: 0 2px 8px rgba(22,163,74,0.15) !important;
+}
+.stat-chip-green strong { color: #16A34A !important; }
+.stat-chip-red {
+  background: linear-gradient(135deg, #FFF5F5, #FEE2E2) !important;
+  border-color: #FECACA !important; color: #B91C1C !important;
+  box-shadow: 0 2px 8px rgba(220,38,38,0.15) !important;
+}
+.stat-chip-red strong { color: var(--red) !important; }
+
+.chip-box {
+  display: inline-block; width: 12px; height: 12px;
+  border-radius: 3px; flex-shrink: 0;
+}
+.chip-box-green { background: #16A34A; }
+.chip-box-red   { background: var(--red); }
+
 /* ══ Card ════════════════════════════════════════════════════════════════════ */
 .card {
   background: var(--card);
@@ -501,6 +522,7 @@ textarea#fm-notes:focus {
   }
   .top-controls .field-group { width: 100%; }
   .top-controls .stat-chip { width: 100%; justify-content: center; }
+  .stat-chip-green, .stat-chip-red { width: 100%; justify-content: center; }
   .top-controls input[type="month"],
   .top-controls select { width: 100%; }
 

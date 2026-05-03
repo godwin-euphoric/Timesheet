@@ -220,7 +220,7 @@ async function loadMainTab() {
   loadMainDateDropdown(data);
   loadMainCategories(data);
   await loadMonthlySummary(data);
-  renderWastedMonthSummary(data);
+  renderWastedMonthSummary(data);  // also sets wasted chip
   await renderDayEntries();
 }
 
@@ -285,6 +285,12 @@ async function loadMonthlySummary(data) {
     if (dt.getDay() !== 0 && dt.getDay() !== 6 && !leavesSet.has(ds)) workingDays++;
   }
   document.getElementById('working-days-count').textContent = workingDays;
+
+  // Productive hours chip
+  let totalProductive = 0;
+  Object.values(entries).forEach(dayE => Object.values(dayE).forEach(h => { totalProductive += h; }));
+  totalProductive = Math.round(totalProductive * 100) / 100;
+  document.getElementById('productive-hours-chip').textContent = totalProductive + ' hrs';
 
   const tbody = document.getElementById('entries-tbody');
   tbody.innerHTML = '';
@@ -413,6 +419,8 @@ function renderWastedMonthSummary(data) {
   let total = 0;
   Object.values(wastedEntries).forEach(arr => arr.forEach(e => { total += e.hours || 0; }));
   total = Math.round(total * 100) / 100;
+
+  document.getElementById('wasted-hours-chip').textContent = total > 0 ? total + ' hrs' : '0 hrs';
 
   if (!total) { container.innerHTML = ''; return; }
 
