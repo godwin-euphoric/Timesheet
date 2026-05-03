@@ -982,6 +982,10 @@ function renderHabitsTable(habits, habitLog) {
     bodyRows += `
       <tr class="habit-row">
         <td class="habit-name-cell" onclick="startEditHabit(this, ${i})">
+          <div class="habit-reorder">
+            <button class="btn-habit-move" onclick="event.stopPropagation();moveHabit(${i},-1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+            <button class="btn-habit-move" onclick="event.stopPropagation();moveHabit(${i},1)" ${i === habits.length - 1 ? 'disabled' : ''}>▼</button>
+          </div>
           <span class="habit-name-text" title="Click to edit">${habit}</span>
           <button class="btn-habit-del" onclick="event.stopPropagation();deleteHabit(${i})" title="Remove habit">✕</button>
         </td>
@@ -1034,6 +1038,16 @@ async function deleteHabit(index) {
   userData.habits.splice(index, 1);
   await saveUserData({ habits: userData.habits });
   renderHabitsTable(userData.habits, userData.habitLog);
+}
+
+async function moveHabit(index, direction) {
+  const userData = await getUserData();
+  const habits   = userData.habits;
+  const newIndex = index + direction;
+  if (newIndex < 0 || newIndex >= habits.length) return;
+  [habits[index], habits[newIndex]] = [habits[newIndex], habits[index]];
+  await saveUserData({ habits });
+  renderHabitsTable(habits, userData.habitLog);
 }
 
 function startEditHabit(td, index) {
