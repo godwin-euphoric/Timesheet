@@ -93,6 +93,7 @@ function showToast(msg, ms = 2500) {
 
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
   auth.signInWithPopup(provider).catch(e => showToast('Sign-in failed: ' + e.message));
 }
 
