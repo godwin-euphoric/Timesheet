@@ -980,12 +980,13 @@ function renderHabitsTable(habits, habitLog) {
       </td>`;
     }).join('');
     bodyRows += `
-      <tr class="habit-row">
+      <tr class="habit-row" draggable="true"
+        ondragstart="habitDragStart(event,${i})"
+        ondragover="habitDragOver(event,${i})"
+        ondrop="habitDrop(event,${i})"
+        ondragend="habitDragEnd(event)">
         <td class="habit-name-cell" onclick="startEditHabit(this, ${i})">
-          <div class="habit-reorder">
-            <button class="btn-habit-move" onclick="event.stopPropagation();moveHabit(${i},-1)" ${i === 0 ? 'disabled' : ''}>▲</button>
-            <button class="btn-habit-move" onclick="event.stopPropagation();moveHabit(${i},1)" ${i === habits.length - 1 ? 'disabled' : ''}>▼</button>
-          </div>
+          <span class="drag-handle" title="Drag to reorder">⠿</span>
           <span class="habit-name-text" title="Click to edit">${habit}</span>
           <button class="btn-habit-del" onclick="event.stopPropagation();deleteHabit(${i})" title="Remove habit">✕</button>
         </td>
@@ -1040,12 +1041,32 @@ async function deleteHabit(index) {
   renderHabitsTable(userData.habits, userData.habitLog);
 }
 
-async function moveHabit(index, direction) {
+function habitDragStart(e, index) {
+  dragSrcHabitIdx = index;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => e.currentTarget.classList.add('dragging'), 0);
+}
+
+function habitDragOver(e, index) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.habit-row').forEach((r, i) => {
+    r.classList.toggle('drag-over', i === index && i !== dragSrcHabitIdx);
+  });
+}
+
+function habitDragEnd(e) {
+  document.querySelectorAll('.habit-row').forEach(r => r.classList.remove('dragging', 'drag-over'));
+  dragSrcHabitIdx = null;
+}
+
+async function habitDrop(e, index) {
+  e.preventDefault();
+  if (dragSrcHabitIdx === null || dragSrcHabitIdx === index) return;
   const userData = await getUserData();
   const habits   = userData.habits;
-  const newIndex = index + direction;
-  if (newIndex < 0 || newIndex >= habits.length) return;
-  [habits[index], habits[newIndex]] = [habits[newIndex], habits[index]];
+  const [moved]  = habits.splice(dragSrcHabitIdx, 1);
+  habits.splice(index, 0, moved);
   await saveUserData({ habits });
   renderHabitsTable(habits, userData.habitLog);
 }
@@ -1495,6 +1516,8 @@ async function emailReport() {
 
 let swInterval = null;
 let swElapsed  = 0;   // ms
+
+let dragSrcHabitIdx = null;
 let swRunning  = false;
 let swStarted  = 0;   // Date.now() when last started
 
