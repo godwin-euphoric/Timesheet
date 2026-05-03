@@ -245,6 +245,30 @@ input:focus, select:focus {
 }
 .stat-chip strong { color: var(--amber); font-size: 17px; font-weight: 800; }
 
+/* ══ Stopwatch chip ══════════════════════════════════════════════════════════ */
+.stopwatch-chip {
+  display: flex; align-items: center; gap: 6px;
+  height: 40px; padding: 0 12px;
+  background: linear-gradient(135deg, #1E1B4B, #312E81);
+  border: 1.5px solid rgba(255,255,255,0.12); border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(79,70,229,0.25);
+  align-self: flex-end;
+}
+.sw-display {
+  font-size: 15px; font-weight: 800; color: #FCD34D;
+  font-variant-numeric: tabular-nums; letter-spacing: 1px;
+  min-width: 72px; text-align: center;
+}
+.sw-btn {
+  width: 26px; height: 26px; border: none; border-radius: 6px;
+  font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.sw-start  { background: #16A34A; color: white; }
+.sw-stop   { background: var(--red); color: white; }
+.sw-reset  { background: rgba(255,255,255,0.12); color: #CBD5E1; }
+.sw-reset:hover { background: rgba(255,255,255,0.22); }
+
 /* ══ Stat chip variants ══════════════════════════════════════════════════════ */
 .stat-chip-green {
   background: linear-gradient(135deg, #F0FDF4, #DCFCE7) !important;
@@ -523,6 +547,7 @@ textarea#fm-notes:focus {
   .top-controls .field-group { width: 100%; }
   .top-controls .stat-chip { width: 100%; justify-content: center; }
   .stat-chip-green, .stat-chip-red { width: 100%; justify-content: center; }
+  .stopwatch-chip { width: 100%; justify-content: center; }
   .top-controls input[type="month"],
   .top-controls select { width: 100%; }
 

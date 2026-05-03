@@ -1321,3 +1321,47 @@ async function emailReport() {
     console.error(e);
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+//  STOPWATCH
+// ══════════════════════════════════════════════════════════════════════════
+
+let swInterval = null;
+let swElapsed  = 0;   // ms
+let swRunning  = false;
+let swStarted  = 0;   // Date.now() when last started
+
+function swTick() {
+  const total = swElapsed + (Date.now() - swStarted);
+  const h = Math.floor(total / 3600000);
+  const m = Math.floor((total % 3600000) / 60000);
+  const s = Math.floor((total % 60000) / 1000);
+  document.getElementById('sw-display').textContent =
+    `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function swToggle() {
+  const btn = document.getElementById('sw-toggle');
+  if (!swRunning) {
+    swStarted  = Date.now();
+    swInterval = setInterval(swTick, 500);
+    swRunning  = true;
+    btn.textContent = '⏸';
+    btn.className   = 'sw-btn sw-stop';
+  } else {
+    clearInterval(swInterval);
+    swElapsed += Date.now() - swStarted;
+    swRunning  = false;
+    btn.textContent = '▶';
+    btn.className   = 'sw-btn sw-start';
+  }
+}
+
+function swReset() {
+  clearInterval(swInterval);
+  swElapsed = 0; swRunning = false;
+  const btn = document.getElementById('sw-toggle');
+  btn.textContent = '▶';
+  btn.className   = 'sw-btn sw-start';
+  document.getElementById('sw-display').textContent = '00:00:00';
+}
