@@ -80,24 +80,11 @@
         </div>
       </div>
       <div class="divider"></div>
-      <div class="entries-label" id="entries-date-label">Entries for today</div>
+      <div class="entries-label" id="entries-date-label">Month Summary</div>
       <table class="mini-table">
-        <thead><tr><th>Category</th><th>Hours</th><th></th></tr></thead>
-        <tbody id="entries-tbody"><tr><td colspan="3" class="empty">No entries yet</td></tr></tbody>
+        <thead><tr><th>Category</th><th>Completed</th><th>Target</th><th>Status</th></tr></thead>
+        <tbody id="entries-tbody"><tr><td colspan="4" class="empty">No categories yet</td></tr></tbody>
       </table>
-    </div>
-
-    <div class="card">
-      <div class="card-title">
-        Day-by-Day — <span id="main-daily-month-label"></span>
-        <span class="card-hint">Click any cell to edit</span>
-      </div>
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead id="main-daily-thead"></thead>
-          <tbody id="main-daily-tbody"></tbody>
-        </table>
-      </div>
     </div>
 
   </div>
@@ -114,6 +101,7 @@
         <label>Mark as Leave</label>
         <div class="inline-row">
           <select id="leave-date-select"><option value="">-- Pick a date --</option></select>
+          <input type="text" id="leave-reason" placeholder="Reason (e.g. Sick, Holiday)" style="width:200px">
           <button class="btn-primary" onclick="addLeave()">Mark Leave</button>
         </div>
       </div>

@@ -37,7 +37,8 @@ const state = {
   yearlyYear:       new Date().getFullYear(),
   settingsMonth:    currentMonth(),
   settingsMetadata: [],
-  monthlyLeaves:    [],
+  monthlyLeaves:       [],
+  monthlyLeaveReasons: {},
   cache:            {},   // month → {categories, leaves, entries}
   allMonthsCache:   null
 };
@@ -184,12 +185,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // ══════════════════════════════════════════════════════════════════════════
 
 async function loadMainTab() {
-  document.getElementById('main-daily-month-label').textContent = formatMonth(state.mainMonth);
   const data = await getMonthData(state.mainMonth);
   loadMainDateDropdown(data);
   loadMainCategories(data);
-  loadDateEntries(data);
-  await renderMainDailyTable(data);
+  await loadMonthlySummary(data);
 }
 
 function loadMainDateDropdown(data) {
@@ -234,24 +233,47 @@ function loadMainCategories(data) {
   });
 }
 
-function loadDateEntries(data) {
-  const date = state.mainDate;
-  if (!date) return;
-  document.getElementById('entries-date-label').textContent = `Entries for ${formatDate(date)}`;
-  const dayEntries = (data.entries[date]) || {};
+async function loadMonthlySummary(data) {
+  if (!data) data = await getMonthData(state.mainMonth);
+  const month = state.mainMonth;
+  const [year, mon] = month.split('-').map(Number);
+  const leavesSet = new Set(data.leaves);
+  const entries   = data.entries;
+
+  document.getElementById('entries-date-label').textContent = `Month Summary — ${formatMonth(month)}`;
+
+  const todayDate = new Date();
+  const endDay = (year === todayDate.getFullYear() && mon === todayDate.getMonth() + 1)
+    ? todayDate.getDate() : daysInMonth(year, mon);
+  let workingDays = 0;
+  for (let d = 1; d <= endDay; d++) {
+    const dt = new Date(year, mon - 1, d);
+    const ds = `${month}-${String(d).padStart(2, '0')}`;
+    if (dt.getDay() !== 0 && dt.getDay() !== 6 && !leavesSet.has(ds)) workingDays++;
+  }
+  document.getElementById('working-days-count').textContent = workingDays;
+
   const tbody = document.getElementById('entries-tbody');
   tbody.innerHTML = '';
-  const rows = Object.entries(dayEntries);
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="3" class="empty">No entries yet</td></tr>';
+
+  if (!data.categories.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">No categories — add them in Settings first</td></tr>';
     return;
   }
-  rows.forEach(([cat, hrs]) => {
+
+  data.categories.forEach(c => {
+    let completed = 0;
+    Object.values(entries).forEach(dayE => { completed += dayE[c.category] || 0; });
+    completed       = Math.round(completed * 100) / 100;
+    const target    = Math.round(c.daily_target * workingDays * 100) / 100;
+    const pending   = Math.max(0, Math.round((target - completed) * 100) / 100);
+    const onTrack   = completed >= target;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${cat}</td>
-      <td>${hrs} hrs</td>
-      <td><button class="btn-danger" onclick="deleteEntryFromLog('${date}',${JSON.stringify(cat)})">✕</button></td>
+      <td>${c.category}</td>
+      <td class="cell-hrs">${completed} hrs</td>
+      <td>${target} hrs</td>
+      <td class="${onTrack ? 'good' : 'bad'}">${onTrack ? '✓ On track' : pending + ' hrs left'}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -274,8 +296,7 @@ async function logEntry() {
 
   document.getElementById('main-hours').value = '';
   showToast('Entry saved');
-  loadDateEntries(data);
-  await renderMainDailyTable(data);
+  await loadMonthlySummary(data);
 }
 
 async function deleteEntryFromLog(date, category) {
@@ -288,170 +309,15 @@ async function deleteEntryFromLog(date, category) {
     await saveMonthData(month, data);
   }
   showToast('Entry deleted');
-  loadDateEntries(data);
-  await renderMainDailyTable(data);
-}
-
-async function renderMainDailyTable(data) {
-  if (!data) data = await getMonthData(state.mainMonth);
-  const month = state.mainMonth;
-  const [year, mon] = month.split('-').map(Number);
-  const today      = todayStr();
-  const categories = data.categories.map(c => c.category);
-  const entries    = data.entries;
-  const leavesSet  = new Set(data.leaves);
-  const total      = daysInMonth(year, mon);
-  const dayNames   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  // Working days so far
-  const todayDate = new Date();
-  const endDay = (year === todayDate.getFullYear() && mon === todayDate.getMonth() + 1)
-    ? todayDate.getDate() : total;
-  let workingDays = 0;
-  for (let d = 1; d <= endDay; d++) {
-    const dt = new Date(year, mon - 1, d);
-    const ds = `${month}-${String(d).padStart(2, '0')}`;
-    if (dt.getDay() !== 0 && dt.getDay() !== 6 && !leavesSet.has(ds)) workingDays++;
-  }
-  document.getElementById('working-days-count').textContent = workingDays;
-
-  document.getElementById('main-daily-thead').innerHTML = `
-    <tr>
-      <th>Date</th><th>Day</th>
-      ${categories.map(c => `<th>${c}</th>`).join('')}
-      <th>Total</th><th>Status</th>
-    </tr>
-  `;
-
-  // Replace tbody to wipe old event listeners
-  const oldTbody = document.getElementById('main-daily-tbody');
-  const newTbody = oldTbody.cloneNode(false);
-  newTbody.id = 'main-daily-tbody';
-  oldTbody.parentNode.replaceChild(newTbody, oldTbody);
-
-  const colTotals = Object.fromEntries(categories.map(c => [c, 0]));
-  let grandTotal = 0;
-
-  for (let day = 1; day <= total; day++) {
-    const dt      = new Date(year, mon - 1, day);
-    const dateStr = `${month}-${String(day).padStart(2, '0')}`;
-    const isWeekend  = dt.getDay() === 0 || dt.getDay() === 6;
-    const isLeave    = leavesSet.has(dateStr);
-    const isToday    = dateStr === today;
-    const isFuture   = dateStr > today;
-    const isEditable = !isWeekend && !isFuture;
-    const dayEntries = entries[dateStr] || {};
-    let dayTotal = 0;
-
-    const tr = document.createElement('tr');
-    if (isToday)        tr.className = 'row-today';
-    else if (isWeekend) tr.className = 'row-weekend';
-    else if (isLeave)   tr.className = 'row-leave';
-
-    tr.innerHTML = `
-      <td>${String(day).padStart(2, '0')} ${formatMonthShort(month)}</td>
-      <td>${dayNames[dt.getDay()]}</td>
-    `;
-
-    categories.forEach(cat => {
-      const hrs = dayEntries[cat] || 0;
-      colTotals[cat] = Math.round((colTotals[cat] + hrs) * 100) / 100;
-      dayTotal       = Math.round((dayTotal + hrs) * 100) / 100;
-      const td = document.createElement('td');
-      td.textContent = hrs > 0 ? hrs : '';
-      if (hrs > 0) td.classList.add('cell-hrs');
-      if (isEditable) {
-        td.classList.add('editable-cell');
-        td.dataset.date = dateStr;
-        td.dataset.cat  = cat;
-        td.dataset.hrs  = hrs;
-      }
-      tr.appendChild(td);
-    });
-
-    grandTotal = Math.round((grandTotal + dayTotal) * 100) / 100;
-
-    const totalTd = document.createElement('td');
-    totalTd.textContent = dayTotal > 0 ? dayTotal : '';
-    if (dayTotal > 0) totalTd.classList.add('cell-hrs');
-    tr.appendChild(totalTd);
-
-    const statusTd = document.createElement('td');
-    if (isWeekend)        { statusTd.textContent = 'Weekend';         statusTd.className = 'neutral'; }
-    else if (isLeave)     { statusTd.textContent = 'Leave';           statusTd.className = 'good'; }
-    else if (isFuture)    { statusTd.textContent = '—';               statusTd.className = 'neutral'; }
-    else if (dayTotal > 0){ statusTd.textContent = dayTotal + ' hrs'; statusTd.className = 'good'; }
-    else                  { statusTd.textContent = 'No entry';        statusTd.className = 'bad'; }
-    tr.appendChild(statusTd);
-
-    newTbody.appendChild(tr);
-  }
-
-  // Totals row
-  const totalTr = document.createElement('tr');
-  totalTr.className = 'row-total';
-  totalTr.innerHTML = `
-    <td colspan="2">Total</td>
-    ${categories.map(c => `<td>${colTotals[c] > 0 ? colTotals[c] : ''}</td>`).join('')}
-    <td>${grandTotal}</td><td></td>
-  `;
-  newTbody.appendChild(totalTr);
-
-  // Editable cell click handler
-  newTbody.addEventListener('click', async e => {
-    const td = e.target.closest('td.editable-cell');
-    if (!td || td.querySelector('input')) return;
-
-    const dateStr = td.dataset.date;
-    const cat     = td.dataset.cat;
-    const prevHrs = parseFloat(td.dataset.hrs) || 0;
-
-    const input = document.createElement('input');
-    input.type = 'number'; input.min = '0'; input.max = '24'; input.step = '0.25';
-    input.value = prevHrs || ''; input.placeholder = '0';
-    input.className = 'cell-edit-input';
-    td.textContent = ''; td.classList.remove('cell-hrs');
-    td.appendChild(input);
-    input.focus(); input.select();
-
-    let committed = false;
-    async function commitEdit() {
-      if (committed) return;
-      committed = true;
-      const newHrs = parseFloat(input.value) || 0;
-      if (newHrs === prevHrs) { await renderMainDailyTable(); return; }
-      const month = dateStr.slice(0, 7);
-      const d = await getMonthData(month);
-      if (newHrs > 0) {
-        if (!d.entries[dateStr]) d.entries[dateStr] = {};
-        d.entries[dateStr][cat] = newHrs;
-      } else {
-        if (d.entries[dateStr]) {
-          delete d.entries[dateStr][cat];
-          if (!Object.keys(d.entries[dateStr]).length) delete d.entries[dateStr];
-        }
-      }
-      await saveMonthData(month, d);
-      if (state.mainDate === dateStr) loadDateEntries(d);
-      await renderMainDailyTable(d);
-    }
-
-    input.addEventListener('blur', commitEdit);
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter')  input.blur();
-      if (e.key === 'Escape') { committed = true; renderMainDailyTable(); }
-    });
-  });
+  await loadMonthlySummary(data);
 }
 
 document.getElementById('main-month').addEventListener('change', async function () {
   state.mainMonth = this.value; state.mainDate = null;
   await loadMainTab();
 });
-document.getElementById('main-date').addEventListener('change', async function () {
+document.getElementById('main-date').addEventListener('change', function () {
   state.mainDate = this.value;
-  const data = await getMonthData(state.mainMonth);
-  loadDateEntries(data);
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -460,7 +326,8 @@ document.getElementById('main-date').addEventListener('change', async function (
 
 async function loadMonthlyTab() {
   const data = await getMonthData(state.monthlyMonth);
-  state.monthlyLeaves = [...data.leaves];
+  state.monthlyLeaves       = [...(data.leaves || [])];
+  state.monthlyLeaveReasons = { ...(data.leaveReasons || {}) };
   renderLeaveTags();
   loadLeaveDropdown(data);
   await renderMonthlyTable(data);
@@ -491,26 +358,32 @@ function renderLeaveTags() {
     container.innerHTML = '<span class="empty-inline">None</span>';
     return;
   }
-  container.innerHTML = state.monthlyLeaves.map(d =>
-    `<div class="leave-tag">${formatDate(d)}<button onclick="removeLeave('${d}')">✕</button></div>`
-  ).join('');
+  container.innerHTML = state.monthlyLeaves.map(d => {
+    const reason = state.monthlyLeaveReasons[d];
+    return `<div class="leave-tag">${formatDate(d)}${reason ? ' · ' + reason : ''}<button onclick="removeLeave('${d}')">✕</button></div>`;
+  }).join('');
 }
 
 async function addLeave() {
-  const sel  = document.getElementById('leave-date-select');
-  const date = sel.value;
+  const sel    = document.getElementById('leave-date-select');
+  const date   = sel.value;
+  const reason = document.getElementById('leave-reason').value.trim();
   if (!date) return;
   if (!state.monthlyLeaves.includes(date)) {
     state.monthlyLeaves.push(date);
     state.monthlyLeaves.sort();
-    await persistLeaves();
-    showToast('Leave marked');
   }
+  if (reason) state.monthlyLeaveReasons[date] = reason;
+  else delete state.monthlyLeaveReasons[date];
+  await persistLeaves();
+  showToast('Leave marked');
   sel.value = '';
+  document.getElementById('leave-reason').value = '';
 }
 
 async function removeLeave(date) {
   state.monthlyLeaves = state.monthlyLeaves.filter(d => d !== date);
+  delete state.monthlyLeaveReasons[date];
   await persistLeaves();
   showToast('Leave removed');
 }
@@ -518,7 +391,8 @@ async function removeLeave(date) {
 async function persistLeaves() {
   const month = state.monthlyMonth;
   const data  = await getMonthData(month);
-  data.leaves = state.monthlyLeaves;
+  data.leaves       = state.monthlyLeaves;
+  data.leaveReasons = state.monthlyLeaveReasons;
   await saveMonthData(month, data);
   renderLeaveTags();
   loadLeaveDropdown(data);
@@ -548,8 +422,11 @@ async function renderMonthlyTable(data) {
     </tr>
   `;
 
-  const tbody    = document.getElementById('monthly-tbody');
-  tbody.innerHTML = '';
+  const oldTbody = document.getElementById('monthly-tbody');
+  const newTbody = oldTbody.cloneNode(false);
+  newTbody.id = 'monthly-tbody';
+  oldTbody.parentNode.replaceChild(newTbody, oldTbody);
+  const tbody = newTbody;
   const colTotals = Object.fromEntries(categories.map(c => [c, 0]));
   let grandTotal  = 0;
 
@@ -563,17 +440,20 @@ async function renderMonthlyTable(data) {
     const dayEntries = entries[dateStr] || {};
     let dayTotal = 0;
 
+    const isEditable = !isWeekend && !isFuture;
     const catCells = categories.map(cat => {
       const hrs = dayEntries[cat] || 0;
       colTotals[cat] = Math.round((colTotals[cat] + hrs) * 100) / 100;
       dayTotal       = Math.round((dayTotal + hrs) * 100) / 100;
-      return `<td${hrs > 0 ? ' class="cell-hrs"' : ''}>${hrs > 0 ? hrs : ''}</td>`;
+      const editAttrs = isEditable ? ` class="editable-cell${hrs > 0 ? ' cell-hrs' : ''}" data-date="${dateStr}" data-cat="${cat}" data-hrs="${hrs}"` : (hrs > 0 ? ' class="cell-hrs"' : '');
+      return `<td${editAttrs}>${hrs > 0 ? hrs : ''}</td>`;
     });
     grandTotal = Math.round((grandTotal + dayTotal) * 100) / 100;
 
     const rowClass  = isToday ? 'row-today' : isWeekend ? 'row-weekend' : isLeave ? 'row-leave' : '';
+    const leaveReason = (data.leaveReasons || {})[dateStr] || '';
     const statusCell = isWeekend   ? '<td class="neutral">Weekend</td>'
-      : isLeave                    ? '<td class="good">Leave</td>'
+      : isLeave                    ? `<td class="good">Leave${leaveReason ? ' · ' + leaveReason : ''}</td>`
       : isFuture                   ? '<td class="neutral">—</td>'
       : dayTotal > 0               ? `<td class="good">${dayTotal} hrs</td>`
       :                              '<td class="bad">No entry</td>';
@@ -598,6 +478,51 @@ async function renderMonthlyTable(data) {
     <td>${grandTotal}</td><td></td>
   `;
   tbody.appendChild(totalTr);
+
+  // Editable cells
+  tbody.addEventListener('click', async e => {
+    const td = e.target.closest('td.editable-cell');
+    if (!td || td.querySelector('input')) return;
+    const dateStr = td.dataset.date;
+    const cat     = td.dataset.cat;
+    const prevHrs = parseFloat(td.dataset.hrs) || 0;
+
+    const input = document.createElement('input');
+    input.type = 'number'; input.min = '0'; input.max = '24'; input.step = '0.25';
+    input.value = prevHrs || ''; input.placeholder = '0';
+    input.className = 'cell-edit-input';
+    td.textContent = ''; td.classList.remove('cell-hrs');
+    td.appendChild(input);
+    input.focus(); input.select();
+
+    let committed = false;
+    async function commitEdit() {
+      if (committed) return;
+      committed = true;
+      const newHrs = parseFloat(input.value) || 0;
+      const month  = dateStr.slice(0, 7);
+      const d      = await getMonthData(month);
+      if (newHrs !== prevHrs) {
+        if (newHrs > 0) {
+          if (!d.entries[dateStr]) d.entries[dateStr] = {};
+          d.entries[dateStr][cat] = newHrs;
+        } else {
+          if (d.entries[dateStr]) {
+            delete d.entries[dateStr][cat];
+            if (!Object.keys(d.entries[dateStr]).length) delete d.entries[dateStr];
+          }
+        }
+        await saveMonthData(month, d);
+        if (state.mainMonth === month) await loadMonthlySummary(d);
+      }
+      await renderMonthlyTable(d);
+    }
+    input.addEventListener('blur', commitEdit);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  input.blur();
+      if (e.key === 'Escape') { committed = true; renderMonthlyTable(); }
+    });
+  });
 }
 
 document.getElementById('monthly-month').addEventListener('change', async function () {
