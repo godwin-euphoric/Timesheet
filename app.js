@@ -40,7 +40,9 @@ const state = {
   monthlyLeaves:       [],
   monthlyLeaveReasons: {},
   cache:            {},   // month → {categories, leaves, entries}
-  allMonthsCache:   null
+  allMonthsCache:   null,
+  lastAdjustment:   null, // { month, cat, prev }
+  lastMonthlyEdit:  null, // { date, cat, prev }
 };
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -287,16 +289,33 @@ async function loadMonthlySummary(data) {
 
   tbody.querySelectorAll('.adjust-input').forEach(input => {
     input.addEventListener('change', async () => {
-      const cat = input.dataset.cat;
-      const val = parseFloat(input.value) || 0;
+      const cat  = input.dataset.cat;
+      const prev = adjustments[cat] || 0;
+      const val  = parseFloat(input.value) || 0;
       const d = await getMonthData(month);
       if (!d.adjustments) d.adjustments = {};
       if (val === 0) delete d.adjustments[cat];
       else d.adjustments[cat] = val;
       await saveMonthData(month, d);
+      state.lastAdjustment = { month, cat, prev };
+      document.getElementById('main-undo-btn').classList.remove('hidden');
       await loadMonthlySummary(d);
     });
   });
+}
+
+async function undoMainAdjustment() {
+  if (!state.lastAdjustment) return;
+  const { month, cat, prev } = state.lastAdjustment;
+  const d = await getMonthData(month);
+  if (!d.adjustments) d.adjustments = {};
+  if (prev === 0) delete d.adjustments[cat];
+  else d.adjustments[cat] = prev;
+  await saveMonthData(month, d);
+  state.lastAdjustment = null;
+  document.getElementById('main-undo-btn').classList.add('hidden');
+  showToast('Adjustment undone');
+  await loadMonthlySummary(d);
 }
 
 async function logEntry() {
@@ -336,6 +355,8 @@ async function deleteEntryFromLog(date, category) {
 
 document.getElementById('main-month').addEventListener('change', async function () {
   state.mainMonth = this.value; state.mainDate = null;
+  state.lastAdjustment = null;
+  document.getElementById('main-undo-btn').classList.add('hidden');
   await loadMainTab();
 });
 document.getElementById('main-date').addEventListener('change', async function () {
@@ -570,6 +591,8 @@ async function renderMonthlyTable(data) {
           }
         }
         await saveMonthData(month, d);
+        state.lastMonthlyEdit = { date: dateStr, cat, prev: prevHrs };
+        document.getElementById('monthly-undo-btn').classList.remove('hidden');
         if (state.mainMonth === month) await loadMonthlySummary(d);
       }
       await renderMonthlyTable(d);
@@ -582,8 +605,32 @@ async function renderMonthlyTable(data) {
   });
 }
 
+async function undoMonthlyEdit() {
+  if (!state.lastMonthlyEdit) return;
+  const { date, cat, prev } = state.lastMonthlyEdit;
+  const month = date.slice(0, 7);
+  const d = await getMonthData(month);
+  if (prev > 0) {
+    if (!d.entries[date]) d.entries[date] = {};
+    d.entries[date][cat] = prev;
+  } else {
+    if (d.entries[date]) {
+      delete d.entries[date][cat];
+      if (!Object.keys(d.entries[date]).length) delete d.entries[date];
+    }
+  }
+  await saveMonthData(month, d);
+  state.lastMonthlyEdit = null;
+  document.getElementById('monthly-undo-btn').classList.add('hidden');
+  showToast('Edit undone');
+  if (state.mainMonth === month) await loadMonthlySummary(d);
+  await renderMonthlyTable(d);
+}
+
 document.getElementById('monthly-month').addEventListener('change', async function () {
   state.monthlyMonth = this.value;
+  state.lastMonthlyEdit = null;
+  document.getElementById('monthly-undo-btn').classList.add('hidden');
   await loadMonthlyTab();
 });
 

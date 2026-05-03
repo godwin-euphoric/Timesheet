@@ -90,11 +90,16 @@
     <div class="summary-grid">
 
       <div class="card">
-        <div class="entries-label" id="entries-date-label">Month Summary</div>
-        <table class="mini-table">
-          <thead><tr><th>Category</th><th>Completed</th><th>Target</th><th>Adjust</th><th>Pending</th><th>Status</th></tr></thead>
-          <tbody id="entries-tbody"><tr><td colspan="6" class="empty">No categories yet</td></tr></tbody>
-        </table>
+        <div class="summary-card-header">
+          <div class="entries-label" id="entries-date-label" style="margin-bottom:0">Month Summary</div>
+          <button id="main-undo-btn" class="btn-undo hidden" onclick="undoMainAdjustment()">↩ Undo Adjustment</button>
+        </div>
+        <div class="table-scroll">
+          <table class="mini-table">
+            <thead><tr><th>Category</th><th>Completed</th><th>Target</th><th>Adjust</th><th>Pending</th><th>Status</th></tr></thead>
+            <tbody id="entries-tbody"><tr><td colspan="6" class="empty">No categories yet</td></tr></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="card">
@@ -125,9 +130,12 @@
     </div>
 
     <div class="card">
-      <div class="leave-section">
-        <span class="leave-label">Leaves marked:</span>
-        <div id="leave-tags" class="leave-tags"><span class="empty-inline">None</span></div>
+      <div class="summary-card-header" style="margin-bottom:12px">
+        <div class="leave-section" style="margin-bottom:0;flex:1">
+          <span class="leave-label">Leaves marked:</span>
+          <div id="leave-tags" class="leave-tags"><span class="empty-inline">None</span></div>
+        </div>
+        <button id="monthly-undo-btn" class="btn-undo hidden" onclick="undoMonthlyEdit()">↩ Undo Edit</button>
       </div>
       <div class="table-scroll">
         <table class="data-table">

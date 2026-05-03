@@ -398,15 +398,75 @@ td.editable-cell:hover { background: #EEF2FF !important; }
 }
 .toast.show { opacity: 1; transform: translateY(0); }
 
+/* ══ Summary card header (label + undo button) ═══════════════════════════════ */
+.summary-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 8px; flex-wrap: wrap;
+}
+
+/* ══ Undo button ═════════════════════════════════════════════════════════════ */
+.btn-undo {
+  height: 30px; padding: 0 12px;
+  background: #F8FAFC; color: var(--muted);
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: all 0.15s;
+}
+.btn-undo:hover { background: #FEF3C7; color: var(--amber); border-color: #FDE68A; }
+
 /* ══ Responsive ══════════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
   .summary-grid { grid-template-columns: 1fr; }
 }
+
 @media (max-width: 768px) {
-  header { padding: 0 14px; height: 56px; }
+  /* Header */
+  header { padding: 0 10px; height: 56px; }
   header h1 { display: none; }
-  .tab-btn { padding: 0 12px; font-size: 13px; height: 56px; }
+  .logo { width: 36px; height: 36px; border-radius: 10px; }
+  .logo svg { width: 18px; height: 18px; }
+  .tab-btn { padding: 0 10px; font-size: 12px; height: 56px; }
   .btn-header-action { display: none; }
-  .tab-content { padding: 0 14px; }
-  .card { padding: 16px; border-radius: 14px; }
+  .btn-signout { padding: 0 8px; font-size: 12px; }
+  .avatar { width: 28px; height: 28px; }
+
+  /* Tab content */
+  .tab-content { padding: 0 12px; }
+  .card { padding: 14px 12px; border-radius: 14px; }
+
+  /* Top controls — stack vertically */
+  .top-controls {
+    flex-direction: column; align-items: stretch; gap: 10px;
+  }
+  .top-controls .field-group { width: 100%; }
+  .top-controls .stat-chip { width: 100%; justify-content: center; }
+  .top-controls input[type="month"],
+  .top-controls select { width: 100%; }
+
+  /* Leave inline-row — stack */
+  .inline-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .inline-row select,
+  .inline-row input,
+  .inline-row button { width: 100% !important; }
+
+  /* Log form — stack */
+  .log-form { flex-direction: column; gap: 10px; }
+  .log-form .field-group { width: 100% !important; flex: unset !important; }
+  .log-form select,
+  .log-form input { width: 100%; }
+  .log-form .btn-primary { width: 100%; }
+
+  /* Summary grid already 1-col at 900px */
+  .summary-grid { grid-template-columns: 1fr; }
+
+  /* Mini table — already in table-scroll, just tighten cells */
+  .mini-table th, .mini-table td { padding: 8px 6px; font-size: 12px; }
+  .mini-table th { font-size: 10px; }
+
+  /* Data table cells */
+  .data-table th, .data-table td { padding: 8px 10px; font-size: 12px; }
+
+  /* Settings add-row — stack */
+  .add-row { flex-direction: column; align-items: stretch; }
+  .add-row input, .add-row button { width: 100% !important; }
 }
