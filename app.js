@@ -178,6 +178,8 @@ async function getUserData() {
   const data = doc.exists ? doc.data() : {};
   if (!data.fmCategories) data.fmCategories = [];
   if (!data.fmLog)        data.fmLog        = [];
+  if (!data.habits)       data.habits       = [];
+  if (!data.habitLog)     data.habitLog     = {};
   state.userDataCache = data;
   return data;
 }
@@ -207,7 +209,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, log: loadLogTab, settings: loadSettingsTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, settings: loadSettingsTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -928,6 +930,111 @@ document.getElementById('yearly-year').addEventListener('change', async function
   state.yearlyYear = parseInt(this.value);
   await loadYearlyTab();
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+//  HABITS TAB
+// ══════════════════════════════════════════════════════════════════════════
+
+function getNext5Days() {
+  const days = [];
+  const now  = new Date();
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+    days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  }
+  return days;
+}
+
+async function loadHabitsTab() {
+  const userData = await getUserData();
+  renderHabitsTable(userData.habits, userData.habitLog);
+}
+
+function renderHabitsTable(habits, habitLog) {
+  const days     = getNext5Days();
+  const today    = todayStr();
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const table    = document.getElementById('habits-table');
+
+  const headCells = days.map(d => {
+    const dt  = new Date(d + 'T00:00:00');
+    const lbl = `${String(dt.getDate()).padStart(2,'0')}<br><small>${dayNames[dt.getDay()]}</small>`;
+    return `<th class="habit-day-col${d === today ? ' col-today' : ''}">${lbl}</th>`;
+  }).join('');
+
+  const thead = `
+    <thead>
+      <tr>
+        <th class="habit-name-col">Habit</th>
+        ${headCells}
+      </tr>
+    </thead>`;
+
+  let bodyRows = '';
+  habits.forEach((habit, i) => {
+    const cells = days.map(d => {
+      const checked = (habitLog[d] || {})[habit] ? 'checked' : '';
+      return `<td class="habit-check-cell${d === today ? ' cell-today' : ''}">
+        <input type="checkbox" class="habit-cb" ${checked}
+          onchange="toggleHabit('${d}','${encodeURIComponent(habit)}',this.checked)">
+      </td>`;
+    }).join('');
+    bodyRows += `
+      <tr class="habit-row">
+        <td class="habit-name-cell">
+          <span class="habit-name-text">${habit}</span>
+          <button class="btn-habit-del" onclick="deleteHabit(${i})" title="Remove habit">✕</button>
+        </td>
+        ${cells}
+      </tr>`;
+  });
+
+  // Add row
+  bodyRows += `
+    <tr class="habit-add-row">
+      <td colspan="${days.length + 1}">
+        <div class="habit-add-inline">
+          <span class="habit-plus">+</span>
+          <input type="text" id="new-habit-input" class="habit-add-input" placeholder="Type a habit and press Enter or click Add..."
+            onkeydown="if(event.key==='Enter') addHabit()">
+          <button class="btn-primary" style="height:34px;padding:0 16px;font-size:13px" onclick="addHabit()">Add</button>
+        </div>
+      </td>
+    </tr>`;
+
+  table.innerHTML = thead + `<tbody>${bodyRows}</tbody>`;
+}
+
+async function toggleHabit(date, encodedHabit, checked) {
+  const habit    = decodeURIComponent(encodedHabit);
+  const userData = await getUserData();
+  if (!userData.habitLog[date]) userData.habitLog[date] = {};
+  if (checked) userData.habitLog[date][habit] = true;
+  else         delete userData.habitLog[date][habit];
+  if (!Object.keys(userData.habitLog[date]).length) delete userData.habitLog[date];
+  await saveUserData({ habitLog: userData.habitLog });
+}
+
+async function addHabit() {
+  const input = document.getElementById('new-habit-input');
+  const name  = input.value.trim();
+  if (!name) return;
+  const userData = await getUserData();
+  if (userData.habits.includes(name)) { showToast('Already exists'); return; }
+  userData.habits.push(name);
+  await saveUserData({ habits: userData.habits });
+  showToast(`"${name}" added`);
+  renderHabitsTable(userData.habits, userData.habitLog);
+  document.getElementById('new-habit-input')?.focus();
+}
+
+async function deleteHabit(index) {
+  if (!confirm('Remove this habit?')) return;
+  const userData = await getUserData();
+  userData.habits.splice(index, 1);
+  await saveUserData({ habits: userData.habits });
+  renderHabitsTable(userData.habits, userData.habitLog);
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 //  LOG TAB (FM Log)

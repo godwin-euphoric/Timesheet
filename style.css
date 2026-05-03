@@ -422,6 +422,75 @@ td.editable-cell:hover { background: #1E2A42 !important; }
 }
 .empty-inline { font-size: 13px; color: var(--muted); font-style: italic; }
 
+/* ══ Habit Tracker ═══════════════════════════════════════════════════════════ */
+.habits-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+.habits-table th {
+  padding: 10px 16px; font-size: 11px; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px;
+  background: #0D1628; border-bottom: 2px solid var(--border);
+  text-align: center;
+}
+.habit-name-col  { text-align: left !important; min-width: 180px; }
+.habit-day-col   { min-width: 60px; }
+.habits-table th.col-today { color: var(--amber); border-bottom-color: var(--amber); }
+
+.habit-row td { border-bottom: 1px solid var(--border); }
+.habit-row:hover td { background: var(--card2); }
+
+.habit-name-cell {
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.habit-name-text { font-weight: 600; color: var(--text); }
+
+.btn-habit-del {
+  opacity: 0; background: none; border: none; color: var(--muted);
+  font-size: 13px; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.habit-row:hover .btn-habit-del { opacity: 1; }
+.btn-habit-del:hover { background: var(--red-bg); color: var(--red); }
+
+.habit-check-cell { text-align: center; padding: 10px 8px; }
+.habit-check-cell.cell-today { background: rgba(252,211,77,0.05); }
+
+/* Custom checkbox */
+.habit-cb {
+  appearance: none; -webkit-appearance: none;
+  width: 26px; height: 26px;
+  border: 2px solid var(--border); border-radius: 7px;
+  background: var(--card2); cursor: pointer;
+  transition: all 0.15s; position: relative;
+  display: block; margin: 0 auto;
+}
+.habit-cb:hover { border-color: var(--primary); }
+.habit-cb:checked {
+  background: var(--green); border-color: var(--green);
+}
+.habit-cb:checked::after {
+  content: '✓'; position: absolute;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  color: #0B1120; font-size: 15px; font-weight: 900; line-height: 1;
+}
+
+/* Add row */
+.habit-add-row td { padding: 10px 16px; border-top: 2px dashed var(--border); }
+.habit-add-inline {
+  display: flex; align-items: center; gap: 10px;
+}
+.habit-plus {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--primary-l); color: var(--primary-h);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 700; flex-shrink: 0;
+}
+.habit-add-input {
+  flex: 1; height: 36px !important; padding: 0 12px !important;
+  background: var(--card2) !important; border-color: var(--border) !important;
+  border-radius: 8px !important; color: var(--text) !important; font-size: 13px;
+}
+
 /* ══ FM count badge ══════════════════════════════════════════════════════════ */
 .fm-count-badge {
   background: var(--amber-bg); color: var(--amber);
