@@ -189,6 +189,7 @@ async function loadMainTab() {
   loadMainDateDropdown(data);
   loadMainCategories(data);
   await loadMonthlySummary(data);
+  await renderDayEntries();
 }
 
 function loadMainDateDropdown(data) {
@@ -257,25 +258,43 @@ async function loadMonthlySummary(data) {
   tbody.innerHTML = '';
 
   if (!data.categories.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty">No categories — add them in Settings first</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No categories — add them in Settings first</td></tr>';
     return;
   }
+
+  const adjustments = data.adjustments || {};
 
   data.categories.forEach(c => {
     let completed = 0;
     Object.values(entries).forEach(dayE => { completed += dayE[c.category] || 0; });
-    completed       = Math.round(completed * 100) / 100;
-    const target    = Math.round(c.daily_target * workingDays * 100) / 100;
-    const pending   = Math.max(0, Math.round((target - completed) * 100) / 100);
-    const onTrack   = completed >= target;
+    completed        = Math.round(completed * 100) / 100;
+    const target     = Math.round(c.daily_target * workingDays * 100) / 100;
+    const adjustment = Math.round((adjustments[c.category] || 0) * 100) / 100;
+    const pending    = Math.round((target - completed + adjustment) * 100) / 100;
+    const onTrack    = pending <= 0;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${c.category}</td>
       <td class="cell-hrs">${completed} hrs</td>
       <td>${target} hrs</td>
+      <td><input type="number" class="inline-input sm adjust-input" data-cat="${c.category}"
+           value="${adjustment || ''}" step="0.25" placeholder="0" style="width:72px"></td>
       <td class="${onTrack ? 'good' : 'bad'}">${onTrack ? '✓ On track' : pending + ' hrs left'}</td>
     `;
     tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.adjust-input').forEach(input => {
+    input.addEventListener('change', async () => {
+      const cat = input.dataset.cat;
+      const val = parseFloat(input.value) || 0;
+      const d = await getMonthData(month);
+      if (!d.adjustments) d.adjustments = {};
+      if (val === 0) delete d.adjustments[cat];
+      else d.adjustments[cat] = val;
+      await saveMonthData(month, d);
+      await loadMonthlySummary(d);
+    });
   });
 }
 
@@ -297,6 +316,7 @@ async function logEntry() {
   document.getElementById('main-hours').value = '';
   showToast('Entry saved');
   await loadMonthlySummary(data);
+  await renderDayEntries();
 }
 
 async function deleteEntryFromLog(date, category) {
@@ -310,15 +330,49 @@ async function deleteEntryFromLog(date, category) {
   }
   showToast('Entry deleted');
   await loadMonthlySummary(data);
+  await renderDayEntries();
 }
 
 document.getElementById('main-month').addEventListener('change', async function () {
   state.mainMonth = this.value; state.mainDate = null;
   await loadMainTab();
 });
-document.getElementById('main-date').addEventListener('change', function () {
+document.getElementById('main-date').addEventListener('change', async function () {
   state.mainDate = this.value;
+  await renderDayEntries();
 });
+
+async function renderDayEntries() {
+  const date  = state.mainDate;
+  const label = document.getElementById('day-entries-label');
+  const list  = document.getElementById('day-entries-list');
+  label.textContent = date ? `Entries — ${formatDate(date)}` : "Today's Entries";
+
+  if (!date) {
+    list.innerHTML = '<span class="empty-inline">Select a date</span>';
+    return;
+  }
+
+  const data       = await getMonthData(date.slice(0, 7));
+  const dayEntries = (data.entries || {})[date] || {};
+  const cats       = Object.keys(dayEntries);
+
+  if (!cats.length) {
+    list.innerHTML = '<span class="empty-inline">No entries for this date</span>';
+    return;
+  }
+
+  list.innerHTML = cats.map(cat => `
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:8px 0;border-bottom:1px solid #F1F5F9">
+      <span style="font-weight:500;font-size:13px">${cat}</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="cell-hrs">${dayEntries[cat]} hrs</span>
+        <button class="btn-danger" onclick="deleteEntryFromLog('${date}','${cat}')">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 //  MONTHLY TAB
@@ -399,7 +453,7 @@ async function persistLeaves() {
   await renderMonthlyTable(data);
   if (state.mainMonth === month) {
     loadMainDateDropdown(data);
-    await renderMainDailyTable(data);
+    await loadMonthlySummary(data);
   }
 }
 
@@ -445,14 +499,16 @@ async function renderMonthlyTable(data) {
       const hrs = dayEntries[cat] || 0;
       colTotals[cat] = Math.round((colTotals[cat] + hrs) * 100) / 100;
       dayTotal       = Math.round((dayTotal + hrs) * 100) / 100;
-      const editAttrs = isEditable ? ` class="editable-cell${hrs > 0 ? ' cell-hrs' : ''}" data-date="${dateStr}" data-cat="${cat}" data-hrs="${hrs}"` : (hrs > 0 ? ' class="cell-hrs"' : '');
+      const editAttrs = isEditable
+        ? ` class="editable-cell${hrs > 0 ? ' cell-hrs' : ''}" data-date="${dateStr}" data-cat="${cat}" data-hrs="${hrs}"`
+        : (hrs > 0 ? ' class="cell-hrs"' : '');
       return `<td${editAttrs}>${hrs > 0 ? hrs : ''}</td>`;
     });
     grandTotal = Math.round((grandTotal + dayTotal) * 100) / 100;
 
-    const rowClass  = isToday ? 'row-today' : isWeekend ? 'row-weekend' : isLeave ? 'row-leave' : '';
+    const rowClass    = isToday ? 'row-today' : isWeekend ? 'row-weekend' : isLeave ? 'row-leave' : '';
     const leaveReason = (data.leaveReasons || {})[dateStr] || '';
-    const statusCell = isWeekend   ? '<td class="neutral">Weekend</td>'
+    const statusCell  = isWeekend  ? '<td class="neutral">Weekend</td>'
       : isLeave                    ? `<td class="good">Leave${leaveReason ? ' · ' + leaveReason : ''}</td>`
       : isFuture                   ? '<td class="neutral">—</td>'
       : dayTotal > 0               ? `<td class="good">${dayTotal} hrs</td>`
