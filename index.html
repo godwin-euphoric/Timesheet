@@ -77,24 +77,26 @@
       <div class="stat-chip">Working days so far&nbsp;&nbsp;<strong id="working-days-count">—</strong></div>
     </div>
 
-    <div class="card">
-      <div class="card-title">Log Hours</div>
-      <div class="log-form">
-        <div class="field-group" style="flex:1">
-          <label>Category</label>
-          <select id="main-category"><option value="">-- Select --</option></select>
-        </div>
-        <div class="field-group" style="width:140px">
-          <label>Hours</label>
-          <input type="number" id="main-hours" placeholder="e.g. 2.5" min="0" max="24" step="0.25">
-        </div>
-        <div class="field-group" style="align-self:flex-end">
-          <button class="btn-primary" onclick="logEntry()">+ Add</button>
+    <div class="log-row">
+
+      <div class="card">
+        <div class="card-title">Log Hours</div>
+        <div class="log-form">
+          <div class="field-group" style="flex:1">
+            <label>Category</label>
+            <select id="main-category"><option value="">-- Select --</option></select>
+          </div>
+          <div class="field-group" style="width:140px">
+            <label>Hours</label>
+            <input type="number" id="main-hours" placeholder="e.g. 2.5" min="0" max="24" step="0.25">
+          </div>
+          <div class="field-group" style="align-self:flex-end">
+            <button class="btn-primary" onclick="logEntry()">+ Add</button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="card wasted-card">
+      <div class="card wasted-card">
       <div class="card-title wasted-title">Wasted Time</div>
       <div class="log-form">
         <div class="field-group" style="width:130px">
@@ -110,6 +112,8 @@
         </div>
       </div>
     </div>
+
+    </div><!-- end log-row -->
 
     <div class="summary-grid">
 

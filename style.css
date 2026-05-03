@@ -362,6 +362,18 @@ td.editable-cell:hover { background: #EEF2FF !important; }
 }
 .empty-inline { font-size: 13px; color: #94A3B8; font-style: italic; }
 
+/* ══ Log row (Log Hours + Wasted Time side by side) ═════════════════════════ */
+.log-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 0;
+}
+.log-row .card { margin-bottom: 20px; }
+@media (max-width: 768px) {
+  .log-row { grid-template-columns: 1fr; }
+}
+
 /* ══ Wasted Time ═════════════════════════════════════════════════════════════ */
 .wasted-card { border-color: #FECACA !important; }
 .wasted-title { color: var(--red) !important; }
