@@ -79,17 +79,23 @@
           <button class="btn-primary" onclick="logEntry()">+ Add</button>
         </div>
       </div>
-      <div class="divider"></div>
-      <div class="entries-label" id="entries-date-label">Month Summary</div>
-      <table class="mini-table">
-        <thead><tr><th>Category</th><th>Completed</th><th>Target</th><th>Adjustment</th><th>Status</th></tr></thead>
-        <tbody id="entries-tbody"><tr><td colspan="5" class="empty">No categories yet</td></tr></tbody>
-      </table>
     </div>
 
-    <div class="card" style="padding:16px 24px">
-      <div class="entries-label" id="day-entries-label">Today's Entries</div>
-      <div id="day-entries-list"><span class="empty-inline">No entries for this date</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+
+      <div class="card">
+        <div class="entries-label" id="entries-date-label">Month Summary</div>
+        <table class="mini-table">
+          <thead><tr><th>Category</th><th>Completed</th><th>Target</th><th>Adjust</th><th>Pending</th><th>Status</th></tr></thead>
+          <tbody id="entries-tbody"><tr><td colspan="6" class="empty">No categories yet</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="entries-label" id="day-entries-label">Today's Entries</div>
+        <div id="day-entries-list"><span class="empty-inline">No entries for this date</span></div>
+      </div>
+
     </div>
 
   </div>
