@@ -981,9 +981,9 @@ function renderHabitsTable(habits, habitLog) {
     }).join('');
     bodyRows += `
       <tr class="habit-row">
-        <td class="habit-name-cell">
-          <span class="habit-name-text">${habit}</span>
-          <button class="btn-habit-del" onclick="deleteHabit(${i})" title="Remove habit">✕</button>
+        <td class="habit-name-cell" onclick="startEditHabit(this, ${i})">
+          <span class="habit-name-text" title="Click to edit">${habit}</span>
+          <button class="btn-habit-del" onclick="event.stopPropagation();deleteHabit(${i})" title="Remove habit">✕</button>
         </td>
         ${cells}
       </tr>`;
@@ -1034,6 +1034,52 @@ async function deleteHabit(index) {
   userData.habits.splice(index, 1);
   await saveUserData({ habits: userData.habits });
   renderHabitsTable(userData.habits, userData.habitLog);
+}
+
+function startEditHabit(td, index) {
+  if (td.querySelector('input.habit-edit-input')) return;
+  const span  = td.querySelector('.habit-name-text');
+  const oldName = span.textContent;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = oldName;
+  input.className = 'habit-edit-input';
+  span.replaceWith(input);
+  input.focus(); input.select();
+
+  let saved = false;
+  async function commitRename() {
+    if (saved) return;
+    saved = true;
+    const newName = input.value.trim();
+    if (!newName || newName === oldName) {
+      renderHabitsTable((await getUserData()).habits, (await getUserData()).habitLog);
+      return;
+    }
+    const userData = await getUserData();
+    if (userData.habits.includes(newName)) {
+      showToast('Habit name already exists'); saved = false;
+      input.focus(); return;
+    }
+    userData.habits[index] = newName;
+    // Rename in habitLog too
+    Object.keys(userData.habitLog).forEach(date => {
+      if (userData.habitLog[date][oldName] !== undefined) {
+        userData.habitLog[date][newName] = userData.habitLog[date][oldName];
+        delete userData.habitLog[date][oldName];
+      }
+    });
+    await saveUserData({ habits: userData.habits, habitLog: userData.habitLog });
+    showToast('Habit renamed');
+    renderHabitsTable(userData.habits, userData.habitLog);
+  }
+
+  input.addEventListener('blur', commitRename);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  input.blur();
+    if (e.key === 'Escape') { saved = true; renderHabitsTable; input.blur(); }
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════

@@ -443,6 +443,17 @@ td.editable-cell:hover { background: #1E2A42 !important; }
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .habit-name-text { font-weight: 600; color: var(--text); }
+.habit-name-cell { cursor: pointer; }
+.habit-name-cell:hover .habit-name-text { color: var(--primary-h); text-decoration: underline dotted; }
+
+input.habit-edit-input {
+  flex: 1; height: 30px !important; padding: 0 8px !important;
+  background: var(--card2) !important; color: var(--text) !important;
+  border: 2px solid var(--primary) !important; border-radius: 6px !important;
+  font-size: 13px; font-weight: 600;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.18) !important;
+  outline: none;
+}
 
 .btn-habit-del {
   opacity: 0; background: none; border: none; color: var(--muted);
