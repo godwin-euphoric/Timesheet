@@ -133,9 +133,10 @@ async function getMonthData(month) {
   if (state.cache[month]) return state.cache[month];
   const doc = await monthRef(month).get();
   const data = doc.exists ? doc.data() : { categories: [], leaves: [], entries: {} };
-  if (!data.entries)    data.entries    = {};
-  if (!data.leaves)     data.leaves     = [];
-  if (!data.categories) data.categories = [];
+  if (!data.entries)       data.entries       = {};
+  if (!data.leaves)        data.leaves        = [];
+  if (!data.categories)    data.categories    = [];
+  if (!data.wastedEntries) data.wastedEntries = {};
   state.cache[month] = data;
   return data;
 }
@@ -152,9 +153,10 @@ async function getAllMonths() {
   const result = {};
   snap.forEach(doc => {
     const d = doc.data();
-    if (!d.entries)    d.entries    = {};
-    if (!d.leaves)     d.leaves     = [];
-    if (!d.categories) d.categories = [];
+    if (!d.entries)       d.entries       = {};
+    if (!d.leaves)        d.leaves        = [];
+    if (!d.categories)    d.categories    = [];
+    if (!d.wastedEntries) d.wastedEntries = {};
     result[doc.id] = d;
     state.cache[doc.id] = d;
   });
@@ -218,6 +220,7 @@ async function loadMainTab() {
   loadMainDateDropdown(data);
   loadMainCategories(data);
   await loadMonthlySummary(data);
+  renderWastedMonthSummary(data);
   await renderDayEntries();
 }
 
@@ -326,6 +329,7 @@ async function loadMonthlySummary(data) {
       state.lastAdjustment = { month, cat, prev };
       document.getElementById('main-undo-btn').classList.remove('hidden');
       await loadMonthlySummary(d);
+      renderWastedMonthSummary(d);
     });
   });
 }
@@ -379,6 +383,60 @@ async function deleteEntryFromLog(date, category) {
   await renderDayEntries();
 }
 
+// ── Wasted Time ───────────────────────────────────────────────────────────
+
+async function logWastedTime() {
+  const date  = document.getElementById('main-date').value;
+  const hours = parseFloat(document.getElementById('wasted-hours').value);
+  const note  = document.getElementById('wasted-note').value.trim();
+  if (!date)                        { showToast('Select a date');         return; }
+  if (isNaN(hours) || hours <= 0)   { showToast('Enter valid hours');     return; }
+
+  const month = date.slice(0, 7);
+  const data  = await getMonthData(month);
+  if (!data.wastedEntries[date]) data.wastedEntries[date] = [];
+  data.wastedEntries[date].push({ hours, note });
+  await saveMonthData(month, data);
+
+  document.getElementById('wasted-hours').value = '';
+  document.getElementById('wasted-note').value  = '';
+  showToast('Wasted time logged');
+  renderWastedMonthSummary(data);
+  await renderDayEntries();
+}
+
+function renderWastedMonthSummary(data) {
+  const container = document.getElementById('wasted-month-summary');
+  if (!data) { container.innerHTML = ''; return; }
+
+  const wastedEntries = data.wastedEntries || {};
+  let total = 0;
+  Object.values(wastedEntries).forEach(arr => arr.forEach(e => { total += e.hours || 0; }));
+  total = Math.round(total * 100) / 100;
+
+  if (!total) { container.innerHTML = ''; return; }
+
+  container.innerHTML = `
+    <div class="wasted-month-row">
+      <span class="wasted-label-text">Wasted this month</span>
+      <span class="wasted-total">${total} hrs</span>
+    </div>
+  `;
+}
+
+async function deleteWastedEntry(date, idx) {
+  const month = date.slice(0, 7);
+  const data  = await getMonthData(month);
+  if (data.wastedEntries[date]) {
+    data.wastedEntries[date].splice(idx, 1);
+    if (!data.wastedEntries[date].length) delete data.wastedEntries[date];
+    await saveMonthData(month, data);
+  }
+  showToast('Entry deleted');
+  renderWastedMonthSummary(data);
+  await renderDayEntries();
+}
+
 document.getElementById('main-month').addEventListener('change', async function () {
   state.mainMonth = this.value; state.mainDate = null;
   state.lastAdjustment = null;
@@ -404,13 +462,9 @@ async function renderDayEntries() {
   const data       = await getMonthData(date.slice(0, 7));
   const dayEntries = (data.entries || {})[date] || {};
   const cats       = Object.keys(dayEntries);
+  const wastedDay  = (data.wastedEntries || {})[date] || [];
 
-  if (!cats.length) {
-    list.innerHTML = '<span class="empty-inline">No entries for this date</span>';
-    return;
-  }
-
-  list.innerHTML = cats.map(cat => `
+  let html = cats.map(cat => `
     <div style="display:flex;align-items:center;justify-content:space-between;
                 padding:8px 0;border-bottom:1px solid #F1F5F9">
       <span style="font-weight:500;font-size:13px">${cat}</span>
@@ -420,6 +474,27 @@ async function renderDayEntries() {
       </div>
     </div>
   `).join('');
+
+  if (wastedDay.length) {
+    html += `<div style="padding:8px 0 2px;font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:0.8px">Wasted</div>`;
+    html += wastedDay.map((e, i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:8px 0;border-bottom:1px solid #F1F5F9">
+        <span style="font-size:13px;color:var(--muted)">${e.note || 'No note'}</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-weight:700;color:var(--red)">${e.hours} hrs</span>
+          <button class="btn-danger" onclick="deleteWastedEntry('${date}',${i})">✕</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  if (!cats.length && !wastedDay.length) {
+    list.innerHTML = '<span class="empty-inline">No entries for this date</span>';
+    return;
+  }
+
+  list.innerHTML = html;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -695,12 +770,13 @@ async function loadYearlyTab() {
         <th>Month</th><th>Working Days</th>
         ${allCats.map(c => `<th>${c}<br><small style="font-weight:500;color:#94a3b8">Done / Target</small></th>`).join('')}
         <th>Total Done</th>
+        <th style="color:var(--red)">Wasted</th>
       </tr>
     `;
     tbody.innerHTML = '';
 
     const colTotals = Object.fromEntries(allCats.map(c => [c, { done: 0, target: 0 }]));
-    let totalWD = 0, totalDone = 0;
+    let totalWD = 0, totalDone = 0, totalWasted = 0;
 
     months.forEach(month => {
       const mData = allData[month];
@@ -731,8 +807,13 @@ async function loadYearlyTab() {
         return `<td class="${cls}">${done} / ${target}</td>`;
       });
 
-      totalWD  += workingDays;
-      totalDone = Math.round((totalDone + mDone) * 100) / 100;
+      let mWasted = 0;
+      Object.values(mData.wastedEntries || {}).forEach(arr => arr.forEach(e => { mWasted += e.hours || 0; }));
+      mWasted = Math.round(mWasted * 100) / 100;
+
+      totalWD     += workingDays;
+      totalDone    = Math.round((totalDone + mDone) * 100) / 100;
+      totalWasted  = Math.round((totalWasted + mWasted) * 100) / 100;
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -740,6 +821,7 @@ async function loadYearlyTab() {
         <td>${workingDays}</td>
         ${cells.join('')}
         <td><strong>${Math.round(mDone * 100) / 100}</strong></td>
+        <td${mWasted > 0 ? ' class="bad"' : ''}>${mWasted > 0 ? mWasted : ''}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -754,6 +836,7 @@ async function loadYearlyTab() {
         return `<td class="${cls}">${Math.round(d.done * 100) / 100} / ${Math.round(d.target * 100) / 100}</td>`;
       }).join('')}
       <td>${Math.round(totalDone * 100) / 100}</td>
+      <td${totalWasted > 0 ? ' class="bad"' : ''}>${totalWasted > 0 ? totalWasted : ''}</td>
     `;
     tbody.appendChild(totalTr);
   }
@@ -1130,6 +1213,18 @@ async function downloadExcel() {
     (allData[month].leaves || []).forEach(d => leaveRows.push([month, d]));
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(leaveRows), 'Leaves');
+
+  // Wasted Time sheet
+  const wastedRows = [['Month', 'Date', 'Hours', 'Note']];
+  Object.keys(allData).sort().forEach(month => {
+    const we = allData[month].wastedEntries || {};
+    Object.keys(we).sort().forEach(date => {
+      we[date].forEach(e => wastedRows.push([month, date, e.hours, e.note || '']));
+    });
+  });
+  if (wastedRows.length > 1) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wastedRows), 'Wasted Time');
+  }
 
   // FM Log sheet
   const fmRows = [['Date', 'Category', 'Title', 'Notes']];

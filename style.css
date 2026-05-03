@@ -362,6 +362,27 @@ td.editable-cell:hover { background: #EEF2FF !important; }
 }
 .empty-inline { font-size: 13px; color: #94A3B8; font-style: italic; }
 
+/* ══ Wasted Time ═════════════════════════════════════════════════════════════ */
+.wasted-card { border-color: #FECACA !important; }
+.wasted-title { color: var(--red) !important; }
+.btn-wasted {
+  height: 40px; padding: 0 22px;
+  background: linear-gradient(135deg, #DC2626, #B91C1C);
+  color: white; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s; white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(220,38,38,0.3);
+}
+.btn-wasted:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(220,38,38,0.42); }
+
+.wasted-month-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 12px; padding: 10px 14px;
+  background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px;
+}
+.wasted-label-text { font-size: 13px; font-weight: 600; color: var(--red); }
+.wasted-total { font-size: 16px; font-weight: 800; color: var(--red); }
+
 /* ══ Journal notes field ═════════════════════════════════════════════════════ */
 .notes-label {
   display: block; font-size: 11px; font-weight: 700; color: var(--muted);
