@@ -50,6 +50,7 @@
       <button class="tab-btn active" data-tab="main">Main</button>
       <button class="tab-btn" data-tab="monthly">Monthly</button>
       <button class="tab-btn" data-tab="yearly">Yearly</button>
+      <button class="tab-btn" data-tab="log">Log</button>
       <button class="tab-btn" data-tab="settings">Settings</button>
     </nav>
     <div class="header-right">
@@ -172,6 +173,48 @@
       </div>
     </div>
 
+    <div class="card">
+      <div class="card-title">FM Log — Count by Month</div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead id="yearly-fm-thead"></thead>
+          <tbody id="yearly-fm-tbody"><tr><td colspan="2" class="empty">No FM log data yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ LOG ════════════════════════════════════════════════════════════════ -->
+  <div id="tab-log" class="tab-content">
+
+    <div class="card">
+      <div class="card-title">Add Entry</div>
+      <div class="log-form">
+        <div class="field-group" style="width:180px">
+          <label>Category</label>
+          <select id="fm-type"><option value="">-- Select --</option></select>
+        </div>
+        <div class="field-group" style="flex:1">
+          <label>Title / Name</label>
+          <input type="text" id="fm-name" placeholder="Enter title...">
+        </div>
+        <div class="field-group" style="width:160px">
+          <label>Date</label>
+          <input type="date" id="fm-date">
+        </div>
+        <div class="field-group" style="align-self:flex-end">
+          <button class="btn-primary" onclick="addFmEntry()">+ Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="fm-tables-container">
+      <div class="card">
+        <span class="empty-inline">No FM categories yet — add them in Settings.</span>
+      </div>
+    </div>
+
   </div>
 
   <!-- ══ SETTINGS ══════════════════════════════════════════════════════════ -->
@@ -199,6 +242,22 @@
       </div>
       <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9">
         <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">FM Categories</div>
+      <p class="hint">Add categories for your FM Log tab (e.g. Book, Movie, Story, Podcast).</p>
+      <table class="data-table" style="margin-bottom:12px">
+        <thead><tr><th>Category Name</th><th></th></tr></thead>
+        <tbody id="fm-cat-tbody"><tr><td colspan="2" class="empty">No FM categories yet</td></tr></tbody>
+      </table>
+      <div class="add-row">
+        <input type="text" id="new-fm-cat" placeholder="e.g. Book, Movie, Story" style="flex:1">
+        <button class="btn-secondary" onclick="addFmCategory()">+ Add</button>
+      </div>
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9">
+        <button class="btn-primary" onclick="saveFmCategories()">Save FM Categories</button>
       </div>
     </div>
 

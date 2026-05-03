@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════
-//  CONFIG  — paste your Firebase config below, then fill EmailJS values
+//  CONFIG
 // ══════════════════════════════════════════════════════════════════════════
 
 const firebaseConfig = {
@@ -11,7 +11,6 @@ const firebaseConfig = {
   appId:             "1:1004023329023:web:a66721470a3c335a7edcca"
 };
 
-// EmailJS — sign up free at emailjs.com, create a Gmail service + template
 const EMAILJS_PUBLIC_KEY  = 'PASTE_YOUR_EMAILJS_PUBLIC_KEY';
 const EMAILJS_SERVICE_ID  = 'PASTE_YOUR_SERVICE_ID';
 const EMAILJS_TEMPLATE_ID = 'PASTE_YOUR_TEMPLATE_ID';
@@ -37,12 +36,14 @@ const state = {
   yearlyYear:       new Date().getFullYear(),
   settingsMonth:    currentMonth(),
   settingsMetadata: [],
+  fmCatMeta:        [],   // FM categories being edited in settings
   monthlyLeaves:       [],
   monthlyLeaveReasons: {},
-  cache:            {},   // month → {categories, leaves, entries}
+  cache:            {},   // month → data
   allMonthsCache:   null,
-  lastAdjustment:   null, // { month, cat, prev }
-  lastMonthlyEdit:  null, // { date, cat, prev }
+  userDataCache:    null, // user-level doc (fmCategories, fmLog)
+  lastAdjustment:   null,
+  lastMonthlyEdit:  null,
 };
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -105,6 +106,7 @@ auth.onAuthStateChanged(user => {
   state.user = user;
   state.cache = {};
   state.allMonthsCache = null;
+  state.userDataCache  = null;
 
   if (user) {
     document.getElementById('auth-screen').classList.add('hidden');
@@ -120,7 +122,7 @@ auth.onAuthStateChanged(user => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-//  FIRESTORE HELPERS
+//  FIRESTORE — MONTH DATA
 // ══════════════════════════════════════════════════════════════════════════
 
 function monthRef(month) {
@@ -161,6 +163,29 @@ async function getAllMonths() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+//  FIRESTORE — USER DATA (FM categories + FM log)
+// ══════════════════════════════════════════════════════════════════════════
+
+function userRef() {
+  return db.collection('users').doc(state.user.uid);
+}
+
+async function getUserData() {
+  if (state.userDataCache) return state.userDataCache;
+  const doc = await userRef().get();
+  const data = doc.exists ? doc.data() : {};
+  if (!data.fmCategories) data.fmCategories = [];
+  if (!data.fmLog)        data.fmLog        = [];
+  state.userDataCache = data;
+  return data;
+}
+
+async function saveUserData(patch) {
+  await userRef().set(patch, { merge: true });
+  Object.assign(state.userDataCache || (state.userDataCache = {}), patch);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 //  APP INIT & TABS
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -169,6 +194,7 @@ function initApp() {
   document.getElementById('main-month').value     = month;
   document.getElementById('monthly-month').value  = month;
   document.getElementById('settings-month').value = month;
+  document.getElementById('fm-date').value        = todayStr();
   initYearSelector();
   loadMainTab();
 }
@@ -179,7 +205,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, settings: loadSettingsTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, log: loadLogTab, settings: loadSettingsTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -211,8 +237,8 @@ function loadMainDateDropdown(data) {
     const opt = document.createElement('option');
     opt.value = ds;
     let label = `${String(day).padStart(2, '0')} ${formatMonthShort(state.mainMonth)} (${dayNames[dt.getDay()]})`;
-    if (isWeekend)      label += '  [Weekend]';
-    else if (isLeave)   label += '  [Leave]';
+    if (isWeekend)    label += '  [Weekend]';
+    else if (isLeave) label += '  [Leave]';
     opt.textContent = label;
     if (isWeekend || isLeave) opt.style.color = '#aaa';
     if (ds === state.mainDate) opt.selected = true;
@@ -322,9 +348,9 @@ async function logEntry() {
   const date     = document.getElementById('main-date').value;
   const category = document.getElementById('main-category').value;
   const hoursVal = document.getElementById('main-hours').value;
-  if (!date)                                            { showToast('Select a date');       return; }
-  if (!category)                                        { showToast('Select a category');   return; }
-  if (!hoursVal || isNaN(+hoursVal) || +hoursVal <= 0) { showToast('Enter valid hours');   return; }
+  if (!date)                                            { showToast('Select a date');     return; }
+  if (!category)                                        { showToast('Select a category'); return; }
+  if (!hoursVal || isNaN(+hoursVal) || +hoursVal <= 0) { showToast('Enter valid hours'); return; }
 
   state.mainDate = date;
   const month = date.slice(0, 7);
@@ -557,7 +583,6 @@ async function renderMonthlyTable(data) {
   `;
   tbody.appendChild(totalTr);
 
-  // Editable cells
   tbody.addEventListener('click', async e => {
     const td = e.target.closest('td.editable-cell');
     if (!td || td.querySelector('input')) return;
@@ -663,60 +688,137 @@ async function loadYearlyTab() {
   if (!months.length) {
     thead.innerHTML = '';
     tbody.innerHTML = '<tr><td colspan="3" class="empty">No data for this year yet.</td></tr>';
+  } else {
+    const allCats = [...new Set(months.flatMap(m => (allData[m].categories || []).map(c => c.category)))];
+    thead.innerHTML = `
+      <tr>
+        <th>Month</th><th>Working Days</th>
+        ${allCats.map(c => `<th>${c}<br><small style="font-weight:500;color:#94a3b8">Done / Target</small></th>`).join('')}
+        <th>Total Done</th>
+      </tr>
+    `;
+    tbody.innerHTML = '';
+
+    const colTotals = Object.fromEntries(allCats.map(c => [c, { done: 0, target: 0 }]));
+    let totalWD = 0, totalDone = 0;
+
+    months.forEach(month => {
+      const mData = allData[month];
+      const [y, mon] = month.split('-').map(Number);
+      const leavesSet = new Set(mData.leaves || []);
+      const isCurMonth = month === today.slice(0, 7);
+      const endDay = isCurMonth ? new Date().getDate() : daysInMonth(y, mon);
+      let workingDays = 0;
+      for (let d = 1; d <= endDay; d++) {
+        const dt = new Date(y, mon - 1, d);
+        const ds = `${month}-${String(d).padStart(2, '0')}`;
+        if (dt.getDay() !== 0 && dt.getDay() !== 6 && !leavesSet.has(ds)) workingDays++;
+      }
+
+      const catMap  = Object.fromEntries((mData.categories || []).map(c => [c.category, c.daily_target]));
+      const entries = mData.entries || {};
+      let mDone = 0;
+
+      const cells = allCats.map(cat => {
+        const target = Math.round((catMap[cat] || 0) * workingDays * 100) / 100;
+        let done = 0;
+        Object.values(entries).forEach(dayE => { done += dayE[cat] || 0; });
+        done = Math.round(done * 100) / 100;
+        colTotals[cat].done   += done;
+        colTotals[cat].target += target;
+        mDone += done;
+        const cls = target > 0 ? (done >= target ? 'good' : 'bad') : '';
+        return `<td class="${cls}">${done} / ${target}</td>`;
+      });
+
+      totalWD  += workingDays;
+      totalDone = Math.round((totalDone + mDone) * 100) / 100;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${formatMonth(month)}</strong></td>
+        <td>${workingDays}</td>
+        ${cells.join('')}
+        <td><strong>${Math.round(mDone * 100) / 100}</strong></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    const totalTr = document.createElement('tr');
+    totalTr.className = 'row-total';
+    totalTr.innerHTML = `
+      <td>Total</td><td>${totalWD}</td>
+      ${allCats.map(c => {
+        const d   = colTotals[c];
+        const cls = d.target > 0 ? (d.done >= d.target ? 'good' : 'bad') : '';
+        return `<td class="${cls}">${Math.round(d.done * 100) / 100} / ${Math.round(d.target * 100) / 100}</td>`;
+      }).join('')}
+      <td>${Math.round(totalDone * 100) / 100}</td>
+    `;
+    tbody.appendChild(totalTr);
+  }
+
+  // FM count section
+  await renderYearlyFmCount(year, today);
+}
+
+async function renderYearlyFmCount(year, today) {
+  const userData = await getUserData();
+  const cats     = userData.fmCategories || [];
+  const fmLog    = userData.fmLog        || [];
+  const thead    = document.getElementById('yearly-fm-thead');
+  const tbody    = document.getElementById('yearly-fm-tbody');
+
+  if (!cats.length || !fmLog.length) {
+    thead.innerHTML = '';
+    tbody.innerHTML = '<tr><td colspan="2" class="empty">No FM log data yet</td></tr>';
     return;
   }
 
-  const allCats = [...new Set(months.flatMap(m => (allData[m].categories || []).map(c => c.category)))];
+  const yearEntries = fmLog.filter(e => e.date && e.date.startsWith(`${year}-`));
+  if (!yearEntries.length) {
+    thead.innerHTML = '';
+    tbody.innerHTML = `<tr><td colspan="${cats.length + 2}" class="empty">No FM entries for ${year}</td></tr>`;
+    return;
+  }
+
+  // Group by month
+  const byMonth = {};
+  yearEntries.forEach(e => {
+    const m = e.date.slice(0, 7);
+    if (!byMonth[m]) byMonth[m] = {};
+    byMonth[m][e.type] = (byMonth[m][e.type] || 0) + 1;
+  });
+
+  const months = Object.keys(byMonth).filter(m => m <= (today || todayStr()).slice(0, 7)).sort();
+
   thead.innerHTML = `
     <tr>
-      <th>Month</th><th>Working Days</th>
-      ${allCats.map(c => `<th>${c}<br><small style="font-weight:500;color:#94a3b8">Done / Target</small></th>`).join('')}
-      <th>Total Done</th>
+      <th>Month</th>
+      ${cats.map(c => `<th>${c}</th>`).join('')}
+      <th>Total</th>
     </tr>
   `;
   tbody.innerHTML = '';
 
-  const colTotals = Object.fromEntries(allCats.map(c => [c, { done: 0, target: 0 }]));
-  let totalWD = 0, totalDone = 0;
+  const colTotals = Object.fromEntries(cats.map(c => [c, 0]));
+  let grandTotal = 0;
 
   months.forEach(month => {
-    const mData = allData[month];
-    const [y, mon] = month.split('-').map(Number);
-    const leavesSet = new Set(mData.leaves || []);
-    const isCurMonth = month === today.slice(0, 7);
-    const endDay = isCurMonth ? new Date().getDate() : daysInMonth(y, mon);
-    let workingDays = 0;
-    for (let d = 1; d <= endDay; d++) {
-      const dt = new Date(y, mon - 1, d);
-      const ds = `${month}-${String(d).padStart(2, '0')}`;
-      if (dt.getDay() !== 0 && dt.getDay() !== 6 && !leavesSet.has(ds)) workingDays++;
-    }
-
-    const catMap  = Object.fromEntries((mData.categories || []).map(c => [c.category, c.daily_target]));
-    const entries = mData.entries || {};
-    let mDone = 0;
-
-    const cells = allCats.map(cat => {
-      const target = Math.round((catMap[cat] || 0) * workingDays * 100) / 100;
-      let done = 0;
-      Object.values(entries).forEach(dayE => { done += dayE[cat] || 0; });
-      done = Math.round(done * 100) / 100;
-      colTotals[cat].done   += done;
-      colTotals[cat].target += target;
-      mDone += done;
-      const cls = target > 0 ? (done >= target ? 'good' : 'bad') : '';
-      return `<td class="${cls}">${done} / ${target}</td>`;
+    const row = byMonth[month] || {};
+    let mTotal = 0;
+    const cells = cats.map(cat => {
+      const count = row[cat] || 0;
+      colTotals[cat] += count;
+      mTotal += count;
+      return `<td${count > 0 ? ' class="cell-count"' : ''}>${count > 0 ? count : ''}</td>`;
     });
-
-    totalWD  += workingDays;
-    totalDone = Math.round((totalDone + mDone) * 100) / 100;
-
+    grandTotal += mTotal;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${formatMonth(month)}</strong></td>
-      <td>${workingDays}</td>
       ${cells.join('')}
-      <td><strong>${Math.round(mDone * 100) / 100}</strong></td>
+      <td><strong>${mTotal > 0 ? mTotal : ''}</strong></td>
     `;
     tbody.appendChild(tr);
   });
@@ -724,13 +826,9 @@ async function loadYearlyTab() {
   const totalTr = document.createElement('tr');
   totalTr.className = 'row-total';
   totalTr.innerHTML = `
-    <td>Total</td><td>${totalWD}</td>
-    ${allCats.map(c => {
-      const d   = colTotals[c];
-      const cls = d.target > 0 ? (d.done >= d.target ? 'good' : 'bad') : '';
-      return `<td class="${cls}">${Math.round(d.done * 100) / 100} / ${Math.round(d.target * 100) / 100}</td>`;
-    }).join('')}
-    <td>${Math.round(totalDone * 100) / 100}</td>
+    <td>Total</td>
+    ${cats.map(c => `<td>${colTotals[c] > 0 ? colTotals[c] : ''}</td>`).join('')}
+    <td>${grandTotal}</td>
   `;
   tbody.appendChild(totalTr);
 }
@@ -739,6 +837,97 @@ document.getElementById('yearly-year').addEventListener('change', async function
   state.yearlyYear = parseInt(this.value);
   await loadYearlyTab();
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+//  LOG TAB (FM Log)
+// ══════════════════════════════════════════════════════════════════════════
+
+async function loadLogTab() {
+  const userData = await getUserData();
+  populateFmTypeDropdown(userData.fmCategories || []);
+  renderFmTables(userData.fmCategories || [], userData.fmLog || []);
+}
+
+function populateFmTypeDropdown(cats) {
+  const sel = document.getElementById('fm-type');
+  sel.innerHTML = '<option value="">-- Select --</option>';
+  cats.forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat; opt.textContent = cat;
+    sel.appendChild(opt);
+  });
+}
+
+function renderFmTables(cats, fmLog) {
+  const container = document.getElementById('fm-tables-container');
+
+  if (!cats.length) {
+    container.innerHTML = `
+      <div class="card">
+        <span class="empty-inline">No FM categories yet — add them in Settings.</span>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+
+  cats.forEach(cat => {
+    const entries = fmLog
+      .filter(e => e.type === cat)
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    const rows = entries.length
+      ? entries.map(e => `
+          <tr>
+            <td style="font-weight:500">${e.name}</td>
+            <td style="color:var(--muted);font-size:12px">${formatDate(e.date)}</td>
+            <td><button class="btn-danger" onclick="deleteFmEntry('${e.id}')">✕</button></td>
+          </tr>`).join('')
+      : `<tr><td colspan="3" class="empty">No ${cat} entries yet</td></tr>`;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>${cat}</span>
+        <span class="fm-count-badge">${entries.length}</span>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Title / Name</th><th>Date</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+async function addFmEntry() {
+  const type = document.getElementById('fm-type').value.trim();
+  const name = document.getElementById('fm-name').value.trim();
+  const date = document.getElementById('fm-date').value;
+  if (!type) { showToast('Select a category'); return; }
+  if (!name) { showToast('Enter a title');     return; }
+  if (!date) { showToast('Select a date');     return; }
+
+  const userData = await getUserData();
+  const entry = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, name, date };
+  const fmLog = [...(userData.fmLog || []), entry];
+  await saveUserData({ fmLog });
+
+  document.getElementById('fm-name').value = '';
+  showToast(`${type} added`);
+  renderFmTables(userData.fmCategories || [], fmLog);
+}
+
+async function deleteFmEntry(id) {
+  const userData = await getUserData();
+  const fmLog    = (userData.fmLog || []).filter(e => e.id !== id);
+  await saveUserData({ fmLog });
+  showToast('Entry deleted');
+  renderFmTables(userData.fmCategories || [], fmLog);
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 //  SETTINGS TAB
@@ -758,6 +947,7 @@ async function loadSettingsTab() {
   }
   renderSettingsTable();
   await loadSettingsMonthTable();
+  await loadFmCategorySettings();
 }
 
 function renderSettingsTable() {
@@ -783,8 +973,8 @@ function addCategory() {
   const targetEl = document.getElementById('new-target');
   const name     = nameEl.value.trim();
   const target   = parseFloat(targetEl.value);
-  if (!name)                                               { showToast('Enter a category name');   return; }
-  if (isNaN(target) || target < 0)                        { showToast('Enter valid target hours'); return; }
+  if (!name)                                                { showToast('Enter a category name');   return; }
+  if (isNaN(target) || target < 0)                         { showToast('Enter valid target hours'); return; }
   if (state.settingsMetadata.some(c => c.category===name)) { showToast('Category already exists'); return; }
   state.settingsMetadata.push({ category: name, daily_target: target });
   nameEl.value = ''; targetEl.value = '';
@@ -856,13 +1046,55 @@ document.getElementById('settings-month').addEventListener('change', async funct
   await loadSettingsTab();
 });
 
+// ── FM Category Settings ───────────────────────────────────────────────────
+
+async function loadFmCategorySettings() {
+  const userData  = await getUserData();
+  state.fmCatMeta = [...(userData.fmCategories || [])];
+  renderFmCategoryTable();
+}
+
+function renderFmCategoryTable() {
+  const tbody = document.getElementById('fm-cat-tbody');
+  if (!state.fmCatMeta.length) {
+    tbody.innerHTML = '<tr><td colspan="2" class="empty">No FM categories yet — add one below.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = state.fmCatMeta.map((cat, i) => `
+    <tr>
+      <td style="font-weight:500">${cat}</td>
+      <td><button class="btn-danger" onclick="removeFmCategory(${i})">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function addFmCategory() {
+  const input = document.getElementById('new-fm-cat');
+  const name  = input.value.trim();
+  if (!name)                           { showToast('Enter a category name'); return; }
+  if (state.fmCatMeta.includes(name))  { showToast('Already exists');        return; }
+  state.fmCatMeta.push(name);
+  input.value = '';
+  renderFmCategoryTable();
+}
+
+function removeFmCategory(i) {
+  state.fmCatMeta.splice(i, 1);
+  renderFmCategoryTable();
+}
+
+async function saveFmCategories() {
+  await saveUserData({ fmCategories: [...state.fmCatMeta] });
+  showToast('FM categories saved');
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 //  EXCEL DOWNLOAD
 // ══════════════════════════════════════════════════════════════════════════
 
 async function downloadExcel() {
   showToast('Preparing Excel...');
-  const allData = await getAllMonths();
+  const [allData, userData] = await Promise.all([getAllMonths(), getUserData()]);
   const wb = XLSX.utils.book_new();
 
   // Entries sheet
@@ -892,6 +1124,15 @@ async function downloadExcel() {
     (allData[month].leaves || []).forEach(d => leaveRows.push([month, d]));
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(leaveRows), 'Leaves');
+
+  // FM Log sheet
+  const fmRows = [['Date', 'Category', 'Title']];
+  (userData.fmLog || []).sort((a, b) => a.date.localeCompare(b.date)).forEach(e => {
+    fmRows.push([e.date, e.type, e.name]);
+  });
+  if (fmRows.length > 1) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fmRows), 'FM Log');
+  }
 
   XLSX.writeFile(wb, `Timesheet_${new Date().toISOString().slice(0, 10)}.xlsx`);
   showToast('Excel downloaded');
