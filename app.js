@@ -260,7 +260,7 @@ async function loadMonthlySummary(data) {
   tbody.innerHTML = '';
 
   if (!data.categories.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">No categories — add them in Settings first</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No categories — add them in Settings first</td></tr>';
     return;
   }
 
@@ -277,12 +277,11 @@ async function loadMonthlySummary(data) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${c.category}</td>
-      <td class="cell-hrs">${completed} hrs</td>
-      <td>${target} hrs</td>
+      <td class="cell-hrs">${completed}</td>
+      <td>${target}</td>
       <td><input type="number" class="inline-input sm adjust-input" data-cat="${c.category}"
            value="${adjustment || ''}" step="0.25" placeholder="0" style="width:60px"></td>
-      <td class="${onTrack ? 'good' : 'bad'}">${pending} hrs</td>
-      <td class="${onTrack ? 'good' : 'bad'}">${onTrack ? '✓ On track' : '✗ Behind'}</td>
+      <td class="${onTrack ? 'good' : 'bad'}">${pending}</td>
     `;
     tbody.appendChild(tr);
   });
