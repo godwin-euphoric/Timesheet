@@ -654,8 +654,20 @@ textarea#fm-notes:focus {
   .ctrl-pair .field-group { flex: 1; }
   .ctrl-pair input[type="month"],
   .ctrl-pair select { width: 100%; }
-  .ctrl-pair-chips { display: flex; }
-  .ctrl-pair-chips .stat-chip { flex: 1; justify-content: center; }
+
+  /* Productive / Wasted chips — compact stat cards side by side */
+  .ctrl-pair-chips { display: grid; grid-template-columns: 1fr 1fr; width: 100%; gap: 10px; }
+  .ctrl-pair-chips .stat-chip {
+    flex-direction: column; align-items: flex-start;
+    height: auto; padding: 10px 14px; gap: 2px;
+  }
+  .ctrl-pair-chips .stat-chip .chip-box { display: none; }
+  .ctrl-pair-chips .stat-chip .chip-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.7px; opacity: 0.7; white-space: nowrap;
+  }
+  .ctrl-pair-chips .stat-chip strong { font-size: 20px; font-weight: 800; line-height: 1.2; }
+
   .stopwatch-chip { width: 100%; justify-content: center; }
   .stat-chip:not(.stat-chip-green):not(.stat-chip-red) { width: 100%; justify-content: center; }
 
