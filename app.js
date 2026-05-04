@@ -114,6 +114,10 @@ auth.onAuthStateChanged(user => {
     const avatar = document.getElementById('user-avatar');
     if (user.photoURL) { avatar.src = user.photoURL; avatar.style.display = 'block'; }
     else avatar.style.display = 'none';
+    const avatarM = document.getElementById('user-avatar-mobile');
+    if (avatarM) { if (user.photoURL) { avatarM.src = user.photoURL; avatarM.style.display = 'block'; } }
+    const nameM = document.getElementById('mobile-user-name');
+    if (nameM) nameM.textContent = user.displayName || user.email || '';
     initApp();
   } else {
     document.getElementById('auth-screen').classList.remove('hidden');
