@@ -325,6 +325,21 @@ input:focus, select:focus {
 .hint    { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
 .divider { height: 1px; background: var(--border); margin: 18px 0; }
 
+/* ══ Pending bar ════════════════════════════════════════════════════════════ */
+.pending-bar {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.pending-stat {
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 18px; min-width: 160px;
+}
+.pending-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); }
+.pending-val   { font-size: 20px; font-weight: 800; }
+.pend-bad  { color: var(--red); }
+.pend-good { color: var(--green); }
+
 /* ══ Log row ═════════════════════════════════════════════════════════════════ */
 .log-row {
   display: grid;
@@ -697,4 +712,109 @@ textarea#fm-notes:focus {
 
   .add-row { flex-direction: column; align-items: stretch; }
   .add-row input, .add-row button { width: 100% !important; }
+
+  .pending-bar { flex-direction: column; }
+  .pending-stat { min-width: 0; flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 14px; }
+  .pending-val { font-size: 16px; }
+
+  .planner-nav { flex-direction: column; align-items: stretch; gap: 8px; }
+  .planner-new-btn { width: 100%; }
 }
+
+/* ══ Planner Tab ═════════════════════════════════════════════════════════════ */
+.planner-nav {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.planner-sub-tabs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.planner-sub-tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 16px; border-radius: 8px;
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all 0.15s;
+}
+.planner-sub-tab:hover { color: var(--text); border-color: var(--primary); }
+.planner-sub-tab.active {
+  background: var(--primary-l); border-color: var(--primary);
+  color: var(--primary-h); font-weight: 600;
+}
+.planner-tab-del {
+  font-size: 11px; opacity: 0.4; cursor: pointer; line-height: 1;
+  padding: 1px 2px; border-radius: 3px;
+}
+.planner-tab-del:hover { opacity: 1; color: var(--red); }
+.planner-new-btn { flex-shrink: 0; }
+
+.planner-block {
+  margin-bottom: 20px;
+}
+.planner-block-titlebar {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.planner-block-title {
+  flex: 1; background: transparent; border: none;
+  border-bottom: 2px solid var(--border); color: var(--text);
+  font-size: 16px; font-weight: 700; padding: 4px 2px;
+  outline: none; transition: border-color 0.15s;
+}
+.planner-block-title:focus { border-bottom-color: var(--primary); }
+.btn-planner-del-block {
+  background: none; border: none; cursor: pointer;
+  font-size: 16px; opacity: 0.35; transition: opacity 0.15s; padding: 4px;
+}
+.btn-planner-del-block:hover { opacity: 1; }
+
+.planner-table { width: 100%; border-collapse: collapse; }
+.planner-table thead tr { background: #0D1628; }
+.planner-col-th { padding: 0; min-width: 180px; border-bottom: 2px solid var(--border); }
+.planner-col-th-inner {
+  display: flex; align-items: center; gap: 4px; padding: 8px 12px;
+}
+.planner-col-name {
+  flex: 1; background: transparent; border: none; outline: none;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.7px; color: var(--muted); cursor: pointer;
+  min-width: 0;
+}
+.planner-col-name:focus { color: var(--primary-h); }
+.planner-addcol-th { padding: 8px; border-bottom: 2px solid var(--border); width: 60px; }
+
+.planner-table tbody tr:hover td { background: var(--card2); }
+.planner-cell-td {
+  padding: 6px 8px; vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.planner-row-del-td {
+  padding: 6px 4px; vertical-align: middle; text-align: center;
+  border-bottom: 1px solid var(--border); width: 30px;
+}
+.planner-cell {
+  width: 100%; resize: none; overflow: hidden;
+  background: transparent; border: none; outline: none;
+  color: var(--text); font-size: 13px; line-height: 1.6;
+  font-family: inherit; padding: 4px 6px; border-radius: 6px;
+  transition: background 0.12s; min-height: 32px;
+}
+.planner-cell:focus { background: rgba(99,102,241,0.08); }
+
+.btn-planner-icon {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 11px; padding: 2px 4px;
+  border-radius: 4px; transition: all 0.12s; flex-shrink: 0;
+}
+.btn-planner-icon:hover { color: var(--red); background: rgba(248,113,113,0.1); }
+.btn-planner-sm {
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--muted); font-size: 11px; padding: 4px 8px;
+  border-radius: 6px; cursor: pointer; transition: all 0.12s; white-space: nowrap;
+}
+.btn-planner-sm:hover { border-color: var(--primary); color: var(--primary-h); }
+.btn-planner-add-row {
+  margin-top: 8px; padding: 5px 14px; background: none;
+  border: 1px dashed var(--border); border-radius: 8px;
+  color: var(--muted); font-size: 12px; cursor: pointer;
+  transition: all 0.15s; width: 100%;
+}
+.btn-planner-add-row:hover { border-color: var(--primary); color: var(--primary-h); }
+.planner-add-block-btn { margin-top: 4px; width: 100%; }

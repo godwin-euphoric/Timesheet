@@ -213,7 +213,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, settings: loadSettingsTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -307,6 +307,8 @@ async function loadMonthlySummary(data) {
   }
 
   const adjustments = data.adjustments || {};
+  let totalPending = 0;
+  let ssPending    = null;
 
   data.categories.forEach(c => {
     let completed = 0;
@@ -316,6 +318,8 @@ async function loadMonthlySummary(data) {
     const adjustment = Math.round((adjustments[c.category] || 0) * 100) / 100;
     const pending    = Math.round((target - completed + adjustment) * 100) / 100;
     const onTrack    = pending <= 0;
+    if (pending > 0) totalPending += pending;
+    if (c.category.toUpperCase() === 'SS') ssPending = pending;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${c.category}</td>
@@ -327,6 +331,18 @@ async function loadMonthlySummary(data) {
     `;
     tbody.appendChild(tr);
   });
+
+  // Pending bar
+  const bar = document.getElementById('pending-bar');
+  if (bar && data.categories.length) {
+    totalPending = Math.round(totalPending * 100) / 100;
+    const ssHtml = ssPending !== null
+      ? `<div class="pending-stat"><div class="pending-label">Pending — SS</div><div class="pending-val ${ssPending > 0 ? 'pend-bad' : 'pend-good'}">${ssPending} hrs</div></div>`
+      : '';
+    bar.innerHTML = ssHtml +
+      `<div class="pending-stat"><div class="pending-label">Pending Overall</div><div class="pending-val ${totalPending > 0 ? 'pend-bad' : 'pend-good'}">${totalPending} hrs</div></div>`;
+    bar.classList.remove('hidden');
+  }
 
   tbody.querySelectorAll('.adjust-input').forEach(input => {
     input.addEventListener('change', async () => {
@@ -1558,4 +1574,251 @@ function swReset() {
   btn.textContent = '▶';
   btn.className   = 'sw-btn sw-start';
   document.getElementById('sw-display').textContent = '00:00:00';
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  PLANNER TAB
+// ══════════════════════════════════════════════════════════════════════════
+
+state.activePlannerIdx = 0;
+let plannerSaveTimer   = null;
+
+function pId() { return 'p' + Math.random().toString(36).slice(2, 9); }
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function schedulePlannerSave() {
+  clearTimeout(plannerSaveTimer);
+  plannerSaveTimer = setTimeout(() => saveUserData({ planners: state.planners }), 800);
+}
+
+function defaultWeekdayPlanner() {
+  return {
+    id: pId(), name: 'Weekday Planner',
+    blocks: [
+      {
+        id: pId(), header: 'Morning till 10:30 am',
+        cols: ['Activities', 'Notes'],
+        rows: [[
+          '• 7:15 am - Get up + Get ready + Kids dress Iron + GYM MMA Class till 9:30 / 9:45 (optional milk in teashop)\n• Return to Home + Food Protein with Pratheeba + newspaper or TV + Bath + RR + Todo Tracker Note / Regular works Note + decide where to go',
+          'Monday: MMA Gym\nTuesday: MMA Gym\nWednesday: MMA Gym or Gym\nThursday: Walking + script / Cycling / kids school drop + walking\nFriday: MMA'
+        ]]
+      },
+      {
+        id: pId(), header: '10:30 am to 2 pm',
+        cols: ['Activities', 'Notes'],
+        rows: [[
+          'Start from home to Outside and start productivity. If more out works and return to home only u can stay at home\n\nGoals:\n• FM SS, FM other, AI studies / practice\n• Movie / Books / Stories\n• To do home works\n• To do out works\n• Dhana Break\n• Pratheeba Time\n• Meditation\n• Workshops',
+          'Out Options:\n1. One day movie (Wednesday)\n2. Selaiyur Library\n3. Radha Nagar Library\n4. Phoenix mall\n5. New Coworking on Friday or Friends Meeting Place\n6. Big out options - Dhana Studio works / Marriages'
+        ]]
+      },
+      {
+        id: pId(), header: '2 pm to 3 pm',
+        cols: ['Activities', 'Notes'],
+        rows: [['Lunch + Pratheeba and get ready to coworking space / go to hotel and have lunch and go to coworking zone', '']]
+      },
+      {
+        id: pId(), header: '3 pm to 7:30 pm / 8 pm',
+        cols: ['Activities', 'Notes'],
+        rows: [[
+          'Office works zone:\n1. Office works\n2. Study works\n3. Money Generation works\n4. Goals - FM / Script works\n5. Office friends and breaks\n6. Hari / Dhana break\n7. Spillover\n8. Unplanned: Next day / Long Pending\n9. Enter E (Allowed Items)\n\nNote: you can add minor out shoppings when going out and coming back.',
+          ''
+        ]]
+      },
+      {
+        id: pId(), header: '7:30 pm to 8:00 pm — Fruits Time with Family',
+        cols: ['Activities', 'Notes'],
+        rows: [['Fruits Time with Family', '']]
+      },
+      {
+        id: pId(), header: '8 pm Slot',
+        cols: ['Activities', 'Notes'],
+        rows: [[
+          '1. Dhanasekar / Ravi break\n1b. MMA / Dance class\n2. Family related shopping\n2b. Family outing\n3. Cycling / Walking + Phone calls\n4. Office pending works\n5. Spillover works\n6. Movie / Youtube (Allowed items)\n7. Home cleaning\n8. Unplanned Items: Next days works / long pending works\n10. Dinner with family or Alone',
+          ''
+        ]]
+      },
+      {
+        id: pId(), header: '10 pm',
+        cols: ['Activities', 'Notes'],
+        rows: [[
+          '1. Kids games and speech\n2. Pratheeba time spend and speech\n3. Productivity: FM / AI\n4. Movies / Story Books\n5. Family phone Calls\n6. Urgent Spillover\n7. Tomorrow planner\n8. Whatsapp update 1, 2\n9. Sleep Early (12 to 12:30)',
+          'RR: books, movies, Anantha Vikatan, Nanayam Vijayan / YouTube'
+        ]]
+      }
+    ]
+  };
+}
+
+async function loadPlannerTab() {
+  const ud = await getUserData();
+  if (!ud.planners || ud.planners.length === 0) {
+    state.planners = [defaultWeekdayPlanner()];
+    await saveUserData({ planners: state.planners });
+  } else {
+    state.planners = ud.planners;
+  }
+  if (state.activePlannerIdx >= state.planners.length) state.activePlannerIdx = 0;
+  renderPlannerTab();
+}
+
+function renderPlannerTab() {
+  const planners = state.planners;
+  const ai       = state.activePlannerIdx;
+
+  // Sub-tabs
+  document.getElementById('planner-sub-tabs').innerHTML = planners.map((p, i) => `
+    <button class="planner-sub-tab${i === ai ? ' active' : ''}" onclick="switchPlanner(${i})">
+      ${escHtml(p.name)}
+      <span class="planner-tab-del" onclick="event.stopPropagation();deletePlanner(${i})" title="Delete planner">✕</span>
+    </button>`).join('');
+
+  const container = document.getElementById('planner-blocks-container');
+  if (!planners.length) { container.innerHTML = ''; return; }
+
+  const planner = planners[ai];
+  container.innerHTML = planner.blocks.map((b, bi) => renderPlannerBlock(ai, bi, b)).join('') +
+    `<button class="btn-secondary planner-add-block-btn" onclick="addPlannerBlock()">+ Add Block</button>`;
+
+  container.querySelectorAll('.planner-cell').forEach(ta => {
+    autoResizeTa(ta);
+    ta.addEventListener('input', () => autoResizeTa(ta));
+  });
+}
+
+function renderPlannerBlock(pi, bi, block) {
+  const cols = block.cols || ['Column 1', 'Column 2'];
+  const rows = block.rows || [];
+
+  const colThs = cols.map((col, ci) => `
+    <th class="planner-col-th">
+      <div class="planner-col-th-inner">
+        <input class="planner-col-name" value="${escHtml(col)}"
+          onblur="updatePlannerColName(${pi},${bi},${ci},this.value)" onclick="this.select()">
+        ${cols.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="removePlannerColumn(${pi},${bi},${ci})">✕</button>` : ''}
+      </div>
+    </th>`).join('');
+
+  const bodyRows = rows.map((row, ri) => {
+    const cells = cols.map((_, ci) => `
+      <td class="planner-cell-td">
+        <textarea class="planner-cell" rows="1"
+          onblur="updatePlannerCell(${pi},${bi},${ri},${ci},this.value)">${escHtml(row[ci] || '')}</textarea>
+      </td>`).join('');
+    return `<tr>
+      ${cells}
+      <td class="planner-row-del-td">
+        <button class="btn-planner-icon" title="Remove row" onclick="removePlannerRow(${pi},${bi},${ri})">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="planner-block card">
+      <div class="planner-block-titlebar">
+        <input class="planner-block-title" value="${escHtml(block.header)}"
+          onblur="updatePlannerBlockHeader(${pi},${bi},this.value)">
+        <button class="btn-planner-del-block" onclick="deletePlannerBlock(${pi},${bi})" title="Delete block">🗑</button>
+      </div>
+      <div class="table-scroll">
+        <table class="planner-table">
+          <thead><tr>
+            ${colThs}
+            <th class="planner-addcol-th">
+              <button class="btn-planner-sm" onclick="addPlannerColumn(${pi},${bi})">+ Col</button>
+            </th>
+          </tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>
+      <button class="btn-planner-add-row" onclick="addPlannerRow(${pi},${bi})">+ Row</button>
+    </div>`;
+}
+
+function autoResizeTa(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
+}
+
+function switchPlanner(idx) {
+  state.activePlannerIdx = idx;
+  renderPlannerTab();
+}
+
+async function addPlanner() {
+  const name = prompt('Planner name:');
+  if (!name || !name.trim()) return;
+  state.planners.push({ id: pId(), name: name.trim(), blocks: [] });
+  state.activePlannerIdx = state.planners.length - 1;
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function deletePlanner(idx) {
+  if (!confirm(`Delete planner "${state.planners[idx].name}"?`)) return;
+  state.planners.splice(idx, 1);
+  if (state.activePlannerIdx >= state.planners.length) state.activePlannerIdx = Math.max(0, state.planners.length - 1);
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function addPlannerBlock() {
+  const pi = state.activePlannerIdx;
+  state.planners[pi].blocks.push({ id: pId(), header: 'New Block', cols: ['Column 1', 'Column 2'], rows: [['', '']] });
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function deletePlannerBlock(pi, bi) {
+  if (!confirm('Delete this block?')) return;
+  state.planners[pi].blocks.splice(bi, 1);
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function addPlannerRow(pi, bi) {
+  const block = state.planners[pi].blocks[bi];
+  block.rows.push(block.cols.map(() => ''));
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function removePlannerRow(pi, bi, ri) {
+  state.planners[pi].blocks[bi].rows.splice(ri, 1);
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function addPlannerColumn(pi, bi) {
+  const block = state.planners[pi].blocks[bi];
+  block.cols.push('Column ' + (block.cols.length + 1));
+  block.rows.forEach(row => row.push(''));
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function removePlannerColumn(pi, bi, ci) {
+  const block = state.planners[pi].blocks[bi];
+  if (block.cols.length <= 1) return;
+  block.cols.splice(ci, 1);
+  block.rows.forEach(row => row.splice(ci, 1));
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+function updatePlannerBlockHeader(pi, bi, value) {
+  state.planners[pi].blocks[bi].header = value;
+  schedulePlannerSave();
+}
+
+function updatePlannerColName(pi, bi, ci, value) {
+  state.planners[pi].blocks[bi].cols[ci] = value;
+  schedulePlannerSave();
+}
+
+function updatePlannerCell(pi, bi, ri, ci, value) {
+  state.planners[pi].blocks[bi].rows[ri][ci] = value;
+  schedulePlannerSave();
 }

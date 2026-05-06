@@ -52,6 +52,7 @@
       <button class="tab-btn" data-tab="yearly">Yearly</button>
       <button class="tab-btn" data-tab="habits">Habits</button>
       <button class="tab-btn" data-tab="log">Journal</button>
+      <button class="tab-btn" data-tab="planner">Planner</button>
       <button class="tab-btn" data-tab="settings">Settings</button>
     </nav>
     <div class="header-right">
@@ -96,6 +97,8 @@
       </div>
       <div class="stat-chip">Working days so far&nbsp;&nbsp;<strong id="working-days-count">—</strong></div>
     </div>
+
+    <div id="pending-bar" class="pending-bar hidden"></div>
 
     <div class="log-row">
 
@@ -275,6 +278,15 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- ══ PLANNER ════════════════════════════════════════════════════════════ -->
+  <div id="tab-planner" class="tab-content">
+    <div class="planner-nav">
+      <div class="planner-sub-tabs" id="planner-sub-tabs"></div>
+      <button class="btn-secondary planner-new-btn" onclick="addPlanner()">+ New Planner</button>
+    </div>
+    <div id="planner-blocks-container"></div>
   </div>
 
   <!-- ══ SETTINGS ══════════════════════════════════════════════════════════ -->
