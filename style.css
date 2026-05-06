@@ -325,20 +325,37 @@ input:focus, select:focus {
 .hint    { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
 .divider { height: 1px; background: var(--border); margin: 18px 0; }
 
-/* ══ Pending bar ════════════════════════════════════════════════════════════ */
-.pending-bar {
-  display: flex; gap: 14px; flex-wrap: wrap;
-  margin-bottom: 16px;
+/* ══ Row focus checkbox ══════════════════════════════════════════════════════ */
+.cb-col { width: 28px; padding: 0 6px !important; text-align: center; }
+.row-focus-cb { accent-color: var(--primary); width: 15px; height: 15px; cursor: pointer; }
+.mini-table tr.row-focused td { background: rgba(99,102,241,0.13) !important; }
+.mini-table tr.row-focused { outline: 1px solid var(--primary); }
+
+/* ══ Totals row ══════════════════════════════════════════════════════════════ */
+.summary-totals td {
+  background: var(--amber-bg) !important;
+  border-top: 2px solid #4A3000;
+  padding-top: 10px; padding-bottom: 10px;
 }
-.pending-stat {
+
+/* ══ Stats row below summary table ══════════════════════════════════════════ */
+.main-stats-row {
+  display: flex; gap: 0;
+  border-top: 1px solid var(--border); margin-top: 12px;
+  padding-top: 12px; flex-wrap: wrap; gap: 10px;
+}
+.mstat {
   display: flex; flex-direction: column; gap: 2px;
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 10px 18px; min-width: 160px;
+  padding: 8px 16px; border-radius: 10px;
+  border: 1px solid var(--border); min-width: 130px;
 }
-.pending-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); }
-.pending-val   { font-size: 20px; font-weight: 800; }
-.pend-bad  { color: var(--red); }
-.pend-good { color: var(--green); }
+.mstat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+.mstat-val   { font-size: 18px; font-weight: 800; color: var(--text); }
+.mstat-red   { border-color: #5C2020; background: var(--red-bg); }
+.mstat-red   .mstat-val { color: var(--red); }
+.mstat-green { border-color: #1A5C30; background: var(--green-bg); }
+.mstat-green .mstat-val { color: var(--green); }
+.mstat-default { background: var(--card2); }
 
 /* ══ Log row ═════════════════════════════════════════════════════════════════ */
 .log-row {
@@ -665,10 +682,15 @@ textarea#fm-notes:focus {
 
   /* Top controls — stack everything, but ctrl-pair stays in a row */
   .top-controls { flex-direction: column; align-items: stretch; gap: 10px; }
-  .ctrl-pair { width: 100%; }
+  .ctrl-pair { width: 100%; gap: 6px; }
   .ctrl-pair .field-group { flex: 1; }
   .ctrl-pair input[type="month"],
   .ctrl-pair select { width: 100%; }
+
+  /* Stats row on mobile */
+  .main-stats-row { gap: 8px; }
+  .mstat { flex: 1; min-width: 0; padding: 8px 12px; }
+  .mstat-val { font-size: 15px; }
 
   /* Productive / Wasted chips — compact stat cards side by side */
   .ctrl-pair-chips { display: grid; grid-template-columns: 1fr 1fr; width: 100%; gap: 10px; }
@@ -712,10 +734,6 @@ textarea#fm-notes:focus {
 
   .add-row { flex-direction: column; align-items: stretch; }
   .add-row input, .add-row button { width: 100% !important; }
-
-  .pending-bar { flex-direction: column; }
-  .pending-stat { min-width: 0; flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 14px; }
-  .pending-val { font-size: 16px; }
 
   .planner-nav { flex-direction: column; align-items: stretch; gap: 8px; }
   .planner-new-btn { width: 100%; }

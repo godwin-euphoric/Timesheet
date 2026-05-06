@@ -302,13 +302,12 @@ async function loadMonthlySummary(data) {
   tbody.innerHTML = '';
 
   if (!data.categories.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty">No categories — add them in Settings first</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No categories — add them in Settings first</td></tr>';
     return;
   }
 
-  const adjustments = data.adjustments || {};
-  let totalPending = 0;
-  let ssPending    = null;
+  const adjustments  = data.adjustments || {};
+  let totalCompleted = 0, totalTarget = 0, totalPending = 0;
 
   data.categories.forEach(c => {
     let completed = 0;
@@ -318,10 +317,13 @@ async function loadMonthlySummary(data) {
     const adjustment = Math.round((adjustments[c.category] || 0) * 100) / 100;
     const pending    = Math.round((target - completed + adjustment) * 100) / 100;
     const onTrack    = pending <= 0;
-    if (pending > 0) totalPending += pending;
-    if (c.category.toUpperCase() === 'SS') ssPending = pending;
+    totalCompleted  += completed;
+    totalTarget     += target;
+    totalPending    += pending;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
+      <td class="cb-col"><input type="checkbox" class="row-focus-cb" onchange="this.closest('tr').classList.toggle('row-focused',this.checked)"></td>
       <td>${c.category}</td>
       <td class="cell-hrs">${completed}</td>
       <td>${target}</td>
@@ -332,16 +334,44 @@ async function loadMonthlySummary(data) {
     tbody.appendChild(tr);
   });
 
-  // Pending bar
-  const bar = document.getElementById('pending-bar');
-  if (bar && data.categories.length) {
-    totalPending = Math.round(totalPending * 100) / 100;
-    const ssHtml = ssPending !== null
-      ? `<div class="pending-stat"><div class="pending-label">Pending — SS</div><div class="pending-val ${ssPending > 0 ? 'pend-bad' : 'pend-good'}">${ssPending} hrs</div></div>`
-      : '';
-    bar.innerHTML = ssHtml +
-      `<div class="pending-stat"><div class="pending-label">Pending Overall</div><div class="pending-val ${totalPending > 0 ? 'pend-bad' : 'pend-good'}">${totalPending} hrs</div></div>`;
-    bar.classList.remove('hidden');
+  // Totals row
+  totalCompleted = Math.round(totalCompleted * 100) / 100;
+  totalTarget    = Math.round(totalTarget * 100) / 100;
+  totalPending   = Math.round(totalPending * 100) / 100;
+  const totalTr  = document.createElement('tr');
+  totalTr.className = 'summary-totals';
+  totalTr.innerHTML = `
+    <td class="cb-col"></td>
+    <td><strong>Total</strong></td>
+    <td class="cell-hrs"><strong>${totalCompleted}</strong></td>
+    <td><strong>${totalTarget}</strong></td>
+    <td></td>
+    <td class="${totalPending > 0 ? 'bad' : 'good'}"><strong>${totalPending}</strong></td>
+  `;
+  tbody.appendChild(totalTr);
+
+  // Stats row below table (wasted, working days, productive)
+  const wastedEntries = data.wastedEntries || {};
+  let wastedTotal = 0;
+  Object.values(wastedEntries).forEach(arr => arr.forEach(e => { wastedTotal += e.hours || 0; }));
+  wastedTotal = Math.round(wastedTotal * 100) / 100;
+
+  const statsRow = document.getElementById('main-stats-row');
+  if (statsRow) {
+    statsRow.innerHTML = `
+      <div class="mstat mstat-red">
+        <span class="mstat-label">Wasted this month</span>
+        <span class="mstat-val" id="stat-wasted-val">${wastedTotal} hrs</span>
+      </div>
+      <div class="mstat mstat-default">
+        <span class="mstat-label">Working days</span>
+        <span class="mstat-val">${workingDays}</span>
+      </div>
+      <div class="mstat mstat-green">
+        <span class="mstat-label">Productive</span>
+        <span class="mstat-val">${totalProductive} hrs</span>
+      </div>
+    `;
   }
 
   tbody.querySelectorAll('.adjust-input').forEach(input => {
@@ -434,24 +464,14 @@ async function logWastedTime() {
 }
 
 function renderWastedMonthSummary(data) {
-  const container = document.getElementById('wasted-month-summary');
-  if (!data) { container.innerHTML = ''; return; }
-
+  if (!data) return;
   const wastedEntries = data.wastedEntries || {};
   let total = 0;
   Object.values(wastedEntries).forEach(arr => arr.forEach(e => { total += e.hours || 0; }));
   total = Math.round(total * 100) / 100;
-
   document.getElementById('wasted-hours-chip').textContent = total > 0 ? total + ' hrs' : '0 hrs';
-
-  if (!total) { container.innerHTML = ''; return; }
-
-  container.innerHTML = `
-    <div class="wasted-month-row">
-      <span class="wasted-label-text">Wasted this month</span>
-      <span class="wasted-total">${total} hrs</span>
-    </div>
-  `;
+  const el = document.getElementById('stat-wasted-val');
+  if (el) el.textContent = total + ' hrs';
 }
 
 async function deleteWastedEntry(date, idx) {

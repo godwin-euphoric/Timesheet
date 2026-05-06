@@ -98,7 +98,20 @@
       <div class="stat-chip">Working days so far&nbsp;&nbsp;<strong id="working-days-count">—</strong></div>
     </div>
 
-    <div id="pending-bar" class="pending-bar hidden"></div>
+    <!-- Month Summary — before log controls -->
+    <div class="card">
+      <div class="summary-card-header">
+        <div class="entries-label" id="entries-date-label" style="margin-bottom:0">Month Summary</div>
+        <button id="main-undo-btn" class="btn-undo hidden" onclick="undoMainAdjustment()">↩ Undo Adjustment</button>
+      </div>
+      <div class="table-scroll">
+        <table class="mini-table">
+          <thead><tr><th class="cb-col"></th><th>Category</th><th>Completed</th><th>Target</th><th>Adjust</th><th>Pending</th></tr></thead>
+          <tbody id="entries-tbody"><tr><td colspan="6" class="empty">No categories yet</td></tr></tbody>
+        </table>
+      </div>
+      <div id="main-stats-row" class="main-stats-row"></div>
+    </div>
 
     <div class="log-row">
 
@@ -122,47 +135,29 @@
       </div>
 
       <div class="card wasted-card">
-      <div class="card-title wasted-title">Wasted Time</div>
-      <div class="log-form">
-        <div class="form-fields-row">
-          <div class="field-group" style="width:120px">
-            <label>Hours</label>
-            <input type="number" id="wasted-hours" placeholder="e.g. 1.5" min="0" max="24" step="0.25">
+        <div class="card-title wasted-title">Wasted Time</div>
+        <div class="log-form">
+          <div class="form-fields-row">
+            <div class="field-group" style="width:120px">
+              <label>Hours</label>
+              <input type="number" id="wasted-hours" placeholder="e.g. 1.5" min="0" max="24" step="0.25">
+            </div>
+            <div class="field-group" style="flex:1">
+              <label>Note</label>
+              <input type="text" id="wasted-note" placeholder="What was it? (e.g. Social media, YouTube)">
+            </div>
           </div>
-          <div class="field-group" style="flex:1">
-            <label>Note</label>
-            <input type="text" id="wasted-note" placeholder="What was it? (e.g. Social media, YouTube)">
+          <div class="field-group form-action">
+            <button class="btn-wasted" onclick="logWastedTime()">+ Add</button>
           </div>
-        </div>
-        <div class="field-group form-action">
-          <button class="btn-wasted" onclick="logWastedTime()">+ Add</button>
         </div>
       </div>
-    </div>
 
     </div><!-- end log-row -->
 
-    <div class="summary-grid">
-
-      <div class="card">
-        <div class="summary-card-header">
-          <div class="entries-label" id="entries-date-label" style="margin-bottom:0">Month Summary</div>
-          <button id="main-undo-btn" class="btn-undo hidden" onclick="undoMainAdjustment()">↩ Undo Adjustment</button>
-        </div>
-        <div class="table-scroll">
-          <table class="mini-table">
-            <thead><tr><th>Category</th><th>Completed</th><th>Target</th><th>Adjust</th><th>Pending</th></tr></thead>
-            <tbody id="entries-tbody"><tr><td colspan="5" class="empty">No categories yet</td></tr></tbody>
-          </table>
-        </div>
-        <div id="wasted-month-summary"></div>
-      </div>
-
-      <div class="card">
-        <div class="entries-label" id="day-entries-label">Today's Entries</div>
-        <div id="day-entries-list"><span class="empty-inline">No entries for this date</span></div>
-      </div>
-
+    <div class="card">
+      <div class="entries-label" id="day-entries-label">Today's Entries</div>
+      <div id="day-entries-list"><span class="empty-inline">No entries for this date</span></div>
     </div>
 
   </div>
