@@ -1614,6 +1614,8 @@ function schedulePlannerSave() {
   plannerSaveTimer = setTimeout(() => saveUserData({ planners: state.planners }), 800);
 }
 
+function mkRow(c0, c1) { return { c0: c0 || '', c1: c1 || '' }; }
+
 function defaultWeekdayPlanner() {
   return {
     id: pId(), name: 'Weekday Planner',
@@ -1621,52 +1623,52 @@ function defaultWeekdayPlanner() {
       {
         id: pId(), header: 'Morning till 10:30 am',
         cols: ['Activities', 'Notes'],
-        rows: [[
+        rows: [mkRow(
           '• 7:15 am - Get up + Get ready + Kids dress Iron + GYM MMA Class till 9:30 / 9:45 (optional milk in teashop)\n• Return to Home + Food Protein with Pratheeba + newspaper or TV + Bath + RR + Todo Tracker Note / Regular works Note + decide where to go',
           'Monday: MMA Gym\nTuesday: MMA Gym\nWednesday: MMA Gym or Gym\nThursday: Walking + script / Cycling / kids school drop + walking\nFriday: MMA'
-        ]]
+        )]
       },
       {
         id: pId(), header: '10:30 am to 2 pm',
         cols: ['Activities', 'Notes'],
-        rows: [[
+        rows: [mkRow(
           'Start from home to Outside and start productivity. If more out works and return to home only u can stay at home\n\nGoals:\n• FM SS, FM other, AI studies / practice\n• Movie / Books / Stories\n• To do home works\n• To do out works\n• Dhana Break\n• Pratheeba Time\n• Meditation\n• Workshops',
           'Out Options:\n1. One day movie (Wednesday)\n2. Selaiyur Library\n3. Radha Nagar Library\n4. Phoenix mall\n5. New Coworking on Friday or Friends Meeting Place\n6. Big out options - Dhana Studio works / Marriages'
-        ]]
+        )]
       },
       {
         id: pId(), header: '2 pm to 3 pm',
         cols: ['Activities', 'Notes'],
-        rows: [['Lunch + Pratheeba and get ready to coworking space / go to hotel and have lunch and go to coworking zone', '']]
+        rows: [mkRow('Lunch + Pratheeba and get ready to coworking space / go to hotel and have lunch and go to coworking zone', '')]
       },
       {
         id: pId(), header: '3 pm to 7:30 pm / 8 pm',
         cols: ['Activities', 'Notes'],
-        rows: [[
+        rows: [mkRow(
           'Office works zone:\n1. Office works\n2. Study works\n3. Money Generation works\n4. Goals - FM / Script works\n5. Office friends and breaks\n6. Hari / Dhana break\n7. Spillover\n8. Unplanned: Next day / Long Pending\n9. Enter E (Allowed Items)\n\nNote: you can add minor out shoppings when going out and coming back.',
           ''
-        ]]
+        )]
       },
       {
         id: pId(), header: '7:30 pm to 8:00 pm — Fruits Time with Family',
         cols: ['Activities', 'Notes'],
-        rows: [['Fruits Time with Family', '']]
+        rows: [mkRow('Fruits Time with Family', '')]
       },
       {
         id: pId(), header: '8 pm Slot',
         cols: ['Activities', 'Notes'],
-        rows: [[
+        rows: [mkRow(
           '1. Dhanasekar / Ravi break\n1b. MMA / Dance class\n2. Family related shopping\n2b. Family outing\n3. Cycling / Walking + Phone calls\n4. Office pending works\n5. Spillover works\n6. Movie / Youtube (Allowed items)\n7. Home cleaning\n8. Unplanned Items: Next days works / long pending works\n10. Dinner with family or Alone',
           ''
-        ]]
+        )]
       },
       {
         id: pId(), header: '10 pm',
         cols: ['Activities', 'Notes'],
-        rows: [[
+        rows: [mkRow(
           '1. Kids games and speech\n2. Pratheeba time spend and speech\n3. Productivity: FM / AI\n4. Movies / Story Books\n5. Family phone Calls\n6. Urgent Spillover\n7. Tomorrow planner\n8. Whatsapp update 1, 2\n9. Sleep Early (12 to 12:30)',
           'RR: books, movies, Anantha Vikatan, Nanayam Vijayan / YouTube'
-        ]]
+        )]
       }
     ]
   };
@@ -1674,7 +1676,12 @@ function defaultWeekdayPlanner() {
 
 async function loadPlannerTab() {
   const ud = await getUserData();
-  if (!ud.planners || ud.planners.length === 0) {
+  // Treat planners with old nested-array rows as missing (Firestore couldn't save them)
+  const hasValidPlanners = ud.planners && ud.planners.length > 0 &&
+    ud.planners[0].blocks && ud.planners[0].blocks.length > 0 &&
+    ud.planners[0].blocks[0].rows && ud.planners[0].blocks[0].rows.length > 0 &&
+    !Array.isArray(ud.planners[0].blocks[0].rows[0]);
+  if (!hasValidPlanners) {
     state.planners = [defaultWeekdayPlanner()];
     await saveUserData({ planners: state.planners });
   } else {
@@ -1725,7 +1732,7 @@ function renderPlannerBlock(pi, bi, block) {
     const cells = cols.map((_, ci) => `
       <td class="planner-cell-td">
         <textarea class="planner-cell" rows="1"
-          onblur="updatePlannerCell(${pi},${bi},${ri},${ci},this.value)">${escHtml(row[ci] || '')}</textarea>
+          onblur="updatePlannerCell(${pi},${bi},${ri},${ci},this.value)">${escHtml(row['c'+ci] || '')}</textarea>
       </td>`).join('');
     return `<tr>
       ${cells}
@@ -1786,7 +1793,7 @@ async function deletePlanner(idx) {
 
 async function addPlannerBlock() {
   const pi = state.activePlannerIdx;
-  state.planners[pi].blocks.push({ id: pId(), header: 'New Block', cols: ['Column 1', 'Column 2'], rows: [['', '']] });
+  state.planners[pi].blocks.push({ id: pId(), header: 'New Block', cols: ['Column 1', 'Column 2'], rows: [{ c0: '', c1: '' }] });
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -1799,8 +1806,10 @@ async function deletePlannerBlock(pi, bi) {
 }
 
 async function addPlannerRow(pi, bi) {
-  const block = state.planners[pi].blocks[bi];
-  block.rows.push(block.cols.map(() => ''));
+  const block  = state.planners[pi].blocks[bi];
+  const newRow = {};
+  block.cols.forEach((_, i) => { newRow['c' + i] = ''; });
+  block.rows.push(newRow);
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -1812,9 +1821,10 @@ async function removePlannerRow(pi, bi, ri) {
 }
 
 async function addPlannerColumn(pi, bi) {
-  const block = state.planners[pi].blocks[bi];
-  block.cols.push('Column ' + (block.cols.length + 1));
-  block.rows.forEach(row => row.push(''));
+  const block  = state.planners[pi].blocks[bi];
+  const newIdx = block.cols.length;
+  block.cols.push('Column ' + (newIdx + 1));
+  block.rows.forEach(row => { row['c' + newIdx] = ''; });
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -1823,7 +1833,10 @@ async function removePlannerColumn(pi, bi, ci) {
   const block = state.planners[pi].blocks[bi];
   if (block.cols.length <= 1) return;
   block.cols.splice(ci, 1);
-  block.rows.forEach(row => row.splice(ci, 1));
+  block.rows.forEach(row => {
+    for (let i = ci; i < block.cols.length; i++) row['c' + i] = row['c' + (i + 1)] || '';
+    delete row['c' + block.cols.length];
+  });
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -1839,6 +1852,6 @@ function updatePlannerColName(pi, bi, ci, value) {
 }
 
 function updatePlannerCell(pi, bi, ri, ci, value) {
-  state.planners[pi].blocks[bi].rows[ri][ci] = value;
+  state.planners[pi].blocks[bi].rows[ri]['c' + ci] = value;
   schedulePlannerSave();
 }
