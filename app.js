@@ -1735,6 +1735,272 @@ async function downloadExcel() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+//  EXCEL IMPORT
+// ══════════════════════════════════════════════════════════════════════════
+
+let _importPending = null;
+
+function closeImportModal() {
+  document.getElementById('import-modal').style.display = 'none';
+  document.getElementById('import-file-input').value = '';
+  _importPending = null;
+}
+
+async function importExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  showToast('Reading file...');
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+
+    // ── helpers ────────────────────────────────────────────────────────────
+    function cellVal(cell) {
+      const v = cell.value;
+      if (v === null || v === undefined) return '';
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      if (typeof v === 'object' && 'result' in v) return v.result ?? '';
+      if (typeof v === 'object' && 'text' in v) return String(v.text);
+      return v;
+    }
+    function cellStr(cell) { const v = cellVal(cell); return v === null || v === undefined ? '' : String(v).trim(); }
+    function cellNum(cell) { const v = cellVal(cell); return typeof v === 'number' ? v : (parseFloat(v) || 0); }
+
+    function sheetRows(ws) {
+      const rows = [];
+      ws.eachRow(row => {
+        const vals = [];
+        row.eachCell({ includeEmpty: true }, cell => vals.push(cell));
+        rows.push(vals);
+      });
+      return rows;
+    }
+
+    // ── parse each E- sheet ────────────────────────────────────────────────
+    const parsed = {};
+
+    wb.eachSheet(ws => {
+      const name = ws.name;
+      const rows = sheetRows(ws);
+      if (!rows.length) return;
+
+      // E - Monthly Entries
+      if (name === 'E - Monthly Entries') {
+        const header = rows[0].map(c => cellStr(c));
+        const cats = header.slice(2, header.length - 2); // strip Date, Day, Total, Status
+        const entries = {};
+        let month = null;
+        for (let i = 1; i < rows.length; i++) {
+          const dateStr = cellStr(rows[i][0]);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+          if (!month) month = dateStr.slice(0, 7);
+          const dayData = {};
+          cats.forEach((cat, ci) => {
+            const hrs = cellNum(rows[i][2 + ci]);
+            if (hrs) dayData[cat] = hrs;
+          });
+          if (Object.keys(dayData).length) entries[dateStr] = dayData;
+        }
+        if (month) parsed.monthlyEntries = { month, entries };
+      }
+
+      // E - Journal
+      else if (name === 'E - Journal') {
+        const fmLog = [];
+        for (let i = 1; i < rows.length; i++) {
+          const date = cellStr(rows[i][0]);
+          const type = cellStr(rows[i][1]);
+          const name2 = cellStr(rows[i][2]);
+          const notes = cellStr(rows[i][3]);
+          if (date && name2) fmLog.push({ id: pId(), date, type, name: name2, notes });
+        }
+        if (fmLog.length) parsed.fmLog = fmLog;
+      }
+
+      // E - Categories
+      else if (name === 'E - Categories') {
+        const categories = [];
+        for (let i = 1; i < rows.length; i++) {
+          const category = cellStr(rows[i][0]);
+          const daily_target = cellNum(rows[i][1]);
+          if (category) categories.push({ category, daily_target });
+        }
+        if (categories.length) parsed.categories = categories;
+      }
+
+      // E - Leaves
+      else if (name === 'E - Leaves') {
+        const leaves = [];
+        for (let i = 1; i < rows.length; i++) {
+          const d = cellStr(rows[i][0]);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(d)) leaves.push(d);
+        }
+        if (leaves.length) parsed.leaves = leaves;
+      }
+
+      // E - Wasted Time
+      else if (name === 'E - Wasted Time') {
+        const wastedEntries = {};
+        for (let i = 1; i < rows.length; i++) {
+          const date = cellStr(rows[i][0]);
+          const hours = cellNum(rows[i][1]);
+          const note = cellStr(rows[i][2]);
+          if (date && hours) {
+            if (!wastedEntries[date]) wastedEntries[date] = [];
+            wastedEntries[date].push({ hours, note });
+          }
+        }
+        if (Object.keys(wastedEntries).length) parsed.wastedEntries = wastedEntries;
+      }
+
+      // E - Adjustments
+      else if (name === 'E - Adjustments') {
+        const adjustments = {};
+        for (let i = 1; i < rows.length; i++) {
+          const cat = cellStr(rows[i][0]);
+          const val = cellNum(rows[i][1]);
+          if (cat) adjustments[cat] = val;
+        }
+        if (Object.keys(adjustments).length) parsed.adjustments = adjustments;
+      }
+
+      // E - Habits
+      else if (name === 'E - Habits') {
+        const habits = [];
+        const habitLog = {};
+        let inLog = false;
+        let logHabits = [];
+        for (let i = 1; i < rows.length; i++) {
+          const first = cellStr(rows[i][0]);
+          if (!inLog && !first) { inLog = true; continue; } // blank row = separator
+          if (!inLog) {
+            if (first) habits.push(first);
+          } else {
+            if (!logHabits.length) { logHabits = rows[i].slice(1).map(c => cellStr(c)).filter(Boolean); continue; }
+            if (!first) continue;
+            const dateStr = first;
+            const dayLog = {};
+            logHabits.forEach((h, hi) => {
+              if (cellStr(rows[i][1 + hi]).toLowerCase() === 'yes') dayLog[h] = true;
+            });
+            if (Object.keys(dayLog).length) habitLog[dateStr] = dayLog;
+          }
+        }
+        if (habits.length) parsed.habits = { habits, habitLog };
+      }
+
+      // E - Planner sheets
+      else if (name.startsWith('E - ')) {
+        const plannerName = name.slice(4).trim();
+        const blocks = [];
+        let block = null;
+        let expectingColHeader = false;
+        for (let i = 0; i < rows.length; i++) {
+          const firstVal = cellStr(rows[i][0]);
+          const rowVals = rows[i].map(c => cellStr(c));
+          const nonEmpty = rowVals.filter(Boolean).length;
+          if (!nonEmpty) { block = null; expectingColHeader = false; continue; } // blank = separator
+          if (!block) {
+            // first non-blank after separator = block header
+            block = { header: firstVal, cols: [], rows: [] };
+            blocks.push(block);
+            expectingColHeader = true;
+            continue;
+          }
+          if (expectingColHeader) {
+            block.cols = rowVals.filter(Boolean);
+            expectingColHeader = false;
+            continue;
+          }
+          // data row
+          const rowObj = {};
+          block.cols.forEach((_, ci) => { rowObj[`c${ci}`] = cellStr(rows[i][ci]) || ''; });
+          block.rows.push(rowObj);
+        }
+        if (blocks.length) {
+          if (!parsed.planners) parsed.planners = [];
+          parsed.planners.push({ id: pId(), name: plannerName, blocks });
+        }
+      }
+    });
+
+    // ── detect month ───────────────────────────────────────────────────────
+    const month = parsed.monthlyEntries?.month
+      || parsed.leaves?.[0]?.slice(0, 7)
+      || parsed.wastedEntries && Object.keys(parsed.wastedEntries).sort()[0]?.slice(0, 7)
+      || state.mainMonth;
+
+    // ── build summary for confirmation modal ───────────────────────────────
+    const lines = [];
+    if (parsed.monthlyEntries) lines.push(`• Monthly entries for <b>${formatMonth(month)}</b> (${Object.keys(parsed.monthlyEntries.entries).length} days)`);
+    if (parsed.categories)     lines.push(`• ${parsed.categories.length} categories`);
+    if (parsed.leaves)         lines.push(`• ${parsed.leaves.length} leave days`);
+    if (parsed.wastedEntries)  lines.push(`• Wasted time entries`);
+    if (parsed.adjustments)    lines.push(`• Adjustments for ${Object.keys(parsed.adjustments).length} categories`);
+    if (parsed.fmLog)          lines.push(`• ${parsed.fmLog.length} journal entries`);
+    if (parsed.habits)         lines.push(`• ${parsed.habits.habits.length} habits + log`);
+    if (parsed.planners)       lines.push(`• ${parsed.planners.length} planner sheet(s)`);
+
+    if (!lines.length) { showToast('Nothing to import found in file'); closeImportModal(); return; }
+
+    document.getElementById('import-modal-body').innerHTML =
+      `Found the following data to import:<br><br>${lines.join('<br>')}` +
+      `<br><br><b style="color:#f0a040">This will overwrite existing data for the affected month/sections.</b>`;
+
+    _importPending = { parsed, month };
+    const modal = document.getElementById('import-modal');
+    modal.style.display = 'flex';
+    document.getElementById('import-confirm-btn').onclick = confirmImport;
+
+  } catch(e) {
+    console.error('Import read failed', e);
+    showToast('Failed to read file');
+    closeImportModal();
+  }
+}
+
+async function confirmImport() {
+  if (!_importPending) return;
+  const { parsed, month } = _importPending;
+  closeImportModal();
+  showToast('Importing...');
+  try {
+    // Load existing month doc to merge into
+    const monthData = await getMonthData(month);
+
+    if (parsed.categories)    monthData.categories    = parsed.categories;
+    if (parsed.leaves)        monthData.leaves        = parsed.leaves;
+    if (parsed.wastedEntries) monthData.wastedEntries = parsed.wastedEntries;
+    if (parsed.adjustments)   monthData.adjustments   = parsed.adjustments;
+    if (parsed.monthlyEntries) monthData.entries      = parsed.monthlyEntries.entries;
+
+    await saveMonthData(month, monthData);
+
+    if (parsed.fmLog)   await saveUserData({ fmLog: parsed.fmLog });
+    if (parsed.habits)  await saveUserData({ habits: parsed.habits.habits, habitLog: parsed.habits.habitLog });
+    if (parsed.planners) {
+      // Merge imported planners by name — replace matching, append new
+      const existing = state.planners || [];
+      parsed.planners.forEach(imp => {
+        const idx = existing.findIndex(p => p.name === imp.name);
+        if (idx >= 0) existing[idx] = imp; else existing.push(imp);
+      });
+      state.planners = existing;
+      await saveUserData({ planners: state.planners });
+    }
+
+    // Invalidate caches so tabs reload fresh data
+    state.userDataCache = null;
+
+    showToast('Import complete — reload tabs to see changes');
+  } catch(e) {
+    console.error('Import save failed', e);
+    showToast('Import failed — check console');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 //  EMAIL REPORT
 // ══════════════════════════════════════════════════════════════════════════
 
