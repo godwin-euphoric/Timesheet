@@ -1514,7 +1514,7 @@ async function downloadExcel() {
       const cats = (data.categories||[]).map(c=>c.category);
       const [y,m] = month.split('-').map(Number);
       const total = daysInMonth(y,m);
-      const ws = wb.addWorksheet('Monthly Entries');
+      const ws = wb.addWorksheet('E - Monthly Entries');
       ws.getColumn(1).width = 14; ws.getColumn(2).width = 8;
       cats.forEach((_,i) => { ws.getColumn(3+i).width = 12; });
       ws.getColumn(3+cats.length).width = 10;
@@ -1587,7 +1587,7 @@ async function downloadExcel() {
     try {
       const fmEntries = (userData.fmLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
       if (fmEntries.length) {
-        const ws = wb.addWorksheet('Journal');
+        const ws = wb.addWorksheet('E - Journal');
         ws.getColumn(1).width=14; ws.getColumn(2).width=20; ws.getColumn(3).width=42; ws.getColumn(4).width=42;
         const hRow = ws.addRow(['Date','Category','Title','Notes']);
         styleRow(hRow, 4, BLUE_FILL, BLUE_FONT);
@@ -1604,7 +1604,7 @@ async function downloadExcel() {
       const data = await getMonthData(month);
       const cats = data.categories || [];
       if (cats.length) {
-        const ws = wb.addWorksheet('Categories');
+        const ws = wb.addWorksheet('E - Categories');
         ws.getColumn(1).width = 30; ws.getColumn(2).width = 20;
         const hRow = ws.addRow(['Category', 'Daily Target (hrs)']);
         styleRow(hRow, 2, BLUE_FILL, BLUE_FONT);
@@ -1618,7 +1618,7 @@ async function downloadExcel() {
       const data = await getMonthData(month);
       const leaves = (data.leaves || []).slice().sort();
       if (leaves.length) {
-        const ws = wb.addWorksheet('Leaves');
+        const ws = wb.addWorksheet('E - Leaves');
         ws.getColumn(1).width = 16;
         const hRow = ws.addRow(['Leave Date']);
         styleRow(hRow, 1, BLUE_FILL, BLUE_FONT);
@@ -1636,7 +1636,7 @@ async function downloadExcel() {
         arr.forEach(e => rows.push([date, e.hours, e.note || '']));
       });
       if (rows.length) {
-        const ws = wb.addWorksheet('Wasted Time');
+        const ws = wb.addWorksheet('E - Wasted Time');
         ws.getColumn(1).width = 14; ws.getColumn(2).width = 14; ws.getColumn(3).width = 40;
         const hRow = ws.addRow(['Date', 'Hours', 'Note']);
         styleRow(hRow, 3, BLUE_FILL, BLUE_FONT);
@@ -1651,7 +1651,7 @@ async function downloadExcel() {
       const adjustments = data.adjustments || {};
       const entries = Object.entries(adjustments).filter(([,v]) => v !== 0);
       if (entries.length) {
-        const ws = wb.addWorksheet('Adjustments');
+        const ws = wb.addWorksheet('E - Adjustments');
         ws.getColumn(1).width = 30; ws.getColumn(2).width = 18;
         const hRow = ws.addRow(['Category', 'Adjustment (hrs)']);
         styleRow(hRow, 2, BLUE_FILL, BLUE_FONT);
@@ -1664,7 +1664,7 @@ async function downloadExcel() {
       const habits = userData.habits || [];
       const habitLog = userData.habitLog || {};
       if (habits.length) {
-        const ws = wb.addWorksheet('Habits');
+        const ws = wb.addWorksheet('E - Habits');
         // Section 1: habit list
         const listHRow = ws.addRow(['Habit Name']);
         styleRow(listHRow, 1, BLUE_FILL, BLUE_FONT);
@@ -1691,7 +1691,7 @@ async function downloadExcel() {
     // ── 10. Planner — each planner tab = one sheet, blocks stacked ─────────
     try {
       (state.planners||[]).forEach(pl => {
-        const ws = wb.addWorksheet(sanitizeName(pl.name));
+        const ws = wb.addWorksheet(sanitizeName(`E - ${pl.name}`));
         let firstBlock = true;
         (pl.blocks||[]).forEach(block => {
           const cols = block.cols||['Col1','Col2'];
