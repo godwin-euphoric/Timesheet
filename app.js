@@ -1658,10 +1658,11 @@ async function downloadExcel() {
         const catVals = cats.map(cat=>{ const hrs=dayEntries[cat]||0; dayTotal+=hrs; return hrs||''; });
         dayTotal = Math.round(dayTotal*100)/100;
         let status='';
-        if (dt.getDay()===0||dt.getDay()===6) status='Weekend';
+        if (dateStr>today) status='Future';
         else if (leavesSet.has(dateStr)) status='Leave';
-        else if (dateStr>today) status='Future';
-        else status=dayTotal>0?'Done':'No entry';
+        else if (dayTotal>0) status='Done';
+        else if (dt.getDay()===0||dt.getDay()===6) status='Weekend';
+        else status='No entry';
         const row = ws.addRow([dateStr, dayNames[dt.getDay()], ...catVals, dayTotal||'', status]);
         borderRow(row, 2+cats.length+2);
         if (dt.getDay()===0||dt.getDay()===6) row.eachCell(cell=>{ cell.fill=GRAY_FILL; });
@@ -1676,17 +1677,15 @@ async function downloadExcel() {
         const allCats = [...new Set(months.flatMap(mo=>(allData[mo].categories||[]).map(c=>c.category)))];
         const ws = wb.addWorksheet(`Yearly ${year}`);
         ws.getColumn(1).width = 18; ws.getColumn(2).width = 14;
-        allCats.forEach((_,i)=>{ ws.getColumn(3+i).width = 18; });
-        ws.getColumn(3+allCats.length).width = 12;
-        ws.getColumn(4+allCats.length).width = 10;
-
+        allCats.forEach((_,i)=>{ ws.getColumn(3+i).width = 14; });
         ws.getColumn(3+allCats.length).width = 12;
         ws.getColumn(4+allCats.length).width = 10;
         ws.getColumn(5+allCats.length).width = 12;
         ws.getColumn(6+allCats.length).width = 12;
+        ws.getColumn(7+allCats.length).width = 36;
 
-        const hRow = ws.addRow(['Month','Working Days',...allCats.map(c=>`${c} (Done/Target)`),'Total Done','Wasted','GYM Days','MMA Days']);
-        styleRow(hRow, 2+allCats.length+4, BLUE_FILL, BLUE_FONT);
+        const hRow = ws.addRow(['Month','Working Days',...allCats,'Total Done','Wasted','GYM Days','MMA Days','Comments']);
+        styleRow(hRow, 2+allCats.length+5, BLUE_FILL, BLUE_FONT);
         const today = todayStr();
         months.forEach(month => {
           const mData = allData[month];
@@ -1700,16 +1699,16 @@ async function downloadExcel() {
           const ents = mData.entries||{};
           let mDone=0;
           const catCells = allCats.map(cat=>{
-            const target=Math.round((catMap[cat]||0)*workingDays*100)/100;
             let done=0; Object.values(ents).forEach(dayE=>{done+=dayE[cat]||0;}); done=Math.round(done*100)/100; mDone+=done;
-            return `${done} / ${target}`;
+            return done||'';
           });
           let mWasted=0; Object.values(mData.wastedEntries||{}).forEach(arr=>arr.forEach(e=>{mWasted+=e.hours||0;})); mWasted=Math.round(mWasted*100)/100;
           const mbd2 = mData.fitnessBreakdown||{};
           const mGym = Object.values(mbd2).filter(d=>(d.fitGYM||0)>0).length;
           const mMma = Object.values(mbd2).filter(d=>(d.fitMMA||0)>0).length;
-          const row = ws.addRow([formatMonth(month), workingDays, ...catCells, Math.round(mDone*100)/100, mWasted, mGym||'', mMma||'']);
-          borderRow(row, 2+allCats.length+4);
+          const comment = mData.yearlyComment||'';
+          const row = ws.addRow([formatMonth(month), workingDays, ...catCells, Math.round(mDone*100)/100||'', mWasted||'', mGym||'', mMma||'', comment]);
+          borderRow(row, 2+allCats.length+5);
         });
       }
     } catch(e) { console.error('Yearly failed', e); }
