@@ -1903,54 +1903,48 @@ async function importExcel(input) {
   showToast('Reading file...');
   try {
     const buf = await file.arrayBuffer();
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buf);
+    // Use SheetJS (XLSX) for reading — more reliable in browsers than ExcelJS
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
 
     // ── helpers ────────────────────────────────────────────────────────────
-    function cellVal(cell) {
-      const v = cell.value;
+    function sv(v) { // safe string value from a raw cell value
       if (v === null || v === undefined) return '';
-      if (v instanceof Date) return v.toISOString().slice(0, 10);
-      if (typeof v === 'object' && 'result' in v) return v.result ?? '';
-      if (typeof v === 'object' && 'text' in v) return String(v.text);
-      return v;
+      if (v instanceof Date) {
+        const d = v;
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      }
+      return String(v).trim();
     }
-    function cellStr(cell) { const v = cellVal(cell); return v === null || v === undefined ? '' : String(v).trim(); }
-    function cellNum(cell) { const v = cellVal(cell); return typeof v === 'number' ? v : (parseFloat(v) || 0); }
+    function nv(v) { return typeof v === 'number' ? v : (parseFloat(v) || 0); }
 
-    function sheetRows(ws) {
-      const rows = [];
-      ws.eachRow(row => {
-        const vals = [];
-        row.eachCell({ includeEmpty: true }, cell => vals.push(cell));
-        rows.push(vals);
-      });
-      return rows;
+    // sheet_to_json with header:1 gives rows as plain value arrays
+    function getRows(sheetName) {
+      const ws = wb.Sheets[sheetName];
+      if (!ws) return [];
+      return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
     }
 
     // ── parse each E- sheet ────────────────────────────────────────────────
     const parsed = {};
 
-    wb.eachSheet(ws => {
-      const name = ws.name;
-      const rows = sheetRows(ws);
-      if (!rows.length) return;
+    for (const name of wb.SheetNames) {
+      const rows = getRows(name);
+      if (rows.length < 2) continue;
 
       // E - Monthly Entries
       if (name === 'E - Monthly Entries') {
-        const header = rows[0].map(c => cellStr(c));
-        const cats = header.slice(2, header.length - 2); // strip Date, Day, Total, Status
+        const header = rows[0].map(sv);
+        // categories sit between Date,Day and Total (find Total index)
+        const totalIdx = header.indexOf('Total');
+        const cats = totalIdx > 2 ? header.slice(2, totalIdx) : [];
         const entries = {};
         let month = null;
         for (let i = 1; i < rows.length; i++) {
-          const dateStr = cellStr(rows[i][0]);
+          const dateStr = sv(rows[i][0]);
           if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
           if (!month) month = dateStr.slice(0, 7);
           const dayData = {};
-          cats.forEach((cat, ci) => {
-            const hrs = cellNum(rows[i][2 + ci]);
-            if (hrs) dayData[cat] = hrs;
-          });
+          cats.forEach((cat, ci) => { const hrs = nv(rows[i][2 + ci]); if (hrs) dayData[cat] = hrs; });
           if (Object.keys(dayData).length) entries[dateStr] = dayData;
         }
         if (month) parsed.monthlyEntries = { month, entries };
@@ -1960,10 +1954,7 @@ async function importExcel(input) {
       else if (name === 'E - Journal') {
         const fmLog = [];
         for (let i = 1; i < rows.length; i++) {
-          const date = cellStr(rows[i][0]);
-          const type = cellStr(rows[i][1]);
-          const name2 = cellStr(rows[i][2]);
-          const notes = cellStr(rows[i][3]);
+          const date = sv(rows[i][0]), type = sv(rows[i][1]), name2 = sv(rows[i][2]), notes = sv(rows[i][3]);
           if (date && name2) fmLog.push({ id: pId(), date, type, name: name2, notes });
         }
         if (fmLog.length) parsed.fmLog = fmLog;
@@ -1973,9 +1964,8 @@ async function importExcel(input) {
       else if (name === 'E - Categories') {
         const categories = [];
         for (let i = 1; i < rows.length; i++) {
-          const category = cellStr(rows[i][0]);
-          const daily_target = cellNum(rows[i][1]);
-          if (category) categories.push({ category, daily_target });
+          const category = sv(rows[i][0]);
+          if (category) categories.push({ category, daily_target: nv(rows[i][1]) });
         }
         if (categories.length) parsed.categories = categories;
       }
@@ -1984,7 +1974,7 @@ async function importExcel(input) {
       else if (name === 'E - Leaves') {
         const leaves = [];
         for (let i = 1; i < rows.length; i++) {
-          const d = cellStr(rows[i][0]);
+          const d = sv(rows[i][0]);
           if (/^\d{4}-\d{2}-\d{2}$/.test(d)) leaves.push(d);
         }
         if (leaves.length) parsed.leaves = leaves;
@@ -1994,9 +1984,7 @@ async function importExcel(input) {
       else if (name === 'E - Wasted Time') {
         const wastedEntries = {};
         for (let i = 1; i < rows.length; i++) {
-          const date = cellStr(rows[i][0]);
-          const hours = cellNum(rows[i][1]);
-          const note = cellStr(rows[i][2]);
+          const date = sv(rows[i][0]), hours = nv(rows[i][1]), note = sv(rows[i][2]);
           if (date && hours) {
             if (!wastedEntries[date]) wastedEntries[date] = [];
             wastedEntries[date].push({ hours, note });
@@ -2009,33 +1997,27 @@ async function importExcel(input) {
       else if (name === 'E - Adjustments') {
         const adjustments = {};
         for (let i = 1; i < rows.length; i++) {
-          const cat = cellStr(rows[i][0]);
-          const val = cellNum(rows[i][1]);
-          if (cat) adjustments[cat] = val;
+          const cat = sv(rows[i][0]);
+          if (cat) adjustments[cat] = nv(rows[i][1]);
         }
         if (Object.keys(adjustments).length) parsed.adjustments = adjustments;
       }
 
       // E - Habits
       else if (name === 'E - Habits') {
-        const habits = [];
-        const habitLog = {};
-        let inLog = false;
-        let logHabits = [];
+        const habits = [], habitLog = {};
+        let inLog = false, logHabits = [];
         for (let i = 1; i < rows.length; i++) {
-          const first = cellStr(rows[i][0]);
-          if (!inLog && !first) { inLog = true; continue; } // blank row = separator
-          if (!inLog) {
-            if (first) habits.push(first);
-          } else {
-            if (!logHabits.length) { logHabits = rows[i].slice(1).map(c => cellStr(c)).filter(Boolean); continue; }
+          const first = sv(rows[i][0]);
+          const rowEmpty = rows[i].every(v => !sv(v));
+          if (!inLog && rowEmpty) { inLog = true; continue; }
+          if (!inLog) { if (first) habits.push(first); }
+          else {
+            if (!logHabits.length) { logHabits = rows[i].slice(1).map(sv).filter(Boolean); continue; }
             if (!first) continue;
-            const dateStr = first;
             const dayLog = {};
-            logHabits.forEach((h, hi) => {
-              if (cellStr(rows[i][1 + hi]).toLowerCase() === 'yes') dayLog[h] = true;
-            });
-            if (Object.keys(dayLog).length) habitLog[dateStr] = dayLog;
+            logHabits.forEach((h, hi) => { if (sv(rows[i][1+hi]).toLowerCase() === 'yes') dayLog[h] = true; });
+            if (Object.keys(dayLog).length) habitLog[first] = dayLog;
           }
         }
         if (habits.length) parsed.habits = { habits, habitLog };
@@ -2045,53 +2027,38 @@ async function importExcel(input) {
       else if (name.startsWith('E - ')) {
         const plannerName = name.slice(4).trim();
         const blocks = [];
-        let block = null;
-        let expectingColHeader = false;
+        let block = null, expectingCols = false;
         for (let i = 0; i < rows.length; i++) {
-          const firstVal = cellStr(rows[i][0]);
-          const rowVals = rows[i].map(c => cellStr(c));
+          const firstVal = sv(rows[i][0]);
+          const rowVals = rows[i].map(sv);
           const nonEmpty = rowVals.filter(Boolean).length;
-          if (!nonEmpty) { block = null; expectingColHeader = false; continue; } // blank = separator
-          if (!block) {
-            // first non-blank after separator = block header
-            block = { header: firstVal, cols: [], rows: [] };
-            blocks.push(block);
-            expectingColHeader = true;
-            continue;
-          }
-          if (expectingColHeader) {
-            block.cols = rowVals.filter(Boolean);
-            expectingColHeader = false;
-            continue;
-          }
-          // data row
+          if (!nonEmpty) { block = null; expectingCols = false; continue; }
+          if (!block) { block = { header: firstVal, cols: [], rows: [] }; blocks.push(block); expectingCols = true; continue; }
+          if (expectingCols) { block.cols = rowVals.filter(Boolean); expectingCols = false; continue; }
           const rowObj = {};
-          block.cols.forEach((_, ci) => { rowObj[`c${ci}`] = cellStr(rows[i][ci]) || ''; });
+          block.cols.forEach((_, ci) => { rowObj[`c${ci}`] = sv(rows[i][ci]) || ''; });
           block.rows.push(rowObj);
         }
-        if (blocks.length) {
-          if (!parsed.planners) parsed.planners = [];
-          parsed.planners.push({ id: pId(), name: plannerName, blocks });
-        }
+        if (blocks.length) { if (!parsed.planners) parsed.planners = []; parsed.planners.push({ id: pId(), name: plannerName, blocks }); }
       }
-    });
+    }
 
     // ── detect month ───────────────────────────────────────────────────────
     const month = parsed.monthlyEntries?.month
       || parsed.leaves?.[0]?.slice(0, 7)
-      || parsed.wastedEntries && Object.keys(parsed.wastedEntries).sort()[0]?.slice(0, 7)
+      || (parsed.wastedEntries && Object.keys(parsed.wastedEntries).sort()[0]?.slice(0, 7))
       || state.mainMonth;
 
     // ── build summary for confirmation modal ───────────────────────────────
     const lines = [];
     if (parsed.monthlyEntries) lines.push(`• Monthly entries for <b>${formatMonth(month)}</b> (${Object.keys(parsed.monthlyEntries.entries).length} days)`);
-    if (parsed.categories)     lines.push(`• ${parsed.categories.length} categories`);
-    if (parsed.leaves)         lines.push(`• ${parsed.leaves.length} leave days`);
-    if (parsed.wastedEntries)  lines.push(`• Wasted time entries`);
-    if (parsed.adjustments)    lines.push(`• Adjustments for ${Object.keys(parsed.adjustments).length} categories`);
-    if (parsed.fmLog)          lines.push(`• ${parsed.fmLog.length} journal entries`);
-    if (parsed.habits)         lines.push(`• ${parsed.habits.habits.length} habits + log`);
-    if (parsed.planners)       lines.push(`• ${parsed.planners.length} planner sheet(s)`);
+    if (parsed.categories)    lines.push(`• ${parsed.categories.length} categories`);
+    if (parsed.leaves)        lines.push(`• ${parsed.leaves.length} leave days`);
+    if (parsed.wastedEntries) lines.push(`• Wasted time entries`);
+    if (parsed.adjustments)   lines.push(`• Adjustments for ${Object.keys(parsed.adjustments).length} categories`);
+    if (parsed.fmLog)         lines.push(`• ${parsed.fmLog.length} journal entries`);
+    if (parsed.habits)        lines.push(`• ${parsed.habits.habits.length} habits + log`);
+    if (parsed.planners)      lines.push(`• ${parsed.planners.length} planner sheet(s)`);
 
     if (!lines.length) { showToast('Nothing to import found in file'); closeImportModal(); return; }
 
@@ -2100,8 +2067,7 @@ async function importExcel(input) {
       `<br><br><b style="color:#f0a040">This will overwrite existing data for the affected month/sections.</b>`;
 
     _importPending = { parsed, month };
-    const modal = document.getElementById('import-modal');
-    modal.style.display = 'flex';
+    document.getElementById('import-modal').style.display = 'flex';
     document.getElementById('import-confirm-btn').onclick = confirmImport;
 
   } catch(e) {
