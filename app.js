@@ -665,8 +665,119 @@ async function persistLeaves() {
 const FITNESS_CAT  = 'Fitness';
 const FITNESS_SUBS = ['fitGYM', 'fitMMA', 'fitOthers'];
 
+// ── Mobile transposed monthly table (categories as rows, dates as columns) ──
+function renderMonthlyTableMobile(data) {
+  const month = state.monthlyMonth;
+  const [year, mon] = month.split('-').map(Number);
+  const totalDays = daysInMonth(year, mon);
+  const today = todayStr();
+  const categories = data.categories.map(c => c.category);
+  const entries = data.entries || {};
+  const breakdown = data.fitnessBreakdown || {};
+  const leavesSet = new Set(data.leaves || []);
+  const wastedEntries = data.wastedEntries || {};
+  const dn = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  const dates = [];
+  for (let d = 1; d <= totalDays; d++) {
+    const dt = new Date(year, mon - 1, d);
+    const ds = `${month}-${String(d).padStart(2,'0')}`;
+    dates.push({ d, ds, dt, we: dt.getDay()===0||dt.getDay()===6, isToday: ds===today, future: ds>today, leave: leavesSet.has(ds) });
+  }
+
+  // Header: Category col + one col per date
+  const headCols = dates.map(di =>
+    `<th class="mob-date-th${di.isToday?' col-today':di.we?' col-weekend':''}">${String(di.d).padStart(2,'0')}<br><span class="mob-day-nm">${dn[di.dt.getDay()]}</span></th>`
+  ).join('');
+  document.getElementById('monthly-thead').innerHTML = `<tr><th class="mob-cat-th">Category</th>${headCols}</tr>`;
+
+  const oldTbody = document.getElementById('monthly-tbody');
+  const newTbody = oldTbody.cloneNode(false);
+  newTbody.id = 'monthly-tbody';
+  oldTbody.parentNode.replaceChild(newTbody, oldTbody);
+  const tbody = newTbody;
+
+  function dataCell(di, hrs, extra='', extraCls='') {
+    if (di.future) return `<td class="mob-data-cell${di.we?' mob-we':''}${extraCls?' '+extraCls:''}"></td>`;
+    const v = hrs > 0 ? hrs : '';
+    const hrsClass = hrs > 0 ? ' cell-hrs' : '';
+    return `<td class="editable-cell mob-data-cell${di.we?' mob-we':''}${hrsClass}${extraCls?' '+extraCls:''}" ${extra}>${v}</td>`;
+  }
+
+  // Category rows
+  categories.forEach(cat => {
+    if (cat === FITNESS_CAT) {
+      const fhTr = document.createElement('tr');
+      fhTr.innerHTML = `<td class="mob-cat-th fitness-group" colspan="${dates.length+1}">Fitness</td>`;
+      tbody.appendChild(fhTr);
+      FITNESS_SUBS.forEach(sub => {
+        const tr = document.createElement('tr');
+        const cells = dates.map(di => {
+          if (di.future) return `<td class="mob-data-cell fitness-sub-cell${di.we?' mob-we':''}"></td>`;
+          const bd = breakdown[di.ds] || {};
+          const hasBreakdown = FITNESS_SUBS.some(s => (bd[s]||0) > 0);
+          let hrs = bd[sub] || 0;
+          if (!hasBreakdown && sub === 'fitOthers') hrs = (entries[di.ds]||{})[FITNESS_CAT] || 0;
+          const v = hrs > 0 ? hrs : '';
+          return `<td class="editable-cell fitness-sub-cell mob-data-cell${di.we?' mob-we':''}${hrs>0?' cell-hrs':''}" data-date="${di.ds}" data-cat="${FITNESS_CAT}" data-sub="${sub}" data-hrs="${hrs}">${v}</td>`;
+        }).join('');
+        tr.innerHTML = `<td class="mob-cat-th fitness-sub">${sub}</td>${cells}`;
+        tbody.appendChild(tr);
+      });
+      return;
+    }
+    const tr = document.createElement('tr');
+    const cells = dates.map(di => {
+      const hrs = (entries[di.ds]||{})[cat] || 0;
+      return dataCell(di, hrs, `data-date="${di.ds}" data-cat="${cat}" data-hrs="${hrs}"`);
+    }).join('');
+    tr.innerHTML = `<td class="mob-cat-th">${cat}</td>${cells}`;
+    tbody.appendChild(tr);
+  });
+
+  // Total row
+  const totTr = document.createElement('tr');
+  totTr.className = 'row-total';
+  const totCells = dates.map(di => {
+    const de = entries[di.ds] || {};
+    const t = Math.round((categories.reduce((s,c) => s + (de[c]||0), 0)) * 100) / 100;
+    return `<td class="mob-data-cell${t>0?' cell-hrs':''}">${t>0?t:''}</td>`;
+  }).join('');
+  totTr.innerHTML = `<td class="mob-cat-th">Total</td>${totCells}`;
+  tbody.appendChild(totTr);
+
+  // Status row (compact)
+  const stTr = document.createElement('tr');
+  const stCells = dates.map(di => {
+    const de = entries[di.ds] || {};
+    const t = categories.reduce((s,c) => s+(de[c]||0), 0);
+    let txt='', cls='';
+    if (di.future)     { txt=''; cls='neutral'; }
+    else if (di.leave) { txt='L'; cls='good'; }
+    else if (t > 0)    { txt='✓'; cls='good'; }
+    else if (di.we)    { txt=''; cls='neutral'; }
+    else               { txt='!'; cls='bad'; }
+    return `<td class="mob-data-cell ${cls}" style="text-align:center">${txt}</td>`;
+  }).join('');
+  stTr.innerHTML = `<td class="mob-cat-th" style="color:var(--muted)">Status</td>${stCells}`;
+  tbody.appendChild(stTr);
+
+  // Wasted row
+  const waTr = document.createElement('tr');
+  const waCells = dates.map(di => {
+    if (di.future) return `<td class="mob-data-cell${di.we?' mob-we':''}"></td>`;
+    const wHrs = Math.round((wastedEntries[di.ds]||[]).reduce((s,e)=>s+(e.hours||0),0)*100)/100;
+    return `<td class="editable-cell monthly-wasted-cell mob-data-cell${wHrs>0?' cell-wasted':''}" data-date="${di.ds}" data-wasted="${wHrs}">${wHrs>0?wHrs:''}</td>`;
+  }).join('');
+  waTr.innerHTML = `<td class="mob-cat-th" style="color:var(--red)">Wasted</td>${waCells}`;
+  tbody.appendChild(waTr);
+
+  attachMonthlyEditHandler(tbody);
+}
+
 async function renderMonthlyTable(data) {
   if (!data) data = await getMonthData(state.monthlyMonth);
+  if (window.innerWidth <= 768) { renderMonthlyTableMobile(data); return; }
   const month = state.monthlyMonth;
   const [year, mon] = month.split('-').map(Number);
   const today      = todayStr();
@@ -799,6 +910,10 @@ async function renderMonthlyTable(data) {
     tbody.appendChild(fitTr);
   }
 
+  attachMonthlyEditHandler(tbody);
+}
+
+function attachMonthlyEditHandler(tbody) {
   tbody.addEventListener('click', async e => {
     const td = e.target.closest('td.editable-cell');
     if (!td || td.querySelector('input')) return;
@@ -924,6 +1039,88 @@ function initYearSelector() {
   }
 }
 
+// ── Mobile transposed yearly table (metrics as rows, months as columns) ─────
+function renderYearlyMobile(allData, months, allCats, today, thead, tbody) {
+  // Pre-compute per-month stats
+  const mStats = months.map(month => {
+    const mData = allData[month];
+    const [y, mo] = month.split('-').map(Number);
+    const leavesSet = new Set(mData.leaves || []);
+    const isCur = month === today.slice(0, 7);
+    const endDay = isCur ? new Date().getDate() : daysInMonth(y, mo);
+    let workingDays = 0;
+    for (let d = 1; d <= endDay; d++) {
+      const dt = new Date(y, mo - 1, d);
+      const ds = `${month}-${String(d).padStart(2,'0')}`;
+      if (dt.getDay() !== 0 && dt.getDay() !== 6 && !leavesSet.has(ds)) workingDays++;
+    }
+    const ents = mData.entries || {};
+    const catDone = {};
+    let mDone = 0;
+    allCats.forEach(cat => {
+      let done = 0; Object.values(ents).forEach(dayE => { done += dayE[cat] || 0; }); done = Math.round(done * 100) / 100;
+      catDone[cat] = done; mDone += done;
+    });
+    let mWasted = 0; Object.values(mData.wastedEntries || {}).forEach(arr => arr.forEach(e => { mWasted += e.hours || 0; })); mWasted = Math.round(mWasted * 100) / 100;
+    const mbd = mData.fitnessBreakdown || {};
+    const mGym = Object.values(mbd).filter(d => (d.fitGYM || 0) > 0).length;
+    const mMma = Object.values(mbd).filter(d => (d.fitMMA || 0) > 0).length;
+    return { month, workingDays, catDone, mDone: Math.round(mDone * 100) / 100, mWasted, mGym, mMma, comment: mData.yearlyComment || '' };
+  });
+
+  const shortMonth = m => { const [y, mo] = m.split('-').map(Number); return new Date(y, mo - 1, 1).toLocaleString('en', {month:'short'}) + " '" + String(y).slice(2); };
+
+  // Header: Metric | month cols
+  const monthCols = months.map(m => `<th class="mob-yr-month-th">${shortMonth(m)}</th>`).join('');
+  thead.innerHTML = `<tr><th class="mob-yr-metric-th">Metric</th>${monthCols}</tr>`;
+  tbody.innerHTML = '';
+
+  function addRow(label, values, cls = '', style = '') {
+    const cells = values.map(v => `<td class="mob-yr-cell${cls?' '+cls:''}" style="text-align:center${style?';'+style:''}">${v !== '' && v !== 0 ? v : ''}</td>`).join('');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="mob-yr-metric-th">${label}</td>${cells}`;
+    tbody.appendChild(tr);
+  }
+
+  addRow('Working Days', mStats.map(m => m.workingDays));
+  allCats.forEach(cat => addRow(cat, mStats.map(m => m.catDone[cat] || '')));
+  addRow('Total Done', mStats.map(m => m.mDone || ''), 'good');
+  addRow('Wasted', mStats.map(m => m.mWasted || ''), 'bad');
+  addRow('🏋️ GYM', mStats.map(m => m.mGym || ''));
+  addRow('🥋 MMA', mStats.map(m => m.mMma || ''));
+
+  // Comments row — editable
+  const commentCells = mStats.map(m => {
+    const v = m.comment;
+    return `<td class="yearly-comment-cell editable-cell mob-yr-cell mob-yr-comment" data-month="${m.month}" style="text-align:center;min-width:52px">${v ? `<span class="yearly-comment-text" style="font-size:11px">${v}</span>` : '<span style="color:var(--muted);font-size:12px">+</span>'}</td>`;
+  }).join('');
+  const commentTr = document.createElement('tr');
+  commentTr.innerHTML = `<td class="mob-yr-metric-th" style="color:#94a3b8">Comments</td>${commentCells}`;
+  tbody.appendChild(commentTr);
+
+  tbody.addEventListener('click', async e => {
+    const td = e.target.closest('td.yearly-comment-cell');
+    if (!td || td.querySelector('input')) return;
+    const month = td.dataset.month;
+    const prev = td.querySelector('.yearly-comment-text')?.textContent || '';
+    const input = document.createElement('input');
+    input.type = 'text'; input.value = prev; input.placeholder = '+';
+    input.style.cssText = 'width:100%;background:transparent;border:none;border-bottom:1px solid var(--primary);color:var(--text);font-size:12px;outline:none;text-align:center';
+    td.textContent = ''; td.appendChild(input); input.focus(); input.select();
+    let done = false;
+    async function save() {
+      if (done) return; done = true;
+      const val = input.value.trim();
+      const d = await getMonthData(month);
+      if (val) d.yearlyComment = val; else delete d.yearlyComment;
+      await saveMonthData(month, d);
+      td.innerHTML = val ? `<span class="yearly-comment-text" style="font-size:11px">${val}</span>` : '<span style="color:var(--muted);font-size:12px">+</span>';
+    }
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { done = true; input.blur(); } });
+  });
+}
+
 async function loadYearlyTab() {
   const allData = await getAllMonths();
   const year    = state.yearlyYear;
@@ -940,6 +1137,11 @@ async function loadYearlyTab() {
     tbody.innerHTML = '<tr><td colspan="3" class="empty">No data for this year yet.</td></tr>';
   } else {
     const allCats = [...new Set(months.flatMap(m => (allData[m].categories || []).map(c => c.category)))];
+
+    if (window.innerWidth <= 768) {
+      renderYearlyMobile(allData, months, allCats, today, thead, tbody);
+    } else {
+
     thead.innerHTML = `
       <tr>
         <th>Month</th><th>Working Days</th>
@@ -1053,7 +1255,9 @@ async function loadYearlyTab() {
       input.addEventListener('blur', saveComment);
       input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { done = true; input.blur(); loadYearlyTab(); } });
     });
-  }
+  } // end desktop else
+
+  } // end months.length else
 
   // FM count section
   await renderYearlyFmCount(year, today);
