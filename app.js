@@ -630,6 +630,9 @@ async function persistLeaves() {
   }
 }
 
+const FITNESS_CAT  = 'Fitness';
+const FITNESS_SUBS = ['fitGYM', 'fitMMA', 'fitOthers'];
+
 async function renderMonthlyTable(data) {
   if (!data) data = await getMonthData(state.monthlyMonth);
   const month = state.monthlyMonth;
@@ -638,15 +641,24 @@ async function renderMonthlyTable(data) {
   const leavesSet  = new Set(data.leaves);
   const categories = data.categories.map(c => c.category);
   const entries    = data.entries;
+  const breakdown  = data.fitnessBreakdown || {};
   const total      = daysInMonth(year, mon);
   const dayNames   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const hasFitness = categories.includes(FITNESS_CAT);
+
+  // Two-row header: row1 has group header for Fitness (colspan=3), row2 has sub-names
+  const headerRow1 = categories.map(c =>
+    c === FITNESS_CAT
+      ? `<th colspan="3" class="fitness-group">${c}</th>`
+      : `<th rowspan="2">${c}</th>`
+  ).join('');
+  const headerRow2 = hasFitness
+    ? FITNESS_SUBS.map(s => `<th class="fitness-sub">${s}</th>`).join('')
+    : '';
 
   document.getElementById('monthly-thead').innerHTML = `
-    <tr>
-      <th>Date</th><th>Day</th>
-      ${categories.map(c => `<th>${c}</th>`).join('')}
-      <th>Total</th><th>Status</th>
-    </tr>
+    <tr><th rowspan="2">Date</th><th rowspan="2">Day</th>${headerRow1}<th rowspan="2">Total</th><th rowspan="2">Status</th></tr>
+    <tr>${headerRow2}</tr>
   `;
 
   const oldTbody = document.getElementById('monthly-tbody');
@@ -655,6 +667,7 @@ async function renderMonthlyTable(data) {
   oldTbody.parentNode.replaceChild(newTbody, oldTbody);
   const tbody = newTbody;
   const colTotals = Object.fromEntries(categories.map(c => [c, 0]));
+  const subTotals = Object.fromEntries(FITNESS_SUBS.map(s => [s, 0]));
   let grandTotal  = 0;
 
   for (let day = 1; day <= total; day++) {
@@ -665,10 +678,22 @@ async function renderMonthlyTable(data) {
     const isToday   = dateStr === today;
     const isFuture  = dateStr > today;
     const dayEntries = entries[dateStr] || {};
+    const dayBreak   = breakdown[dateStr] || {};
     let dayTotal = 0;
 
     const isEditable = !isWeekend && !isFuture;
     const catCells = categories.map(cat => {
+      if (cat === FITNESS_CAT) {
+        // render 3 sub-cells
+        return FITNESS_SUBS.map(sub => {
+          const hrs = dayBreak[sub] || 0;
+          subTotals[sub] = Math.round((subTotals[sub] + hrs) * 100) / 100;
+          const editAttrs = isEditable
+            ? ` class="editable-cell fitness-sub-cell${hrs > 0 ? ' cell-hrs' : ''}" data-date="${dateStr}" data-cat="${FITNESS_CAT}" data-sub="${sub}" data-hrs="${hrs}"`
+            : `class="fitness-sub-cell${hrs > 0 ? ' cell-hrs' : ''}"`;
+          return `<td ${editAttrs}>${hrs > 0 ? hrs : ''}</td>`;
+        }).join('');
+      }
       const hrs = dayEntries[cat] || 0;
       colTotals[cat] = Math.round((colTotals[cat] + hrs) * 100) / 100;
       dayTotal       = Math.round((dayTotal + hrs) * 100) / 100;
@@ -677,6 +702,13 @@ async function renderMonthlyTable(data) {
         : (hrs > 0 ? ' class="cell-hrs"' : '');
       return `<td${editAttrs}>${hrs > 0 ? hrs : ''}</td>`;
     });
+
+    // Add fitness total to dayTotal
+    if (hasFitness) {
+      const fitnessTotal = dayEntries[FITNESS_CAT] || 0;
+      colTotals[FITNESS_CAT] = Math.round((colTotals[FITNESS_CAT] + fitnessTotal) * 100) / 100;
+      dayTotal = Math.round((dayTotal + fitnessTotal) * 100) / 100;
+    }
     grandTotal = Math.round((grandTotal + dayTotal) * 100) / 100;
 
     const rowClass    = isToday ? 'row-today' : isWeekend ? 'row-weekend' : isLeave ? 'row-leave' : '';
@@ -701,11 +733,12 @@ async function renderMonthlyTable(data) {
 
   const totalTr = document.createElement('tr');
   totalTr.className = 'row-total';
-  totalTr.innerHTML = `
-    <td colspan="2">Total</td>
-    ${categories.map(c => `<td>${colTotals[c] > 0 ? colTotals[c] : ''}</td>`).join('')}
-    <td>${grandTotal}</td><td></td>
-  `;
+  const totalCells = categories.map(c =>
+    c === FITNESS_CAT
+      ? FITNESS_SUBS.map(s => `<td>${subTotals[s] > 0 ? subTotals[s] : ''}</td>`).join('')
+      : `<td>${colTotals[c] > 0 ? colTotals[c] : ''}</td>`
+  ).join('');
+  totalTr.innerHTML = `<td colspan="2">Total</td>${totalCells}<td>${grandTotal}</td><td></td>`;
   tbody.appendChild(totalTr);
 
   tbody.addEventListener('click', async e => {
@@ -713,6 +746,7 @@ async function renderMonthlyTable(data) {
     if (!td || td.querySelector('input')) return;
     const dateStr = td.dataset.date;
     const cat     = td.dataset.cat;
+    const sub     = td.dataset.sub || null; // fitness sub-type
     const prevHrs = parseFloat(td.dataset.hrs) || 0;
 
     const input = document.createElement('input');
@@ -731,17 +765,33 @@ async function renderMonthlyTable(data) {
       const month  = dateStr.slice(0, 7);
       const d      = await getMonthData(month);
       if (newHrs !== prevHrs) {
-        if (newHrs > 0) {
+        if (sub) {
+          // Fitness sub-cell: update breakdown, recompute Fitness sum
+          if (!d.fitnessBreakdown) d.fitnessBreakdown = {};
+          if (!d.fitnessBreakdown[dateStr]) d.fitnessBreakdown[dateStr] = {};
+          if (newHrs > 0) d.fitnessBreakdown[dateStr][sub] = newHrs;
+          else delete d.fitnessBreakdown[dateStr][sub];
+          if (!Object.keys(d.fitnessBreakdown[dateStr]).length) delete d.fitnessBreakdown[dateStr];
+          // Sum all subs → Fitness entry
+          const subSum = FITNESS_SUBS.reduce((acc, s) => acc + ((d.fitnessBreakdown[dateStr] || {})[s] || 0), 0);
+          const fitnessTotal = Math.round(subSum * 100) / 100;
           if (!d.entries[dateStr]) d.entries[dateStr] = {};
-          d.entries[dateStr][cat] = newHrs;
+          if (fitnessTotal > 0) d.entries[dateStr][FITNESS_CAT] = fitnessTotal;
+          else { delete d.entries[dateStr][FITNESS_CAT]; if (!Object.keys(d.entries[dateStr]).length) delete d.entries[dateStr]; }
+          state.lastMonthlyEdit = { date: dateStr, cat: FITNESS_CAT, sub, prev: prevHrs };
         } else {
-          if (d.entries[dateStr]) {
-            delete d.entries[dateStr][cat];
-            if (!Object.keys(d.entries[dateStr]).length) delete d.entries[dateStr];
+          if (newHrs > 0) {
+            if (!d.entries[dateStr]) d.entries[dateStr] = {};
+            d.entries[dateStr][cat] = newHrs;
+          } else {
+            if (d.entries[dateStr]) {
+              delete d.entries[dateStr][cat];
+              if (!Object.keys(d.entries[dateStr]).length) delete d.entries[dateStr];
+            }
           }
+          state.lastMonthlyEdit = { date: dateStr, cat, prev: prevHrs };
         }
         await saveMonthData(month, d);
-        state.lastMonthlyEdit = { date: dateStr, cat, prev: prevHrs };
         document.getElementById('monthly-undo-btn').classList.remove('hidden');
         if (state.mainMonth === month) await loadMonthlySummary(d);
       }
@@ -757,16 +807,25 @@ async function renderMonthlyTable(data) {
 
 async function undoMonthlyEdit() {
   if (!state.lastMonthlyEdit) return;
-  const { date, cat, prev } = state.lastMonthlyEdit;
+  const { date, cat, sub, prev } = state.lastMonthlyEdit;
   const month = date.slice(0, 7);
   const d = await getMonthData(month);
-  if (prev > 0) {
+  if (sub) {
+    if (!d.fitnessBreakdown) d.fitnessBreakdown = {};
+    if (!d.fitnessBreakdown[date]) d.fitnessBreakdown[date] = {};
+    if (prev > 0) d.fitnessBreakdown[date][sub] = prev;
+    else { delete d.fitnessBreakdown[date][sub]; if (!Object.keys(d.fitnessBreakdown[date]).length) delete d.fitnessBreakdown[date]; }
+    const subSum = FITNESS_SUBS.reduce((acc, s) => acc + ((d.fitnessBreakdown[date] || {})[s] || 0), 0);
+    const fitnessTotal = Math.round(subSum * 100) / 100;
     if (!d.entries[date]) d.entries[date] = {};
-    d.entries[date][cat] = prev;
+    if (fitnessTotal > 0) d.entries[date][FITNESS_CAT] = fitnessTotal;
+    else { delete d.entries[date][FITNESS_CAT]; if (!Object.keys(d.entries[date]).length) delete d.entries[date]; }
   } else {
-    if (d.entries[date]) {
-      delete d.entries[date][cat];
-      if (!Object.keys(d.entries[date]).length) delete d.entries[date];
+    if (prev > 0) {
+      if (!d.entries[date]) d.entries[date] = {};
+      d.entries[date][cat] = prev;
+    } else {
+      if (d.entries[date]) { delete d.entries[date][cat]; if (!Object.keys(d.entries[date]).length) delete d.entries[date]; }
     }
   }
   await saveMonthData(month, d);

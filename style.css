@@ -425,6 +425,12 @@ tr.row-total   td { background: #0D1628; font-weight: 700; border-top: 2px solid
 td.editable-cell { cursor: pointer; transition: background 0.1s; }
 td.editable-cell:hover { background: #1E2A42 !important; }
 
+/* ══ Fitness sub-columns ═════════════════════════════════════════════════════ */
+th.fitness-group { background: #1a3a2a !important; color: #4ade80; font-weight: 700; text-align: center; border-bottom: 1px solid #2d6a48; }
+th.fitness-sub   { background: #152b1f !important; color: #86efac; font-size: 11px; text-align: center; }
+td.fitness-sub-cell { background: rgba(74,222,128,0.04) !important; }
+td.fitness-sub-cell:hover { background: #1a3a2a !important; }
+
 .cell-edit-input {
   width: 72px; height: 28px !important; padding: 0 6px !important;
   border: 2px solid var(--primary) !important;
