@@ -1900,10 +1900,16 @@ function closeImportModal() {
 async function importExcel(input) {
   const file = input.files[0];
   if (!file) return;
+  if (typeof XLSX === 'undefined') { showToast('Refresh the page and try again (library not loaded)'); return; }
   showToast('Reading file...');
   try {
-    const buf = await file.arrayBuffer();
-    // Use SheetJS (XLSX) for reading — more reliable in browsers than ExcelJS
+    // Use FileReader for maximum browser compatibility
+    const buf = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
     const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
 
     // ── helpers ────────────────────────────────────────────────────────────
@@ -2072,7 +2078,7 @@ async function importExcel(input) {
 
   } catch(e) {
     console.error('Import read failed', e);
-    showToast('Failed to read file');
+    showToast(`Import failed: ${e.message || String(e)}`);
     closeImportModal();
   }
 }
