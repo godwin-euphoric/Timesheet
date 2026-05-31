@@ -682,81 +682,167 @@ textarea#fm-notes:focus {
 .mobile-account-card { display: none; }
 .mobile-account-row { display: flex; align-items: center; gap: 12px; }
 .mobile-user-name { font-size: 13px; color: var(--muted); }
+.btn-mobile-icon { display: none; }
 
 @media (max-width: 768px) {
-  /* Header */
-  header { padding: 0 10px; height: 56px; }
+  /* ── Header ──────────────────────────────────────────────────────────────── */
+  header { padding: 0 8px; height: 52px; }
   header h1 { display: none; }
-  .logo { width: 36px; height: 36px; border-radius: 10px; }
-  .logo svg { width: 18px; height: 18px; }
-  .tabs { overflow-x: auto; justify-content: flex-start; scrollbar-width: none; }
+  .logo { width: 32px; height: 32px; border-radius: 9px; }
+  .logo svg { width: 16px; height: 16px; }
+  .tabs { overflow-x: auto; justify-content: flex-start; scrollbar-width: none; gap: 0; }
   .tabs::-webkit-scrollbar { display: none; }
-  .tab-btn { padding: 0 12px; font-size: 12px; height: 56px; white-space: nowrap; flex-shrink: 0; }
+  .tab-btn { padding: 0 10px; font-size: 11px; height: 52px; white-space: nowrap; flex-shrink: 0; letter-spacing: 0; }
   .btn-header-action { display: none; }
-  .header-right { display: none; }
+  .btn-signout { display: none; }
+  .header-right { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
   .mobile-account-card { display: block; }
 
-  /* Layout */
-  .tab-content { padding: 0 12px; }
-  .card { padding: 14px 12px; border-radius: 14px; }
+  /* Mobile icon buttons (export / import) */
+  .btn-mobile-icon {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 8px;
+    background: var(--card2); border: 1px solid var(--border);
+    color: var(--text); font-size: 15px; cursor: pointer;
+    flex-shrink: 0;
+  }
+  .btn-mobile-icon:active { background: var(--primary-l); }
 
-  /* Top controls — stack everything, but ctrl-pair stays in a row */
-  .top-controls { flex-direction: column; align-items: stretch; gap: 10px; }
+  /* ── Layout ──────────────────────────────────────────────────────────────── */
+  .tab-content { padding: 0 10px 80px; }
+  .card { padding: 12px 10px; border-radius: 12px; margin-bottom: 12px; }
+  .card-title { font-size: 13px; margin-bottom: 10px; }
+
+  /* ── Top controls ────────────────────────────────────────────────────────── */
+  .top-controls { flex-direction: column; align-items: stretch; gap: 8px; }
   .ctrl-pair { width: 100%; gap: 6px; }
   .ctrl-pair .field-group { flex: 1; }
-  .ctrl-pair input[type="month"],
-  .ctrl-pair select { width: 100%; }
+  .ctrl-pair input[type="month"], .ctrl-pair select { width: 100%; }
 
-  /* Stats row on mobile */
-  .main-stats-row { gap: 8px; }
-  .mstat { flex: 1; min-width: 0; padding: 8px 12px; }
-  .mstat-val { font-size: 15px; }
+  /* Prevent iOS zoom on input focus */
+  input, select, textarea { font-size: 16px !important; }
+  .cell-edit-input { font-size: 16px !important; width: 90% !important; height: 36px !important; }
 
-  /* Productive / Wasted chips — compact stat cards side by side */
-  .ctrl-pair-chips { display: grid; grid-template-columns: 1fr 1fr; width: 100%; gap: 10px; }
+  /* ── Stats chips ─────────────────────────────────────────────────────────── */
+  .main-stats-row { gap: 6px; flex-wrap: wrap; }
+  .mstat { flex: 1; min-width: calc(50% - 6px); padding: 8px 10px; }
+  .mstat-label { font-size: 10px; }
+  .mstat-val { font-size: 16px; }
+
+  .ctrl-pair-chips { display: grid; grid-template-columns: 1fr 1fr; width: 100%; gap: 8px; }
   .ctrl-pair-chips .stat-chip {
     flex-direction: column; align-items: flex-start;
-    height: auto; padding: 10px 14px; gap: 2px;
+    height: auto; padding: 10px 12px; gap: 2px;
   }
   .ctrl-pair-chips .stat-chip .chip-box { display: none; }
   .ctrl-pair-chips .stat-chip .chip-label {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.7px; opacity: 0.7; white-space: nowrap;
+    letter-spacing: 0.5px; opacity: 0.7;
   }
-  .ctrl-pair-chips .stat-chip strong { font-size: 20px; font-weight: 800; line-height: 1.2; }
-
+  .ctrl-pair-chips .stat-chip strong { font-size: 18px; font-weight: 800; }
   .stopwatch-chip { width: 100%; justify-content: center; }
   .stat-chip:not(.stat-chip-green):not(.stat-chip-red) { width: 100%; justify-content: center; }
 
-  /* Monthly tab inline-row */
-  .inline-row { flex-direction: column; align-items: stretch; gap: 8px; }
-  .inline-row select,
-  .inline-row input,
-  .inline-row button { width: 100% !important; }
+  /* ── Summary card header (month picker + title row) ──────────────────────── */
+  .summary-card-header { flex-wrap: wrap; gap: 8px; }
+  .summary-card-header .field-group { flex: 1; min-width: 140px; }
+  .summary-card-header input[type="month"] { width: 100%; }
 
-  /* Log form — fields stay in a row, button goes full width */
+  /* ── Main summary table: sticky Category column ──────────────────────────── */
+  #tab-main .mini-table { font-size: 12px; }
+  #tab-main .mini-table th, #tab-main .mini-table td { padding: 7px 6px; }
+  #tab-main .mini-table th:nth-child(2), #tab-main .mini-table td:nth-child(2) {
+    position: sticky; left: 0; z-index: 2;
+    background: var(--card); min-width: 100px; max-width: 130px;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.2);
+  }
+  #tab-main .mini-table tr.summary-totals td:nth-child(2) { background: var(--card2); }
+
+  /* ── Monthly table: sticky Date, compact cells ───────────────────────────── */
+  #tab-monthly .table-scroll { -webkit-overflow-scrolling: touch; }
+  #monthly-thead th, #monthly-tbody td {
+    padding: 5px 5px; font-size: 11px; white-space: nowrap;
+  }
+  #monthly-thead th { font-size: 10px; }
+  /* Sticky Date column */
+  #monthly-thead tr th:nth-child(1),
+  #monthly-tbody tr td:nth-child(1) {
+    position: sticky; left: 0; z-index: 4;
+    background: #161e35; box-shadow: 2px 0 6px rgba(0,0,0,0.35);
+    min-width: 62px;
+  }
+  tr.row-weekend td:nth-child(1) { background: #111828 !important; }
+  tr.row-leave   td:nth-child(1) { background: #0A1F10 !important; }
+  tr.row-today   td:nth-child(1) { background: #1C1600 !important; }
+  tr.row-total   td:nth-child(1) { background: #0D1628 !important; }
+  tr.row-fitness-days td { white-space: normal; }
+  /* Fitness group header */
+  th.fitness-group { font-size: 10px; padding: 4px 2px; }
+  th.fitness-sub   { font-size: 9px;  padding: 4px 3px; }
+  td.fitness-sub-cell { min-width: 40px; }
+
+  /* ── Yearly table: sticky Month column ───────────────────────────────────── */
+  #tab-yearly .table-scroll { -webkit-overflow-scrolling: touch; }
+  #yearly-thead th, #yearly-tbody td { padding: 7px 8px; font-size: 12px; white-space: nowrap; }
+  #yearly-thead th { font-size: 10px; }
+  #yearly-thead tr th:first-child,
+  #yearly-tbody tr td:first-child {
+    position: sticky; left: 0; z-index: 3;
+    background: #0D1628; box-shadow: 2px 0 6px rgba(0,0,0,0.35);
+    min-width: 90px;
+  }
+  tr.row-total td:first-child { background: #0D1628 !important; }
+  td.yearly-comment-cell { min-width: 100px; max-width: 150px; font-size: 11px; }
+
+  /* ── Habits table: compact day cells ─────────────────────────────────────── */
+  .habit-name-col { min-width: 130px; max-width: 130px; }
+  .habit-day-col  { min-width: 40px; }
+  .habit-check-cell { padding: 8px 2px; }
+  .habits-table th { padding: 7px 4px; font-size: 10px; }
+  .habit-name-cell { padding: 10px 10px; }
+  .habit-name-text { font-size: 12px; }
+  .btn-habit-del { width: 22px; height: 22px; font-size: 11px; }
+
+  /* ── Planner: wrap text in cells ─────────────────────────────────────────── */
+  .planner-block table td,
+  .planner-block table th { font-size: 12px; padding: 8px 8px; white-space: normal; word-break: break-word; }
+  .planner-nav { flex-direction: column; align-items: stretch; gap: 8px; }
+  .planner-new-btn { width: 100%; }
+
+  /* ── Log form ────────────────────────────────────────────────────────────── */
   .log-form { flex-direction: column; gap: 10px; }
   .form-fields-row { width: 100%; flex-direction: row; }
   .form-fields-row .field-group { flex: 1 !important; width: auto !important; }
-  .form-fields-row select,
-  .form-fields-row input { width: 100%; }
+  .form-fields-row select, .form-fields-row input { width: 100%; }
   .form-action { width: 100%; }
-  .form-action .btn-primary,
-  .form-action .btn-wasted { width: 100%; }
+  .form-action .btn-primary, .form-action .btn-wasted { width: 100%; }
+  .inline-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .inline-row select, .inline-row input, .inline-row button { width: 100% !important; }
 
+  /* ── Grid layouts ────────────────────────────────────────────────────────── */
   .log-row { grid-template-columns: 1fr; }
   .summary-grid { grid-template-columns: 1fr; }
-
-  /* Tables */
-  .mini-table th, .mini-table td { padding: 8px 6px; font-size: 12px; }
-  .mini-table th { font-size: 10px; }
-  .data-table th, .data-table td { padding: 8px 10px; font-size: 12px; }
-
   .add-row { flex-direction: column; align-items: stretch; }
   .add-row input, .add-row button { width: 100% !important; }
 
-  .planner-nav { flex-direction: column; align-items: stretch; gap: 8px; }
-  .planner-new-btn { width: 100%; }
+  /* ── Generic table sizing ────────────────────────────────────────────────── */
+  .mini-table th, .mini-table td { padding: 7px 6px; font-size: 12px; }
+  .mini-table th { font-size: 10px; }
+  .data-table th, .data-table td { padding: 7px 8px; font-size: 12px; }
+  .data-table th { font-size: 10px; }
+
+  /* ── Touch scroll hints ──────────────────────────────────────────────────── */
+  .table-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: none;
+  }
+  .table-scroll::after {
+    content: '';
+    position: absolute; right: 0; top: 0; bottom: 0; width: 18px;
+    background: linear-gradient(to right, transparent, rgba(15,20,40,0.6));
+    pointer-events: none; border-radius: 0 8px 8px 0;
+  }
+  .table-scroll { position: relative; }
 }
 
 /* ══ Planner Tab ═════════════════════════════════════════════════════════════ */

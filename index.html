@@ -60,6 +60,9 @@
       <button class="btn-header-action" onclick="downloadExcel()" title="Download Excel backup">⬇ Excel</button>
       <button class="btn-header-action" onclick="document.getElementById('import-file-input').click()" title="Import from Excel backup">⬆ Import</button>
       <input type="file" id="import-file-input" accept=".xlsx" style="display:none" onchange="importExcel(this)">
+      <!-- Mobile-only compact icon buttons -->
+      <button class="btn-mobile-icon" onclick="downloadExcel()" title="Export Excel">⬇</button>
+      <button class="btn-mobile-icon" onclick="document.getElementById('import-file-input').click()" title="Import Excel">⬆</button>
       <img id="user-avatar" class="avatar" src="" alt="">
       <button class="btn-signout" onclick="doSignOut()">Sign out</button>
     </div>
@@ -379,7 +382,7 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
