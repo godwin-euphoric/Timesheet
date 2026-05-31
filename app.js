@@ -896,6 +896,7 @@ async function loadYearlyTab() {
         <th style="color:var(--red)">Wasted</th>
         <th style="color:#86efac">🏋️ GYM Days</th>
         <th style="color:#86efac">🥋 MMA Days</th>
+        <th style="color:#94a3b8">Comments</th>
       </tr>
     `;
     tbody.innerHTML = '';
@@ -939,6 +940,7 @@ async function loadYearlyTab() {
       const mbd = mData.fitnessBreakdown || {};
       const mGym = Object.values(mbd).filter(d => (d.fitGYM || 0) > 0).length;
       const mMma = Object.values(mbd).filter(d => (d.fitMMA || 0) > 0).length;
+      const comment = mData.yearlyComment || '';
 
       totalWD     += workingDays;
       totalDone    = Math.round((totalDone + mDone) * 100) / 100;
@@ -955,6 +957,7 @@ async function loadYearlyTab() {
         <td${mWasted > 0 ? ' class="bad"' : ''}>${mWasted > 0 ? mWasted : ''}</td>
         <td style="color:#86efac">${mGym || ''}</td>
         <td style="color:#86efac">${mMma || ''}</td>
+        <td class="yearly-comment-cell editable-cell" data-month="${month}" title="Click to edit">${comment ? `<span class="yearly-comment-text">${comment}</span>` : '<span class="yearly-comment-placeholder">Add comment…</span>'}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -971,8 +974,33 @@ async function loadYearlyTab() {
       <td${totalWasted > 0 ? ' class="bad"' : ''}>${totalWasted > 0 ? totalWasted : ''}</td>
       <td style="color:#86efac">${totalGym}</td>
       <td style="color:#86efac">${totalMma}</td>
+      <td></td>
     `;
     tbody.appendChild(totalTr);
+
+    // Inline edit for comment cells
+    tbody.addEventListener('click', async e => {
+      const td = e.target.closest('td.yearly-comment-cell');
+      if (!td || td.querySelector('input')) return;
+      const month = td.dataset.month;
+      const prev  = td.querySelector('.yearly-comment-text')?.textContent || '';
+      const input = document.createElement('input');
+      input.type = 'text'; input.value = prev; input.placeholder = 'Add comment…';
+      input.style.cssText = 'width:100%;background:transparent;border:none;border-bottom:1px solid var(--primary);color:var(--text);font-size:13px;outline:none;padding:2px 0';
+      td.textContent = ''; td.appendChild(input);
+      input.focus(); input.select();
+      let done = false;
+      async function saveComment() {
+        if (done) return; done = true;
+        const val = input.value.trim();
+        const d = await getMonthData(month);
+        if (val) d.yearlyComment = val; else delete d.yearlyComment;
+        await saveMonthData(month, d);
+        td.innerHTML = val ? `<span class="yearly-comment-text">${val}</span>` : '<span class="yearly-comment-placeholder">Add comment…</span>';
+      }
+      input.addEventListener('blur', saveComment);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { done = true; input.blur(); loadYearlyTab(); } });
+    });
   }
 
   // FM count section

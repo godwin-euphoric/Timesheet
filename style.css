@@ -425,6 +425,12 @@ tr.row-total   td { background: #0D1628; font-weight: 700; border-top: 2px solid
 td.editable-cell { cursor: pointer; transition: background 0.1s; }
 td.editable-cell:hover { background: #1E2A42 !important; }
 
+/* ══ Yearly comment cell ═════════════════════════════════════════════════════ */
+td.yearly-comment-cell { min-width: 180px; max-width: 260px; color: #94a3b8; cursor: pointer; }
+td.yearly-comment-cell:hover { background: #1E2A42 !important; }
+.yearly-comment-text { color: var(--text); }
+.yearly-comment-placeholder { color: var(--muted); font-style: italic; font-size: 12px; }
+
 /* ══ Fitness sub-columns ═════════════════════════════════════════════════════ */
 th.fitness-group { background: #1a3a2a !important; color: #4ade80; font-weight: 700; text-align: center; border-bottom: 1px solid #2d6a48; }
 th.fitness-sub   { background: #152b1f !important; color: #86efac; font-size: 11px; text-align: center; }
