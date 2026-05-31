@@ -407,6 +407,7 @@ input:focus, select:focus {
 
 /* ══ Row states ══════════════════════════════════════════════════════════════ */
 tr.row-weekend td { background: #111828 !important; color: #475569; }
+tr.row-weekend td.cell-hrs { color: var(--primary-h) !important; }
 tr.row-leave   td { background: #0A1F10 !important; color: #4ADE80; }
 tr.row-today   td {
   background: linear-gradient(to right, #1C1600, #2A1E04) !important;

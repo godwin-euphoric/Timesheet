@@ -685,9 +685,12 @@ async function renderMonthlyTable(data) {
     const isEditable = !isFuture;
     const catCells = categories.map(cat => {
       if (cat === FITNESS_CAT) {
-        // render 3 sub-cells
+        // If no breakdown exists but a legacy Fitness total does, show it in fitOthers
+        const hasBreakdown = FITNESS_SUBS.some(s => (dayBreak[s] || 0) > 0);
+        const legacyTotal  = (!hasBreakdown && (dayEntries[FITNESS_CAT] || 0) > 0) ? dayEntries[FITNESS_CAT] : 0;
         return FITNESS_SUBS.map(sub => {
-          const hrs = dayBreak[sub] || 0;
+          let hrs = dayBreak[sub] || 0;
+          if (legacyTotal > 0 && sub === 'fitOthers') hrs = legacyTotal;
           subTotals[sub] = Math.round((subTotals[sub] + hrs) * 100) / 100;
           const editAttrs = isEditable
             ? ` class="editable-cell fitness-sub-cell${hrs > 0 ? ' cell-hrs' : ''}" data-date="${dateStr}" data-cat="${FITNESS_CAT}" data-sub="${sub}" data-hrs="${hrs}"`
