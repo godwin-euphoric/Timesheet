@@ -363,18 +363,6 @@ async function loadMonthlySummary(data) {
   const statsRow = document.getElementById('main-stats-row');
   if (statsRow) {
     statsRow.innerHTML = `
-      <div class="mstat mstat-red">
-        <span class="mstat-label">Wasted this month</span>
-        <span class="mstat-val" id="stat-wasted-val">${wastedTotal} hrs</span>
-      </div>
-      <div class="mstat mstat-default">
-        <span class="mstat-label">Working days</span>
-        <span class="mstat-val">${workingDays}</span>
-      </div>
-      <div class="mstat mstat-green">
-        <span class="mstat-label">Productive</span>
-        <span class="mstat-val">${totalProductive} hrs</span>
-      </div>
       <div class="mstat mstat-green">
         <span class="mstat-label">🏋️ GYM days</span>
         <span class="mstat-val">${gymDays}</span>
@@ -693,7 +681,7 @@ async function renderMonthlyTable(data) {
     const dayBreak   = breakdown[dateStr] || {};
     let dayTotal = 0;
 
-    const isEditable = !isWeekend && !isFuture;
+    const isEditable = !isFuture;
     const catCells = categories.map(cat => {
       if (cat === FITNESS_CAT) {
         // render 3 sub-cells
@@ -725,11 +713,11 @@ async function renderMonthlyTable(data) {
 
     const rowClass    = isToday ? 'row-today' : isWeekend ? 'row-weekend' : isLeave ? 'row-leave' : '';
     const leaveReason = (data.leaveReasons || {})[dateStr] || '';
-    const statusCell  = isWeekend  ? '<td class="neutral">Weekend</td>'
-      : isLeave                    ? `<td class="good">Leave${leaveReason ? ' · ' + leaveReason : ''}</td>`
-      : isFuture                   ? '<td class="neutral">—</td>'
-      : dayTotal > 0               ? `<td class="good">${dayTotal} hrs</td>`
-      :                              '<td class="bad">No entry</td>';
+    const statusCell  = isFuture                   ? '<td class="neutral">—</td>'
+      : isLeave                                    ? `<td class="good">Leave${leaveReason ? ' · ' + leaveReason : ''}</td>`
+      : dayTotal > 0                               ? `<td class="good">${dayTotal} hrs</td>`
+      : isWeekend                                  ? '<td class="neutral">Weekend</td>'
+      :                                              '<td class="bad">No entry</td>';
 
     const tr = document.createElement('tr');
     if (rowClass) tr.className = rowClass;
@@ -903,8 +891,8 @@ async function loadYearlyTab() {
     thead.innerHTML = `
       <tr>
         <th>Month</th><th>Working Days</th>
-        ${allCats.map(c => `<th>${c}<br><small style="font-weight:500;color:#94a3b8">Done / Target</small></th>`).join('')}
-        <th>Total Done</th>
+        ${allCats.map(c => `<th>${c}</th>`).join('')}
+        <th style="color:#4ade80">Total Done</th>
         <th style="color:var(--red)">Wasted</th>
         <th style="color:#86efac">🏋️ GYM Days</th>
         <th style="color:#86efac">🥋 MMA Days</th>
@@ -941,7 +929,7 @@ async function loadYearlyTab() {
         colTotals[cat].target += target;
         mDone += done;
         const cls = target > 0 ? (done >= target ? 'good' : 'bad') : '';
-        return `<td class="${cls}">${done} / ${target}</td>`;
+        return `<td class="${cls}">${done > 0 ? done : ''}</td>`;
       });
 
       let mWasted = 0;
@@ -977,10 +965,9 @@ async function loadYearlyTab() {
       <td>Total</td><td>${totalWD}</td>
       ${allCats.map(c => {
         const d   = colTotals[c];
-        const cls = d.target > 0 ? (d.done >= d.target ? 'good' : 'bad') : '';
-        return `<td class="${cls}">${Math.round(d.done * 100) / 100} / ${Math.round(d.target * 100) / 100}</td>`;
+        return `<td>${Math.round(d.done * 100) / 100 || ''}</td>`;
       }).join('')}
-      <td>${Math.round(totalDone * 100) / 100}</td>
+      <td class="good"><strong>${Math.round(totalDone * 100) / 100}</strong></td>
       <td${totalWasted > 0 ? ' class="bad"' : ''}>${totalWasted > 0 ? totalWasted : ''}</td>
       <td style="color:#86efac">${totalGym}</td>
       <td style="color:#86efac">${totalMma}</td>
@@ -1072,31 +1059,38 @@ document.getElementById('yearly-year').addEventListener('change', async function
 //  HABITS TAB
 // ══════════════════════════════════════════════════════════════════════════
 
-function getNext5Days() {
-  const days = [];
-  const now  = new Date();
-  for (let i = 0; i < 5; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-    days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-  }
-  return days;
-}
-
 async function loadHabitsTab() {
+  if (!state.habitsMonth) state.habitsMonth = currentMonth();
+  document.getElementById('habits-month').value = state.habitsMonth;
   const userData = await getUserData();
-  renderHabitsTable(userData.habits, userData.habitLog);
+  renderHabitsTable(userData.habits, userData.habitLog, state.habitsMonth);
 }
 
-function renderHabitsTable(habits, habitLog) {
-  const days     = getNext5Days();
-  const today    = todayStr();
-  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const table    = document.getElementById('habits-table');
+async function onHabitsMonthChange(month) {
+  state.habitsMonth = month;
+  const userData = await getUserData();
+  renderHabitsTable(userData.habits, userData.habitLog, month);
+}
+
+function renderHabitsTable(habits, habitLog, month) {
+  if (!month) month = state.habitsMonth || currentMonth();
+  const [year, mon] = month.split('-').map(Number);
+  const totalDays = daysInMonth(year, mon);
+  const today     = todayStr();
+  const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const table     = document.getElementById('habits-table');
+
+  // All days of the month
+  const days = [];
+  for (let d = 1; d <= totalDays; d++) {
+    days.push(`${month}-${String(d).padStart(2,'0')}`);
+  }
 
   const headCells = days.map(d => {
     const dt  = new Date(d + 'T00:00:00');
+    const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
     const lbl = `${String(dt.getDate()).padStart(2,'0')}<br><small>${dayNames[dt.getDay()]}</small>`;
-    return `<th class="habit-day-col${d === today ? ' col-today' : ''}">${lbl}</th>`;
+    return `<th class="habit-day-col${d === today ? ' col-today' : ''}${isWeekend ? ' col-weekend' : ''}">${lbl}</th>`;
   }).join('');
 
   const thead = `
@@ -1111,7 +1105,9 @@ function renderHabitsTable(habits, habitLog) {
   habits.forEach((habit, i) => {
     const cells = days.map(d => {
       const checked = (habitLog[d] || {})[habit] ? 'checked' : '';
-      return `<td class="habit-check-cell${d === today ? ' cell-today' : ''}">
+      const dt = new Date(d + 'T00:00:00');
+      const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+      return `<td class="habit-check-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
         <input type="checkbox" class="habit-cb" ${checked}
           onchange="toggleHabit('${d}','${encodeURIComponent(habit)}',this.checked)">
       </td>`;
@@ -1131,7 +1127,6 @@ function renderHabitsTable(habits, habitLog) {
       </tr>`;
   });
 
-  // Add row
   bodyRows += `
     <tr class="habit-add-row">
       <td colspan="${days.length + 1}">
@@ -1166,7 +1161,7 @@ async function addHabit() {
   userData.habits.push(name);
   await saveUserData({ habits: userData.habits });
   showToast(`"${name}" added`);
-  renderHabitsTable(userData.habits, userData.habitLog);
+  renderHabitsTable(userData.habits, userData.habitLog, state.habitsMonth);
   document.getElementById('new-habit-input')?.focus();
 }
 
@@ -1175,7 +1170,7 @@ async function deleteHabit(index) {
   const userData = await getUserData();
   userData.habits.splice(index, 1);
   await saveUserData({ habits: userData.habits });
-  renderHabitsTable(userData.habits, userData.habitLog);
+  renderHabitsTable(userData.habits, userData.habitLog, state.habitsMonth);
 }
 
 function habitDragStart(e, index) {
@@ -1205,7 +1200,7 @@ async function habitDrop(e, index) {
   const [moved]  = habits.splice(dragSrcHabitIdx, 1);
   habits.splice(index, 0, moved);
   await saveUserData({ habits });
-  renderHabitsTable(habits, userData.habitLog);
+  renderHabitsTable(habits, userData.habitLog, state.habitsMonth);
 }
 
 function startEditHabit(td, index) {
@@ -1226,7 +1221,7 @@ function startEditHabit(td, index) {
     saved = true;
     const newName = input.value.trim();
     if (!newName || newName === oldName) {
-      renderHabitsTable((await getUserData()).habits, (await getUserData()).habitLog);
+      renderHabitsTable((await getUserData()).habits, (await getUserData()).habitLog, state.habitsMonth);
       return;
     }
     const userData = await getUserData();
@@ -1244,7 +1239,7 @@ function startEditHabit(td, index) {
     });
     await saveUserData({ habits: userData.habits, habitLog: userData.habitLog });
     showToast('Habit renamed');
-    renderHabitsTable(userData.habits, userData.habitLog);
+    renderHabitsTable(userData.habits, userData.habitLog, state.habitsMonth);
   }
 
   input.addEventListener('blur', commitRename);
@@ -1769,7 +1764,7 @@ async function downloadExcel() {
 
     // ── 9. Habits ──────────────────────────────────────────────────────────
     try {
-      const habits = userData.habits || [];
+      const habits = userData.habits && userData.habits.length ? userData.habits : (state.habits || []);
       const habitLog = userData.habitLog || {};
       if (habits.length) {
         const ws = wb.addWorksheet('E - Habits');
@@ -1798,7 +1793,8 @@ async function downloadExcel() {
 
     // ── 10. Planner — each planner tab = one sheet, blocks stacked ─────────
     try {
-      (state.planners||[]).forEach(pl => {
+      const exportPlanners = (state.planners && state.planners.length) ? state.planners : (userData.planners || []);
+      exportPlanners.forEach(pl => {
         const ws = wb.addWorksheet(sanitizeName(`E - ${pl.name}`));
         let firstBlock = true;
         (pl.blocks||[]).forEach(block => {

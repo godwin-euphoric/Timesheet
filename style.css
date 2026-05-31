@@ -477,7 +477,9 @@ td.fitness-sub-cell:hover { background: #1a3a2a !important; }
 }
 .habit-name-col  { text-align: left !important; min-width: 180px; position: sticky; left: 0; z-index: 2; background: #0D1628; }
 .habit-day-col   { min-width: 60px; }
-.habits-table th.col-today { color: var(--amber); border-bottom-color: var(--amber); }
+.habits-table th.col-today   { color: var(--amber); border-bottom-color: var(--amber); }
+.habits-table th.col-weekend { color: var(--muted); opacity: 0.6; }
+td.habit-check-cell.cell-weekend { background: rgba(255,255,255,0.02); }
 
 .habit-row td { border-bottom: 1px solid var(--border); }
 .habit-row:hover td { background: var(--card2); }

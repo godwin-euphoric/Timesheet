@@ -234,7 +234,13 @@
   <!-- ══ HABITS ═══════════════════════════════════════════════════════════ -->
   <div id="tab-habits" class="tab-content">
     <div class="card">
-      <div class="card-title">Habit Tracker — Next 5 Days</div>
+      <div class="summary-card-header">
+        <div class="card-title" style="margin-bottom:0">Habit Tracker</div>
+        <div class="field-group">
+          <label>Month</label>
+          <input type="month" id="habits-month" onchange="onHabitsMonthChange(this.value)">
+        </div>
+      </div>
       <div class="table-scroll">
         <table class="habits-table" id="habits-table"></table>
       </div>
@@ -372,7 +378,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
