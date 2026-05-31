@@ -1598,7 +1598,97 @@ async function downloadExcel() {
       }
     } catch(e) { console.error('Journal failed', e); }
 
-    // ── 5. Planner — each planner tab = one sheet, blocks stacked ──────────
+    // ── 5. Categories ──────────────────────────────────────────────────────
+    try {
+      const month = state.mainMonth;
+      const data = await getMonthData(month);
+      const cats = data.categories || [];
+      if (cats.length) {
+        const ws = wb.addWorksheet('Categories');
+        ws.getColumn(1).width = 30; ws.getColumn(2).width = 20;
+        const hRow = ws.addRow(['Category', 'Daily Target (hrs)']);
+        styleRow(hRow, 2, BLUE_FILL, BLUE_FONT);
+        cats.forEach(c => { const row = ws.addRow([c.category, c.daily_target]); borderRow(row, 2); });
+      }
+    } catch(e) { console.error('Categories failed', e); }
+
+    // ── 6. Leaves ──────────────────────────────────────────────────────────
+    try {
+      const month = state.mainMonth;
+      const data = await getMonthData(month);
+      const leaves = (data.leaves || []).slice().sort();
+      if (leaves.length) {
+        const ws = wb.addWorksheet('Leaves');
+        ws.getColumn(1).width = 16;
+        const hRow = ws.addRow(['Leave Date']);
+        styleRow(hRow, 1, BLUE_FILL, BLUE_FONT);
+        leaves.forEach(d => { const row = ws.addRow([d]); borderRow(row, 1); });
+      }
+    } catch(e) { console.error('Leaves failed', e); }
+
+    // ── 7. Wasted Time ─────────────────────────────────────────────────────
+    try {
+      const month = state.mainMonth;
+      const data = await getMonthData(month);
+      const wastedEntries = data.wastedEntries || {};
+      const rows = [];
+      Object.entries(wastedEntries).sort(([a],[b])=>a.localeCompare(b)).forEach(([date, arr]) => {
+        arr.forEach(e => rows.push([date, e.hours, e.note || '']));
+      });
+      if (rows.length) {
+        const ws = wb.addWorksheet('Wasted Time');
+        ws.getColumn(1).width = 14; ws.getColumn(2).width = 14; ws.getColumn(3).width = 40;
+        const hRow = ws.addRow(['Date', 'Hours', 'Note']);
+        styleRow(hRow, 3, BLUE_FILL, BLUE_FONT);
+        rows.forEach(r => { const row = ws.addRow(r); borderRow(row, 3); });
+      }
+    } catch(e) { console.error('Wasted Time failed', e); }
+
+    // ── 8. Adjustments ─────────────────────────────────────────────────────
+    try {
+      const month = state.mainMonth;
+      const data = await getMonthData(month);
+      const adjustments = data.adjustments || {};
+      const entries = Object.entries(adjustments).filter(([,v]) => v !== 0);
+      if (entries.length) {
+        const ws = wb.addWorksheet('Adjustments');
+        ws.getColumn(1).width = 30; ws.getColumn(2).width = 18;
+        const hRow = ws.addRow(['Category', 'Adjustment (hrs)']);
+        styleRow(hRow, 2, BLUE_FILL, BLUE_FONT);
+        entries.forEach(([cat, val]) => { const row = ws.addRow([cat, val]); borderRow(row, 2); });
+      }
+    } catch(e) { console.error('Adjustments failed', e); }
+
+    // ── 9. Habits ──────────────────────────────────────────────────────────
+    try {
+      const habits = userData.habits || [];
+      const habitLog = userData.habitLog || {};
+      if (habits.length) {
+        const ws = wb.addWorksheet('Habits');
+        // Section 1: habit list
+        const listHRow = ws.addRow(['Habit Name']);
+        styleRow(listHRow, 1, BLUE_FILL, BLUE_FONT);
+        ws.getColumn(1).width = 30;
+        habits.forEach(h => { const row = ws.addRow([h]); borderRow(row, 1); });
+
+        ws.addRow([]);
+
+        // Section 2: log grid — rows = dates, cols = habits
+        const dates = Object.keys(habitLog).sort();
+        if (dates.length) {
+          const gridHRow = ws.addRow(['Date', ...habits]);
+          styleRow(gridHRow, 1 + habits.length, BLUE_FILL, BLUE_FONT);
+          habits.forEach((_, i) => { ws.getColumn(2 + i).width = 20; });
+          dates.forEach(d => {
+            const vals = habits.map(h => (habitLog[d]||{})[h] ? 'Yes' : '');
+            const row = ws.addRow([d, ...vals]);
+            borderRow(row, 1 + habits.length);
+          });
+        }
+      }
+    } catch(e) { console.error('Habits failed', e); }
+
+    // ── 10. Planner — each planner tab = one sheet, blocks stacked ─────────
     try {
       (state.planners||[]).forEach(pl => {
         const ws = wb.addWorksheet(sanitizeName(pl.name));
