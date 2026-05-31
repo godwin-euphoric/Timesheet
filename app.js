@@ -360,14 +360,6 @@ async function loadMonthlySummary(data) {
   const gymDays = Object.values(bd).filter(d => (d.fitGYM || 0) > 0).length;
   const mmaDays = Object.values(bd).filter(d => (d.fitMMA || 0) > 0).length;
 
-  // Habit count for today
-  const userData = await getUserData();
-  const today2 = todayStr();
-  const habitsTotal = (userData.habits || []).length;
-  const habitsToday = Object.keys(userData.habitLog[today2] || {}).length;
-  document.getElementById('habits-today-count').textContent =
-    habitsTotal > 0 ? `${habitsToday} / ${habitsTotal}` : '—';
-
   const wasteNote = data.wasteNote || '';
   const statsRow = document.getElementById('main-stats-row');
   if (statsRow) {
@@ -380,20 +372,37 @@ async function loadMonthlySummary(data) {
         <span class="mstat-label">🥋 MMA days</span>
         <span class="mstat-val">${mmaDays}</span>
       </div>
-      <div class="mstat mstat-waste-note">
+      <div class="mstat mstat-waste-note mstat-clickable" id="waste-note-card" title="Click to edit">
         <span class="mstat-label">⏱ Waste note</span>
-        <textarea id="waste-note-input" class="waste-note-input" placeholder="What did you waste time on this month?">${wasteNote}</textarea>
+        <span id="waste-note-display" class="${wasteNote ? 'waste-note-text' : 'waste-note-placeholder'}">${wasteNote || 'Click to add…'}</span>
       </div>
     `;
-    let wasteTimer;
-    document.getElementById('waste-note-input').addEventListener('input', e => {
-      clearTimeout(wasteTimer);
-      wasteTimer = setTimeout(async () => {
+    document.getElementById('waste-note-card').addEventListener('click', async function() {
+      if (this.querySelector('input')) return;
+      const display = this.querySelector('#waste-note-display');
+      const prev = display.classList.contains('waste-note-placeholder') ? '' : display.textContent;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = prev;
+      input.placeholder = 'What did you waste time on?';
+      input.className = 'waste-note-input';
+      display.replaceWith(input);
+      input.focus(); input.select();
+      let done = false;
+      async function saveNote() {
+        if (done) return; done = true;
+        const val = input.value.trim();
         const d = await getMonthData(month);
-        const val = e.target.value.trim();
         if (val) d.wasteNote = val; else delete d.wasteNote;
         await saveMonthData(month, d);
-      }, 800);
+        const span = document.createElement('span');
+        span.id = 'waste-note-display';
+        span.className = val ? 'waste-note-text' : 'waste-note-placeholder';
+        span.textContent = val || 'Click to add…';
+        input.replaceWith(span);
+      }
+      input.addEventListener('blur', saveNote);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { done = true; input.blur(); } });
     });
   }
 

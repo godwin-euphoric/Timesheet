@@ -428,15 +428,14 @@ td.editable-cell:hover { background: #1E2A42 !important; }
 
 /* ══ Waste note card in stats row ════════════════════════════════════════════ */
 .mstat-waste-note { flex: 2 1 200px; align-items: flex-start !important; }
+.mstat-clickable { cursor: pointer; }
+.mstat-clickable:hover { border-color: var(--primary) !important; background: #1a2340 !important; }
+.waste-note-text { font-size: 13px; color: var(--text); line-height: 1.5; word-break: break-word; }
+.waste-note-placeholder { font-size: 12px; color: var(--muted); font-style: italic; }
 .waste-note-input {
-  width: 100%; min-height: 52px; max-height: 100px;
-  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
-  border-radius: 6px; color: var(--text); font-size: 12px; line-height: 1.5;
-  padding: 6px 8px; resize: vertical; font-family: inherit;
-  transition: border-color 0.15s;
+  width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--primary);
+  color: var(--text); font-size: 13px; font-family: inherit; outline: none; padding: 2px 0;
 }
-.waste-note-input:focus { outline: none; border-color: var(--primary); }
-.waste-note-input::placeholder { color: var(--muted); }
 
 /* ══ Monthly wasted cell ═════════════════════════════════════════════════════ */
 td.monthly-wasted-cell { color: var(--muted); }
