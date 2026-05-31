@@ -360,6 +360,15 @@ async function loadMonthlySummary(data) {
   const gymDays = Object.values(bd).filter(d => (d.fitGYM || 0) > 0).length;
   const mmaDays = Object.values(bd).filter(d => (d.fitMMA || 0) > 0).length;
 
+  // Habit count for today
+  const userData = await getUserData();
+  const today2 = todayStr();
+  const habitsTotal = (userData.habits || []).length;
+  const habitsToday = Object.keys(userData.habitLog[today2] || {}).length;
+  document.getElementById('habits-today-count').textContent =
+    habitsTotal > 0 ? `${habitsToday} / ${habitsTotal}` : '—';
+
+  const wasteNote = data.wasteNote || '';
   const statsRow = document.getElementById('main-stats-row');
   if (statsRow) {
     statsRow.innerHTML = `
@@ -371,7 +380,21 @@ async function loadMonthlySummary(data) {
         <span class="mstat-label">🥋 MMA days</span>
         <span class="mstat-val">${mmaDays}</span>
       </div>
+      <div class="mstat mstat-waste-note">
+        <span class="mstat-label">⏱ Waste note</span>
+        <textarea id="waste-note-input" class="waste-note-input" placeholder="What did you waste time on this month?">${wasteNote}</textarea>
+      </div>
     `;
+    let wasteTimer;
+    document.getElementById('waste-note-input').addEventListener('input', e => {
+      clearTimeout(wasteTimer);
+      wasteTimer = setTimeout(async () => {
+        const d = await getMonthData(month);
+        const val = e.target.value.trim();
+        if (val) d.wasteNote = val; else delete d.wasteNote;
+        await saveMonthData(month, d);
+      }, 800);
+    });
   }
 
   tbody.querySelectorAll('.adjust-input').forEach(input => {
@@ -1641,7 +1664,8 @@ async function downloadExcel() {
       const gymDays = Object.values(ebd).filter(d => (d.fitGYM||0) > 0).length;
       const mmaDays = Object.values(ebd).filter(d => (d.fitMMA||0) > 0).length;
       ws.addRow([]);
-      [['Working days', workingDays],['Productive (hrs)', productive],['Wasted (hrs)', wastedTotal],['GYM days', gymDays],['MMA days', mmaDays]].forEach(r => {
+      const wasteNoteExport = data.wasteNote || '';
+      [['Working days', workingDays],['Productive (hrs)', productive],['Wasted (hrs)', wastedTotal],['GYM days', gymDays],['MMA days', mmaDays],['Waste note', wasteNoteExport]].forEach(r => {
         const row = ws.addRow(r);
         row.getCell(1).font = BOLD_FONT;
         row.getCell(1).fill = GRAY_FILL;

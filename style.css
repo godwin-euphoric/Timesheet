@@ -426,6 +426,18 @@ tr.row-total   td { background: #0D1628; font-weight: 700; border-top: 2px solid
 td.editable-cell { cursor: pointer; transition: background 0.1s; }
 td.editable-cell:hover { background: #1E2A42 !important; }
 
+/* ══ Waste note card in stats row ════════════════════════════════════════════ */
+.mstat-waste-note { flex: 2 1 200px; align-items: flex-start !important; }
+.waste-note-input {
+  width: 100%; min-height: 52px; max-height: 100px;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 12px; line-height: 1.5;
+  padding: 6px 8px; resize: vertical; font-family: inherit;
+  transition: border-color 0.15s;
+}
+.waste-note-input:focus { outline: none; border-color: var(--primary); }
+.waste-note-input::placeholder { color: var(--muted); }
+
 /* ══ Monthly wasted cell ═════════════════════════════════════════════════════ */
 td.monthly-wasted-cell { color: var(--muted); }
 td.monthly-wasted-cell.cell-wasted { color: var(--red); font-weight: 600; }
