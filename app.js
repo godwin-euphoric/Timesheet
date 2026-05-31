@@ -1419,164 +1419,229 @@ async function saveFmCategories() {
 
 async function downloadExcel() {
   showToast('Preparing Excel...');
-  const [allData, userData] = await Promise.all([getAllMonths(), getUserData()]);
-  const wb = XLSX.utils.book_new();
-
-  function sanitizeSheetName(name) {
-    const bad = /[:\\\\/*?\[\]]/g;
-    name = String(name || '').replace(bad, ' ').trim();
-    if (!name) name = 'Sheet';
-    return name.slice(0, 28);
-  }
-
-  // 1) Monthly Summary — use the Main tab month
   try {
-    const month = state.mainMonth;
-    const data = await getMonthData(month);
-    const rows = [['Category', 'Completed (hrs)', 'Target (hrs)', 'Adjust (hrs)', 'Pending (hrs)']];
-    const [y, m] = month.split('-').map(Number);
-    const leavesSet = new Set(data.leaves || []);
-    const todayDate = new Date();
-    const endDay = (y === todayDate.getFullYear() && m === todayDate.getMonth() + 1) ? todayDate.getDate() : daysInMonth(y, m);
-    let workingDays = 0;
-    for (let d = 1; d <= endDay; d++) {
-      const dt = new Date(y, m - 1, d);
-      const ds = `${month}-${String(d).padStart(2, '0')}`;
-      if (dt.getDay() !== 0 && dt.getDay() !== 6 && !leavesSet.has(ds)) workingDays++;
+    const [allData, userData] = await Promise.all([getAllMonths(), getUserData()]);
+    const wb = new ExcelJS.Workbook();
+
+    // ── Colours & borders ──────────────────────────────────────────────────
+    const BORDER = { top:{style:'thin',color:{argb:'FFB0B0B0'}}, left:{style:'thin',color:{argb:'FFB0B0B0'}}, bottom:{style:'thin',color:{argb:'FFB0B0B0'}}, right:{style:'thin',color:{argb:'FFB0B0B0'}} };
+    const BLUE_FILL  = { type:'pattern', pattern:'solid', fgColor:{argb:'FF2E75B6'} };
+    const BLUE_FONT  = { bold:true, color:{argb:'FFFFFFFF'}, size:11 };
+    const LTBLUE_FILL = { type:'pattern', pattern:'solid', fgColor:{argb:'FFDAE3F3'} };
+    const BOLD_FONT  = { bold:true, size:11 };
+    const GRAY_FILL  = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} };
+    const GREEN_FILL = { type:'pattern', pattern:'solid', fgColor:{argb:'FF548235'} };
+    const GREEN_FONT = { bold:true, color:{argb:'FFFFFFFF'}, size:11 };
+    const LTGREEN_FILL = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE2EFDA'} };
+    const LTGREEN_FONT = { bold:true, size:11 };
+
+    function styleRow(row, numCols, fill, font) {
+      row.height = 18;
+      for (let c = 1; c <= numCols; c++) {
+        const cell = row.getCell(c);
+        if (fill) cell.fill = fill;
+        if (font) cell.font = font;
+        cell.border = BORDER;
+        cell.alignment = { vertical:'middle' };
+      }
     }
-    const entries = data.entries || {};
-    const adjustments = data.adjustments || {};
-    let totalCompleted = 0, totalTarget = 0, totalPending = 0;
-    (data.categories || []).forEach(c => {
-      let completed = 0;
-      Object.values(entries).forEach(dayE => { completed += dayE[c.category] || 0; });
-      completed = Math.round(completed * 100) / 100;
-      const target = Math.round(c.daily_target * workingDays * 100) / 100;
-      const adjustment = Math.round((adjustments[c.category] || 0) * 100) / 100;
-      const pending = Math.round((target - completed + adjustment) * 100) / 100;
-      rows.push([c.category, completed, target, adjustment || 0, pending]);
-      totalCompleted += completed; totalTarget += target; totalPending += pending;
-    });
-    rows.push([]);
-    rows.push(['Totals', Math.round(totalCompleted * 100) / 100, Math.round(totalTarget * 100) / 100, '', Math.round(totalPending * 100) / 100]);
-    // Stats
-    const wastedEntries = data.wastedEntries || {};
-    let wastedTotal = 0; Object.values(wastedEntries).forEach(arr => arr.forEach(e => { wastedTotal += e.hours || 0; }));
-    wastedTotal = Math.round(wastedTotal * 100) / 100;
-    const productive = Math.round(Object.values(entries).flatMap(Object.values).reduce((a,b)=>a+b,0) * 100) / 100;
-    rows.push([]);
-    rows.push(['Working days', workingDays]);
-    rows.push(['Productive (hrs)', productive]);
-    rows.push(['Wasted (hrs)', wastedTotal]);
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{wch:30},{wch:14},{wch:14},{wch:14},{wch:14}];
-    XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(`Monthly Summary - ${formatMonth(month)}`));
-  } catch (e) { console.error('Monthly summary export failed', e); }
-
-  // 2) Whole Monthly Entries — use Monthly tab month and export as a wide table
-  try {
-    const month = state.monthlyMonth;
-    const data = await getMonthData(month);
-    const cats = (data.categories || []).map(c => c.category);
-    const [y, m] = month.split('-').map(Number);
-    const total = daysInMonth(y, m);
-    const header = ['Date','Day', ...cats, 'Total', 'Status'];
-    const rows = [header];
-    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const entries = data.entries || {};
-    const leavesSet = new Set(data.leaves || []);
-    const today = todayStr();
-    for (let d = 1; d <= total; d++) {
-      const dt = new Date(y, m - 1, d);
-      const dateStr = `${month}-${String(d).padStart(2,'0')}`;
-      const dayEntries = entries[dateStr] || {};
-      const row = [];
-      row.push(dateStr);
-      row.push(dayNames[dt.getDay()]);
-      let dayTotal = 0;
-      cats.forEach(cat => { const hrs = dayEntries[cat] || 0; row.push(hrs || ''); dayTotal += hrs || 0; });
-      row.push(Math.round(dayTotal * 100) / 100);
-      let status = '';
-      if (dt.getDay() === 0 || dt.getDay() === 6) status = 'Weekend';
-      else if (leavesSet.has(dateStr)) status = 'Leave';
-      else if (dateStr > today) status = 'Future';
-      else status = dayTotal > 0 ? 'Done' : 'No entry';
-      row.push(status);
-      rows.push(row);
+    function borderRow(row, numCols) {
+      for (let c = 1; c <= numCols; c++) row.getCell(c).border = BORDER;
     }
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{wch:16},{wch:10}, ...cats.map(()=>({wch:12})), {wch:10},{wch:12}];
-    XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(`Monthly Entries - ${formatMonth(month)}`));
-  } catch (e) { console.error('Monthly entries export failed', e); }
 
-  // 3) Yearly Tab — same layout as Yearly view for selected year
-  try {
-    const year = state.yearlyYear;
-    const all = allData;
-    const months = Object.keys(all).filter(m => m.startsWith(`${year}-`)).sort();
-    if (months.length) {
-      const allCats = [...new Set(months.flatMap(m => (all[m].categories || []).map(c => c.category)))];
-      const header = ['Month','Working Days', ...allCats.map(c => `${c} (Done/Target)`), 'Total Done','Wasted'];
-      const rows = [header];
-      months.forEach(month => {
-        const mData = all[month];
-        const [y,m] = month.split('-').map(Number);
-        const leavesSet = new Set(mData.leaves || []);
+    function sanitizeName(n) {
+      return String(n||'').replace(/[:\\/*?\[\]]/g,' ').trim().slice(0,28)||'Sheet';
+    }
+
+    // ── 1. Monthly Summary ─────────────────────────────────────────────────
+    try {
+      const month = state.mainMonth;
+      const data = await getMonthData(month);
+      const ws = wb.addWorksheet('Monthly Summary');
+      ws.getColumn(1).width = 30; ws.getColumn(2).width = 16;
+      ws.getColumn(3).width = 14; ws.getColumn(4).width = 14; ws.getColumn(5).width = 14;
+
+      const hRow = ws.addRow(['Category','Completed (hrs)','Target (hrs)','Adjust (hrs)','Pending (hrs)']);
+      styleRow(hRow, 5, BLUE_FILL, BLUE_FONT);
+
+      const [y, m] = month.split('-').map(Number);
+      const leavesSet = new Set(data.leaves || []);
+      const todayDate = new Date();
+      const endDay = (y === todayDate.getFullYear() && m === todayDate.getMonth()+1) ? todayDate.getDate() : daysInMonth(y,m);
+      let workingDays = 0;
+      for (let d=1; d<=endDay; d++) {
+        const dt = new Date(y,m-1,d);
+        const ds = `${month}-${String(d).padStart(2,'0')}`;
+        if (dt.getDay()!==0 && dt.getDay()!==6 && !leavesSet.has(ds)) workingDays++;
+      }
+      const entries = data.entries || {};
+      const adjustments = data.adjustments || {};
+      let totalCompleted=0, totalTarget=0, totalPending=0;
+      (data.categories||[]).forEach(c => {
+        let completed=0;
+        Object.values(entries).forEach(dayE => { completed += dayE[c.category]||0; });
+        completed = Math.round(completed*100)/100;
+        const target = Math.round(c.daily_target * workingDays * 100)/100;
+        const adjustment = Math.round((adjustments[c.category]||0)*100)/100;
+        const pending = Math.round((target - completed + adjustment)*100)/100;
+        const row = ws.addRow([c.category, completed, target, adjustment||0, pending]);
+        borderRow(row, 5);
+        totalCompleted+=completed; totalTarget+=target; totalPending+=pending;
+      });
+      ws.addRow([]);
+      const tRow = ws.addRow(['Totals', Math.round(totalCompleted*100)/100, Math.round(totalTarget*100)/100, '', Math.round(totalPending*100)/100]);
+      styleRow(tRow, 5, LTBLUE_FILL, BOLD_FONT);
+
+      const wastedEntries = data.wastedEntries||{};
+      let wastedTotal=0; Object.values(wastedEntries).forEach(arr=>arr.forEach(e=>{wastedTotal+=e.hours||0;}));
+      wastedTotal = Math.round(wastedTotal*100)/100;
+      const productive = Math.round(Object.values(entries).flatMap(Object.values).reduce((a,b)=>a+b,0)*100)/100;
+      ws.addRow([]);
+      [['Working days', workingDays],['Productive (hrs)', productive],['Wasted (hrs)', wastedTotal]].forEach(r => {
+        const row = ws.addRow(r);
+        row.getCell(1).font = BOLD_FONT;
+        row.getCell(1).fill = GRAY_FILL;
+        row.getCell(2).fill = GRAY_FILL;
+        borderRow(row, 2);
+      });
+    } catch(e) { console.error('Monthly summary failed', e); }
+
+    // ── 2. Monthly Entries ─────────────────────────────────────────────────
+    try {
+      const month = state.monthlyMonth;
+      const data = await getMonthData(month);
+      const cats = (data.categories||[]).map(c=>c.category);
+      const [y,m] = month.split('-').map(Number);
+      const total = daysInMonth(y,m);
+      const ws = wb.addWorksheet('Monthly Entries');
+      ws.getColumn(1).width = 14; ws.getColumn(2).width = 8;
+      cats.forEach((_,i) => { ws.getColumn(3+i).width = 12; });
+      ws.getColumn(3+cats.length).width = 10;
+      ws.getColumn(4+cats.length).width = 12;
+
+      const hRow = ws.addRow(['Date','Day',...cats,'Total','Status']);
+      styleRow(hRow, 2+cats.length+2, BLUE_FILL, BLUE_FONT);
+
+      const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const entries = data.entries||{};
+      const leavesSet = new Set(data.leaves||[]);
+      const today = todayStr();
+      for (let d=1; d<=total; d++) {
+        const dt = new Date(y,m-1,d);
+        const dateStr = `${month}-${String(d).padStart(2,'0')}`;
+        const dayEntries = entries[dateStr]||{};
+        let dayTotal=0;
+        const catVals = cats.map(cat=>{ const hrs=dayEntries[cat]||0; dayTotal+=hrs; return hrs||''; });
+        dayTotal = Math.round(dayTotal*100)/100;
+        let status='';
+        if (dt.getDay()===0||dt.getDay()===6) status='Weekend';
+        else if (leavesSet.has(dateStr)) status='Leave';
+        else if (dateStr>today) status='Future';
+        else status=dayTotal>0?'Done':'No entry';
+        const row = ws.addRow([dateStr, dayNames[dt.getDay()], ...catVals, dayTotal||'', status]);
+        borderRow(row, 2+cats.length+2);
+        if (dt.getDay()===0||dt.getDay()===6) row.eachCell(cell=>{ cell.fill=GRAY_FILL; });
+      }
+    } catch(e) { console.error('Monthly entries failed', e); }
+
+    // ── 3. Yearly ──────────────────────────────────────────────────────────
+    try {
+      const year = state.yearlyYear;
+      const months = Object.keys(allData).filter(mo=>mo.startsWith(`${year}-`)).sort();
+      if (months.length) {
+        const allCats = [...new Set(months.flatMap(mo=>(allData[mo].categories||[]).map(c=>c.category)))];
+        const ws = wb.addWorksheet(`Yearly ${year}`);
+        ws.getColumn(1).width = 18; ws.getColumn(2).width = 14;
+        allCats.forEach((_,i)=>{ ws.getColumn(3+i).width = 18; });
+        ws.getColumn(3+allCats.length).width = 12;
+        ws.getColumn(4+allCats.length).width = 10;
+
+        const hRow = ws.addRow(['Month','Working Days',...allCats.map(c=>`${c} (Done/Target)`),'Total Done','Wasted']);
+        styleRow(hRow, 2+allCats.length+2, BLUE_FILL, BLUE_FONT);
         const today = todayStr();
-        const isCurMonth = month === today.slice(0,7);
-        const endDay = isCurMonth ? new Date().getDate() : daysInMonth(y,m);
-        let workingDays = 0;
-        for (let d=1; d<=endDay; d++) { const dt=new Date(y,m-1,d); const ds = `${month}-${String(d).padStart(2,'0')}`; if (dt.getDay()!==0 && dt.getDay()!==6 && !leavesSet.has(ds)) workingDays++; }
-        const catMap = Object.fromEntries((mData.categories||[]).map(c=>[c.category,c.daily_target]));
-        const entries = mData.entries||{};
-        let mDone = 0;
-        const catCells = allCats.map(cat => {
-          const target = Math.round((catMap[cat]||0) * workingDays * 100) / 100;
-          let done = 0; Object.values(entries).forEach(dayE => { done += dayE[cat] || 0; }); done = Math.round(done*100)/100; mDone += done;
-          return `${done} / ${target}`;
+        months.forEach(month => {
+          const mData = allData[month];
+          const [y,mo] = month.split('-').map(Number);
+          const leavesSet = new Set(mData.leaves||[]);
+          const isCur = month===today.slice(0,7);
+          const endDay = isCur ? new Date().getDate() : daysInMonth(y,mo);
+          let workingDays=0;
+          for (let d=1;d<=endDay;d++){const dt=new Date(y,mo-1,d);const ds=`${month}-${String(d).padStart(2,'0')}`;if(dt.getDay()!==0&&dt.getDay()!==6&&!leavesSet.has(ds))workingDays++;}
+          const catMap = Object.fromEntries((mData.categories||[]).map(c=>[c.category,c.daily_target]));
+          const ents = mData.entries||{};
+          let mDone=0;
+          const catCells = allCats.map(cat=>{
+            const target=Math.round((catMap[cat]||0)*workingDays*100)/100;
+            let done=0; Object.values(ents).forEach(dayE=>{done+=dayE[cat]||0;}); done=Math.round(done*100)/100; mDone+=done;
+            return `${done} / ${target}`;
+          });
+          let mWasted=0; Object.values(mData.wastedEntries||{}).forEach(arr=>arr.forEach(e=>{mWasted+=e.hours||0;})); mWasted=Math.round(mWasted*100)/100;
+          const row = ws.addRow([formatMonth(month), workingDays, ...catCells, Math.round(mDone*100)/100, mWasted]);
+          borderRow(row, 2+allCats.length+2);
         });
-        let mWasted = 0; Object.values(mData.wastedEntries || {}).forEach(arr => arr.forEach(e => { mWasted += e.hours || 0; })); mWasted = Math.round(mWasted*100)/100;
-        rows.push([formatMonth(month), workingDays, ...catCells, Math.round(mDone*100)/100, mWasted]);
+      }
+    } catch(e) { console.error('Yearly failed', e); }
+
+    // ── 4. Journal ─────────────────────────────────────────────────────────
+    try {
+      const fmEntries = (userData.fmLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+      if (fmEntries.length) {
+        const ws = wb.addWorksheet('Journal');
+        ws.getColumn(1).width=14; ws.getColumn(2).width=20; ws.getColumn(3).width=42; ws.getColumn(4).width=42;
+        const hRow = ws.addRow(['Date','Category','Title','Notes']);
+        styleRow(hRow, 4, BLUE_FILL, BLUE_FONT);
+        fmEntries.forEach(e => {
+          const row = ws.addRow([e.date, e.type, e.name, e.notes||'']);
+          borderRow(row, 4);
+        });
+      }
+    } catch(e) { console.error('Journal failed', e); }
+
+    // ── 5. Planner — each planner tab = one sheet, blocks stacked ──────────
+    try {
+      (state.planners||[]).forEach(pl => {
+        const ws = wb.addWorksheet(sanitizeName(pl.name));
+        let firstBlock = true;
+        (pl.blocks||[]).forEach(block => {
+          const cols = block.cols||['Col1','Col2'];
+          if (!firstBlock) ws.addRow([]); // blank row between blocks
+          firstBlock = false;
+
+          // Block header spanning full width
+          const bRow = ws.addRow([block.header]);
+          bRow.height = 20;
+          const bCell = bRow.getCell(1);
+          bCell.fill = GREEN_FILL; bCell.font = GREEN_FONT; bCell.border = BORDER;
+          bCell.alignment = { vertical:'middle' };
+
+          // Column headers
+          const cRow = ws.addRow(cols);
+          styleRow(cRow, cols.length, LTGREEN_FILL, LTGREEN_FONT);
+
+          // Data rows
+          (block.rows||[]).forEach(r => {
+            const row = ws.addRow(cols.map((_,ci)=>r['c'+ci]||''));
+            borderRow(row, cols.length);
+          });
+        });
+        // Set column widths based on widest block
+        const maxCols = Math.max(...(pl.blocks||[]).map(b=>(b.cols||[]).length), 1);
+        for (let c=1; c<=maxCols; c++) ws.getColumn(c).width = 35;
       });
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws['!cols'] = [{wch:18},{wch:14}, ...allCats.map(()=>({wch:14})), {wch:12},{wch:10}];
-      XLSX.utils.book_append_sheet(wb, ws, `Yearly ${year}`);
-    }
-  } catch (e) { console.error('Yearly export failed', e); }
+    } catch(e) { console.error('Planner failed', e); }
 
-  // 4) Journal Completion list (FM Log)
-  try {
-    const fmRows = [['Date','Category','Title','Notes']];
-    (userData.fmLog || []).slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(e => fmRows.push([e.date, e.type, e.name, e.notes || '']));
-    if (fmRows.length > 1) {
-      const ws = XLSX.utils.aoa_to_sheet(fmRows);
-      ws['!cols'] = [{wch:14},{wch:18},{wch:40},{wch:40}];
-      XLSX.utils.book_append_sheet(wb, ws, 'Journal (FM Log)');
-    }
-  } catch (e) { console.error('FM Log export failed', e); }
-
-  // 5) Planner — each block in planners as its own sheet
-  try {
-    const planners = state.planners || [];
-    planners.forEach(pl => {
-      (pl.blocks || []).forEach(block => {
-        const cols = block.cols || ['Col1','Col2'];
-        const rows = [cols];
-        (block.rows || []).forEach(r => rows.push(cols.map((_,ci)=> r['c'+ci] || '')));
-        const name = sanitizeSheetName(`${pl.name} - ${block.header}`);
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        ws['!cols'] = cols.map(()=>({wch:40}));
-        XLSX.utils.book_append_sheet(wb, ws, name);
-      });
-    });
-  } catch (e) { console.error('Planner export failed', e); }
-
-  // Finalize
-  try {
-    XLSX.writeFile(wb, `Timesheet_${new Date().toISOString().slice(0,10)}.xlsx`);
+    // ── Download ────────────────────────────────────────────────────────────
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Timesheet_${new Date().toISOString().slice(0,10)}.xlsx`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     showToast('Excel downloaded');
-  } catch (e) { console.error('Write file failed', e); showToast('Excel export failed'); }
+  } catch(e) { console.error('Excel export failed', e); showToast('Excel export failed'); }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
