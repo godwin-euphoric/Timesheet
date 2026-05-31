@@ -356,6 +356,10 @@ async function loadMonthlySummary(data) {
   Object.values(wastedEntries).forEach(arr => arr.forEach(e => { wastedTotal += e.hours || 0; }));
   wastedTotal = Math.round(wastedTotal * 100) / 100;
 
+  const bd = data.fitnessBreakdown || {};
+  const gymDays = Object.values(bd).filter(d => (d.fitGYM || 0) > 0).length;
+  const mmaDays = Object.values(bd).filter(d => (d.fitMMA || 0) > 0).length;
+
   const statsRow = document.getElementById('main-stats-row');
   if (statsRow) {
     statsRow.innerHTML = `
@@ -370,6 +374,14 @@ async function loadMonthlySummary(data) {
       <div class="mstat mstat-green">
         <span class="mstat-label">Productive</span>
         <span class="mstat-val">${totalProductive} hrs</span>
+      </div>
+      <div class="mstat mstat-green">
+        <span class="mstat-label">🏋️ GYM days</span>
+        <span class="mstat-val">${gymDays}</span>
+      </div>
+      <div class="mstat mstat-green">
+        <span class="mstat-label">🥋 MMA days</span>
+        <span class="mstat-val">${mmaDays}</span>
       </div>
     `;
   }
@@ -741,6 +753,20 @@ async function renderMonthlyTable(data) {
   totalTr.innerHTML = `<td colspan="2">Total</td>${totalCells}<td>${grandTotal}</td><td></td>`;
   tbody.appendChild(totalTr);
 
+  if (hasFitness) {
+    const bd = data.fitnessBreakdown || {};
+    const gymDays = Object.values(bd).filter(d => (d.fitGYM || 0) > 0).length;
+    const mmaDays = Object.values(bd).filter(d => (d.fitMMA || 0) > 0).length;
+    const colSpan = 2 + (categories.length - 1) + 3 + 2;
+    const fitTr = document.createElement('tr');
+    fitTr.className = 'row-fitness-days';
+    fitTr.innerHTML = `<td colspan="${colSpan}" style="text-align:center;padding:6px 12px;font-size:13px;color:#86efac;">
+      <span style="margin-right:20px">🏋️ GYM: <strong>${gymDays}</strong> days</span>
+      <span>🥋 MMA: <strong>${mmaDays}</strong> days</span>
+    </td>`;
+    tbody.appendChild(fitTr);
+  }
+
   tbody.addEventListener('click', async e => {
     const td = e.target.closest('td.editable-cell');
     if (!td || td.querySelector('input')) return;
@@ -880,12 +906,14 @@ async function loadYearlyTab() {
         ${allCats.map(c => `<th>${c}<br><small style="font-weight:500;color:#94a3b8">Done / Target</small></th>`).join('')}
         <th>Total Done</th>
         <th style="color:var(--red)">Wasted</th>
+        <th style="color:#86efac">🏋️ GYM Days</th>
+        <th style="color:#86efac">🥋 MMA Days</th>
       </tr>
     `;
     tbody.innerHTML = '';
 
     const colTotals = Object.fromEntries(allCats.map(c => [c, { done: 0, target: 0 }]));
-    let totalWD = 0, totalDone = 0, totalWasted = 0;
+    let totalWD = 0, totalDone = 0, totalWasted = 0, totalGym = 0, totalMma = 0;
 
     months.forEach(month => {
       const mData = allData[month];
@@ -920,9 +948,15 @@ async function loadYearlyTab() {
       Object.values(mData.wastedEntries || {}).forEach(arr => arr.forEach(e => { mWasted += e.hours || 0; }));
       mWasted = Math.round(mWasted * 100) / 100;
 
+      const mbd = mData.fitnessBreakdown || {};
+      const mGym = Object.values(mbd).filter(d => (d.fitGYM || 0) > 0).length;
+      const mMma = Object.values(mbd).filter(d => (d.fitMMA || 0) > 0).length;
+
       totalWD     += workingDays;
       totalDone    = Math.round((totalDone + mDone) * 100) / 100;
       totalWasted  = Math.round((totalWasted + mWasted) * 100) / 100;
+      totalGym    += mGym;
+      totalMma    += mMma;
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -931,6 +965,8 @@ async function loadYearlyTab() {
         ${cells.join('')}
         <td><strong>${Math.round(mDone * 100) / 100}</strong></td>
         <td${mWasted > 0 ? ' class="bad"' : ''}>${mWasted > 0 ? mWasted : ''}</td>
+        <td style="color:#86efac">${mGym || ''}</td>
+        <td style="color:#86efac">${mMma || ''}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -946,6 +982,8 @@ async function loadYearlyTab() {
       }).join('')}
       <td>${Math.round(totalDone * 100) / 100}</td>
       <td${totalWasted > 0 ? ' class="bad"' : ''}>${totalWasted > 0 ? totalWasted : ''}</td>
+      <td style="color:#86efac">${totalGym}</td>
+      <td style="color:#86efac">${totalMma}</td>
     `;
     tbody.appendChild(totalTr);
   }
@@ -1556,8 +1594,11 @@ async function downloadExcel() {
       let wastedTotal=0; Object.values(wastedEntries).forEach(arr=>arr.forEach(e=>{wastedTotal+=e.hours||0;}));
       wastedTotal = Math.round(wastedTotal*100)/100;
       const productive = Math.round(Object.values(entries).flatMap(Object.values).reduce((a,b)=>a+b,0)*100)/100;
+      const ebd = data.fitnessBreakdown || {};
+      const gymDays = Object.values(ebd).filter(d => (d.fitGYM||0) > 0).length;
+      const mmaDays = Object.values(ebd).filter(d => (d.fitMMA||0) > 0).length;
       ws.addRow([]);
-      [['Working days', workingDays],['Productive (hrs)', productive],['Wasted (hrs)', wastedTotal]].forEach(r => {
+      [['Working days', workingDays],['Productive (hrs)', productive],['Wasted (hrs)', wastedTotal],['GYM days', gymDays],['MMA days', mmaDays]].forEach(r => {
         const row = ws.addRow(r);
         row.getCell(1).font = BOLD_FONT;
         row.getCell(1).fill = GRAY_FILL;
@@ -1616,8 +1657,13 @@ async function downloadExcel() {
         ws.getColumn(3+allCats.length).width = 12;
         ws.getColumn(4+allCats.length).width = 10;
 
-        const hRow = ws.addRow(['Month','Working Days',...allCats.map(c=>`${c} (Done/Target)`),'Total Done','Wasted']);
-        styleRow(hRow, 2+allCats.length+2, BLUE_FILL, BLUE_FONT);
+        ws.getColumn(3+allCats.length).width = 12;
+        ws.getColumn(4+allCats.length).width = 10;
+        ws.getColumn(5+allCats.length).width = 12;
+        ws.getColumn(6+allCats.length).width = 12;
+
+        const hRow = ws.addRow(['Month','Working Days',...allCats.map(c=>`${c} (Done/Target)`),'Total Done','Wasted','GYM Days','MMA Days']);
+        styleRow(hRow, 2+allCats.length+4, BLUE_FILL, BLUE_FONT);
         const today = todayStr();
         months.forEach(month => {
           const mData = allData[month];
@@ -1636,8 +1682,11 @@ async function downloadExcel() {
             return `${done} / ${target}`;
           });
           let mWasted=0; Object.values(mData.wastedEntries||{}).forEach(arr=>arr.forEach(e=>{mWasted+=e.hours||0;})); mWasted=Math.round(mWasted*100)/100;
-          const row = ws.addRow([formatMonth(month), workingDays, ...catCells, Math.round(mDone*100)/100, mWasted]);
-          borderRow(row, 2+allCats.length+2);
+          const mbd2 = mData.fitnessBreakdown||{};
+          const mGym = Object.values(mbd2).filter(d=>(d.fitGYM||0)>0).length;
+          const mMma = Object.values(mbd2).filter(d=>(d.fitMMA||0)>0).length;
+          const row = ws.addRow([formatMonth(month), workingDays, ...catCells, Math.round(mDone*100)/100, mWasted, mGym||'', mMma||'']);
+          borderRow(row, 2+allCats.length+4);
         });
       }
     } catch(e) { console.error('Yearly failed', e); }
