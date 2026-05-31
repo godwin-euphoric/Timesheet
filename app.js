@@ -657,7 +657,7 @@ async function renderMonthlyTable(data) {
     : '';
 
   document.getElementById('monthly-thead').innerHTML = `
-    <tr><th rowspan="2">Date</th><th rowspan="2">Day</th>${headerRow1}<th rowspan="2">Total</th><th rowspan="2">Status</th></tr>
+    <tr><th rowspan="2">Date</th><th rowspan="2">Day</th>${headerRow1}<th rowspan="2">Total</th><th rowspan="2">Status</th><th rowspan="2" style="color:var(--red)">Wasted</th></tr>
     <tr>${headerRow2}</tr>
   `;
 
@@ -669,6 +669,7 @@ async function renderMonthlyTable(data) {
   const colTotals = Object.fromEntries(categories.map(c => [c, 0]));
   const subTotals = Object.fromEntries(FITNESS_SUBS.map(s => [s, 0]));
   let grandTotal  = 0;
+  let wastedColTotal = 0;
 
   for (let day = 1; day <= total; day++) {
     const dt      = new Date(year, mon - 1, day);
@@ -719,6 +720,13 @@ async function renderMonthlyTable(data) {
       : isWeekend                                  ? '<td class="neutral">Weekend</td>'
       :                                              '<td class="bad">No entry</td>';
 
+    const wastedArr = (data.wastedEntries || {})[dateStr] || [];
+    const wastedHrs = Math.round(wastedArr.reduce((s, e) => s + (e.hours || 0), 0) * 100) / 100;
+    wastedColTotal  = Math.round((wastedColTotal + wastedHrs) * 100) / 100;
+    const wastedCell = isFuture
+      ? '<td></td>'
+      : `<td class="editable-cell monthly-wasted-cell${wastedHrs > 0 ? ' cell-wasted' : ''}" data-date="${dateStr}" data-wasted="${wastedHrs}">${wastedHrs > 0 ? wastedHrs : ''}</td>`;
+
     const tr = document.createElement('tr');
     if (rowClass) tr.className = rowClass;
     tr.innerHTML = `
@@ -727,6 +735,7 @@ async function renderMonthlyTable(data) {
       ${catCells.join('')}
       <td${dayTotal > 0 ? ' class="cell-hrs"' : ''}>${dayTotal > 0 ? dayTotal : ''}</td>
       ${statusCell}
+      ${wastedCell}
     `;
     tbody.appendChild(tr);
   }
@@ -738,14 +747,14 @@ async function renderMonthlyTable(data) {
       ? FITNESS_SUBS.map(s => `<td>${subTotals[s] > 0 ? subTotals[s] : ''}</td>`).join('')
       : `<td>${colTotals[c] > 0 ? colTotals[c] : ''}</td>`
   ).join('');
-  totalTr.innerHTML = `<td colspan="2">Total</td>${totalCells}<td>${grandTotal}</td><td></td>`;
+  totalTr.innerHTML = `<td colspan="2">Total</td>${totalCells}<td>${grandTotal}</td><td></td><td${wastedColTotal > 0 ? ' style="color:var(--red)"' : ''}>${wastedColTotal > 0 ? wastedColTotal : ''}</td>`;
   tbody.appendChild(totalTr);
 
   if (hasFitness) {
     const bd = data.fitnessBreakdown || {};
     const gymDays = Object.values(bd).filter(d => (d.fitGYM || 0) > 0).length;
     const mmaDays = Object.values(bd).filter(d => (d.fitMMA || 0) > 0).length;
-    const colSpan = 2 + (categories.length - 1) + 3 + 2;
+    const colSpan = 2 + (categories.length - 1) + 3 + 3; // +3 for Total, Status, Wasted
     const fitTr = document.createElement('tr');
     fitTr.className = 'row-fitness-days';
     fitTr.innerHTML = `<td colspan="${colSpan}" style="text-align:center;padding:6px 12px;font-size:13px;color:#86efac;">
@@ -758,16 +767,17 @@ async function renderMonthlyTable(data) {
   tbody.addEventListener('click', async e => {
     const td = e.target.closest('td.editable-cell');
     if (!td || td.querySelector('input')) return;
-    const dateStr = td.dataset.date;
-    const cat     = td.dataset.cat;
-    const sub     = td.dataset.sub || null; // fitness sub-type
-    const prevHrs = parseFloat(td.dataset.hrs) || 0;
+    const dateStr  = td.dataset.date;
+    const isWasted = 'wasted' in td.dataset;
+    const cat      = td.dataset.cat;
+    const sub      = td.dataset.sub || null;
+    const prevHrs  = parseFloat(isWasted ? td.dataset.wasted : td.dataset.hrs) || 0;
 
     const input = document.createElement('input');
     input.type = 'number'; input.min = '0'; input.max = '24'; input.step = '0.25';
     input.value = prevHrs || ''; input.placeholder = '0';
     input.className = 'cell-edit-input';
-    td.textContent = ''; td.classList.remove('cell-hrs');
+    td.textContent = ''; td.classList.remove('cell-hrs', 'cell-wasted');
     td.appendChild(input);
     input.focus(); input.select();
 
@@ -779,14 +789,17 @@ async function renderMonthlyTable(data) {
       const month  = dateStr.slice(0, 7);
       const d      = await getMonthData(month);
       if (newHrs !== prevHrs) {
-        if (sub) {
-          // Fitness sub-cell: update breakdown, recompute Fitness sum
+        if (isWasted) {
+          if (!d.wastedEntries) d.wastedEntries = {};
+          if (newHrs > 0) d.wastedEntries[dateStr] = [{ hours: newHrs, note: '' }];
+          else delete d.wastedEntries[dateStr];
+          state.lastMonthlyEdit = { date: dateStr, isWasted: true, prev: prevHrs };
+        } else if (sub) {
           if (!d.fitnessBreakdown) d.fitnessBreakdown = {};
           if (!d.fitnessBreakdown[dateStr]) d.fitnessBreakdown[dateStr] = {};
           if (newHrs > 0) d.fitnessBreakdown[dateStr][sub] = newHrs;
           else delete d.fitnessBreakdown[dateStr][sub];
           if (!Object.keys(d.fitnessBreakdown[dateStr]).length) delete d.fitnessBreakdown[dateStr];
-          // Sum all subs → Fitness entry
           const subSum = FITNESS_SUBS.reduce((acc, s) => acc + ((d.fitnessBreakdown[dateStr] || {})[s] || 0), 0);
           const fitnessTotal = Math.round(subSum * 100) / 100;
           if (!d.entries[dateStr]) d.entries[dateStr] = {};
@@ -821,10 +834,14 @@ async function renderMonthlyTable(data) {
 
 async function undoMonthlyEdit() {
   if (!state.lastMonthlyEdit) return;
-  const { date, cat, sub, prev } = state.lastMonthlyEdit;
+  const { date, cat, sub, prev, isWasted } = state.lastMonthlyEdit;
   const month = date.slice(0, 7);
   const d = await getMonthData(month);
-  if (sub) {
+  if (isWasted) {
+    if (!d.wastedEntries) d.wastedEntries = {};
+    if (prev > 0) d.wastedEntries[date] = [{ hours: prev, note: '' }];
+    else delete d.wastedEntries[date];
+  } else if (sub) {
     if (!d.fitnessBreakdown) d.fitnessBreakdown = {};
     if (!d.fitnessBreakdown[date]) d.fitnessBreakdown[date] = {};
     if (prev > 0) d.fitnessBreakdown[date][sub] = prev;

@@ -425,6 +425,11 @@ tr.row-total   td { background: #0D1628; font-weight: 700; border-top: 2px solid
 td.editable-cell { cursor: pointer; transition: background 0.1s; }
 td.editable-cell:hover { background: #1E2A42 !important; }
 
+/* ══ Monthly wasted cell ═════════════════════════════════════════════════════ */
+td.monthly-wasted-cell { color: var(--muted); }
+td.monthly-wasted-cell.cell-wasted { color: var(--red); font-weight: 600; }
+td.monthly-wasted-cell:hover { background: #1E2A42 !important; }
+
 /* ══ Yearly comment cell ═════════════════════════════════════════════════════ */
 td.yearly-comment-cell { min-width: 180px; max-width: 260px; color: #94a3b8; cursor: pointer; }
 td.yearly-comment-cell:hover { background: #1E2A42 !important; }
