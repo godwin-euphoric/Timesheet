@@ -1858,7 +1858,10 @@ async function downloadExcel() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Timesheet_${new Date().toISOString().slice(0,10)}.xlsx`;
+    const _now = new Date();
+    const _d = `${String(_now.getDate()).padStart(2,'0')}-${String(_now.getMonth()+1).padStart(2,'0')}-${_now.getFullYear()}`;
+    const _t = `${_now.getHours()}-${String(_now.getMinutes()).padStart(2,'0')}`;
+    a.download = `Timesheet_${_d}_${_t}.xlsx`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('Excel downloaded');
