@@ -1649,6 +1649,13 @@ async function loadSettingsTab() {
   renderSettingsTable();
   await loadSettingsMonthTable();
   await loadFmCategorySettings();
+  setSaveState('settings-save-btn', false);
+}
+
+// Toggle a save button between gray (clean) and blue (unsaved changes)
+function setSaveState(btnId, dirty) {
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.toggle('is-clean', !dirty);
 }
 
 function renderSettingsTable() {
@@ -1661,9 +1668,9 @@ function renderSettingsTable() {
   tbody.innerHTML = meta.map((c, i) => `
     <tr>
       <td><input class="inline-input" type="text" value="${c.category}"
-           oninput="state.settingsMetadata[${i}].category = this.value"></td>
+           oninput="state.settingsMetadata[${i}].category = this.value; setSaveState('settings-save-btn', true)"></td>
       <td><input class="inline-input sm" type="number" value="${c.daily_target}" step="0.25" min="0"
-           oninput="state.settingsMetadata[${i}].daily_target = parseFloat(this.value)||0"></td>
+           oninput="state.settingsMetadata[${i}].daily_target = parseFloat(this.value)||0; setSaveState('settings-save-btn', true)"></td>
       <td><button class="btn-danger" onclick="removeSettingsCategory(${i})">✕</button></td>
     </tr>
   `).join('');
@@ -1680,11 +1687,13 @@ function addCategory() {
   state.settingsMetadata.push({ category: name, daily_target: target });
   nameEl.value = ''; targetEl.value = '';
   renderSettingsTable();
+  setSaveState('settings-save-btn', true);
 }
 
 function removeSettingsCategory(i) {
   state.settingsMetadata.splice(i, 1);
   renderSettingsTable();
+  setSaveState('settings-save-btn', true);
 }
 
 async function saveSettings() {
@@ -1693,6 +1702,7 @@ async function saveSettings() {
   data.categories = state.settingsMetadata.filter(c => c.category.trim());
   await saveMonthData(month, data);
   showToast('Settings saved');
+  setSaveState('settings-save-btn', false);
   await loadSettingsMonthTable();
   if (state.mainMonth === month) await loadMainTab();
 }
@@ -1705,6 +1715,7 @@ async function copyFromPrevMonth() {
   if (!data.categories?.length) { showToast(`No data for ${formatMonth(prevMonth)}`); return; }
   state.settingsMetadata = data.categories.map(c => ({ ...c }));
   renderSettingsTable();
+  setSaveState('settings-save-btn', true);
   showToast(`Copied from ${formatMonth(prevMonth)}`);
 }
 
@@ -1753,6 +1764,7 @@ async function loadFmCategorySettings() {
   const userData  = await getUserData();
   state.fmCatMeta = [...(userData.fmCategories || [])];
   renderFmCategoryTable();
+  setSaveState('fm-cat-save-btn', false);
 }
 
 function renderFmCategoryTable() {
@@ -1777,16 +1789,19 @@ function addFmCategory() {
   state.fmCatMeta.push(name);
   input.value = '';
   renderFmCategoryTable();
+  setSaveState('fm-cat-save-btn', true);
 }
 
 function removeFmCategory(i) {
   state.fmCatMeta.splice(i, 1);
   renderFmCategoryTable();
+  setSaveState('fm-cat-save-btn', true);
 }
 
 async function saveFmCategories() {
   await saveUserData({ fmCategories: [...state.fmCatMeta] });
   showToast('FM categories saved');
+  setSaveState('fm-cat-save-btn', false);
 }
 
 // ══════════════════════════════════════════════════════════════════════════

@@ -228,6 +228,16 @@ input:focus, select:focus {
 }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79,70,229,0.55); }
 
+/* Save button "clean" (no unsaved changes) — gray until edited */
+.btn-primary.is-clean {
+  background: var(--card2);
+  color: var(--muted);
+  border: 1.5px solid var(--border);
+  box-shadow: none;
+  cursor: default;
+}
+.btn-primary.is-clean:hover { transform: none; box-shadow: none; }
+
 .btn-secondary {
   height: 40px; padding: 0 18px;
   background: var(--card2); color: var(--text);
