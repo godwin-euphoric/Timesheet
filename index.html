@@ -56,7 +56,6 @@
       <button class="tab-btn" data-tab="settings">Settings</button>
     </nav>
     <div class="header-right">
-      <button class="btn-header-action" onclick="emailReport()" title="Email this month's report">✉ Email Report</button>
       <button class="btn-header-action" onclick="downloadExcel()" title="Download Excel backup">⬇ Excel</button>
       <button class="btn-header-action" onclick="document.getElementById('import-file-input').click()" title="Import from Excel backup">⬆ Import</button>
       <input type="file" id="import-file-input" accept=".xlsx" style="display:none" onchange="importExcel(this)">
@@ -101,6 +100,8 @@
         </div>
       </div>
       <div class="stat-chip">Working days so far&nbsp;&nbsp;<strong id="working-days-count">—</strong></div>
+      <div class="stat-chip">😴 Avg Sleep / day (Month)&nbsp;&nbsp;<strong id="sleep-avg-month">—</strong></div>
+      <div class="stat-chip">😴 Avg Sleep / day (Year)&nbsp;&nbsp;<strong id="sleep-avg-year">—</strong></div>
     </div>
 
     <!-- Month Summary — before log controls -->
@@ -388,7 +389,7 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="app.js?v=26"></script>
+<script src="app.js?v=27"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

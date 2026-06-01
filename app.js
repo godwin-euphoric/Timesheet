@@ -274,10 +274,57 @@ function loadMainCategories(data) {
   const sel = document.getElementById('main-category');
   sel.innerHTML = '<option value="">-- Select --</option>';
   data.categories.forEach(c => {
+    if (c.category === FITNESS_CAT) {
+      // Replace Fitness with its 3 splits so they can be logged directly
+      FITNESS_SUBS.forEach(sub => {
+        const opt = document.createElement('option');
+        opt.value = sub; opt.textContent = sub;
+        sel.appendChild(opt);
+      });
+      return;
+    }
     const opt = document.createElement('option');
     opt.value = c.category; opt.textContent = c.category;
     sel.appendChild(opt);
   });
+}
+
+// Sleep averages: total sleep ÷ elapsed days (month start / Jun 1 → yesterday)
+async function renderSleepAverages(mainData) {
+  const todayD = new Date();
+  const yesterday = new Date(todayD.getFullYear(), todayD.getMonth(), todayD.getDate() - 1);
+  const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const yStr = ymd(yesterday);
+
+  // ── Monthly average (for the Main tab month) ──
+  const month = state.mainMonth;
+  const [my, mm] = month.split('-').map(Number);
+  const monthSleep = mainData.sleep || {};
+  let mSum = 0, mDays = 0;
+  const monthEnd = daysInMonth(my, mm);
+  for (let d = 1; d <= monthEnd; d++) {
+    const ds = `${month}-${String(d).padStart(2,'0')}`;
+    if (ds > yStr) break;            // only days up to yesterday
+    mDays++;
+    mSum += monthSleep[ds] || 0;
+  }
+  const mAvg = mDays > 0 ? Math.round((mSum / mDays) * 100) / 100 : 0;
+  const mEl = document.getElementById('sleep-avg-month');
+  if (mEl) mEl.textContent = mDays > 0 ? `${mAvg} hrs` : '—';
+
+  // ── Yearly average (Jun 1 → yesterday across all months) ──
+  const allData = await getAllMonths();
+  let ySum = 0;
+  Object.entries(allData).forEach(([, d]) => {
+    Object.entries(d.sleep || {}).forEach(([date, h]) => {
+      if (date >= SLEEP_AVG_START && date <= yStr) ySum += h || 0;
+    });
+  });
+  const start = new Date(SLEEP_AVG_START + 'T00:00:00');
+  const yDays = Math.floor((yesterday - start) / 86400000) + 1;
+  const yAvg = yDays > 0 ? Math.round((ySum / yDays) * 100) / 100 : 0;
+  const yEl = document.getElementById('sleep-avg-year');
+  if (yEl) yEl.textContent = yDays > 0 ? `${yAvg} hrs` : '—';
 }
 
 async function loadMonthlySummary(data) {
@@ -299,6 +346,9 @@ async function loadMonthlySummary(data) {
     if (dt.getDay() !== 0 && dt.getDay() !== 6 && !leavesSet.has(ds)) workingDays++;
   }
   document.getElementById('working-days-count').textContent = workingDays;
+
+  // Sleep averages (per elapsed day, up to yesterday)
+  await renderSleepAverages(data);
 
   // Productive hours chip
   let totalProductive = 0;
@@ -457,8 +507,16 @@ async function logEntry() {
   state.mainDate = date;
   const month = date.slice(0, 7);
   const data = await getMonthData(month);
-  if (!data.entries[date]) data.entries[date] = {};
-  data.entries[date][category] = parseFloat(hoursVal);
+  const hrs = parseFloat(hoursVal);
+  if (FITNESS_SUBS.includes(category)) {
+    if (!data.fitnessBreakdown) data.fitnessBreakdown = {};
+    if (!data.fitnessBreakdown[date]) data.fitnessBreakdown[date] = {};
+    data.fitnessBreakdown[date][category] = hrs;
+    syncFitnessTotal(data, date);
+  } else {
+    if (!data.entries[date]) data.entries[date] = {};
+    data.entries[date][category] = hrs;
+  }
   await saveMonthData(month, data);
 
   document.getElementById('main-hours').value = '';
@@ -474,6 +532,7 @@ async function deleteEntryFromLog(date, category) {
   if (data.entries[date]?.[category] !== undefined) {
     delete data.entries[date][category];
     if (!Object.keys(data.entries[date]).length) delete data.entries[date];
+    if (category === FITNESS_CAT && data.fitnessBreakdown) delete data.fitnessBreakdown[date];
     await saveMonthData(month, data);
   }
   showToast('Entry deleted');
@@ -681,6 +740,9 @@ const FITNESS_SUBS = ['fitGYM', 'fitMMA', 'fitOthers'];
 // Social Media & Unwanted categories (replaces the old single "Wasted" field)
 const WASTED_SUBS = ['U_Random', 'Insta', 'FB', 'Unwanted'];
 
+// Date tracking started — used as the start point for the yearly sleep average
+const SLEEP_AVG_START = '2026-06-01';
+
 // Get a day's wasted breakdown, with legacy fallback (old single total → Unwanted)
 function getWastedBreakdown(data, date) {
   const bd = (data.wastedBreakdown || {})[date] || {};
@@ -705,6 +767,15 @@ function syncWastedTotal(d, date) {
   if (!d.wastedEntries) d.wastedEntries = {};
   if (total > 0) d.wastedEntries[date] = [{ hours: total, note: '' }];
   else delete d.wastedEntries[date];
+}
+
+// After editing fitnessBreakdown[date][sub], keep entries[date].Fitness synced as the total
+function syncFitnessTotal(d, date) {
+  const bd = (d.fitnessBreakdown || {})[date] || {};
+  const total = Math.round(FITNESS_SUBS.reduce((s, k) => s + (bd[k] || 0), 0) * 100) / 100;
+  if (!d.entries[date]) d.entries[date] = {};
+  if (total > 0) d.entries[date][FITNESS_CAT] = total;
+  else { delete d.entries[date][FITNESS_CAT]; if (!Object.keys(d.entries[date]).length) delete d.entries[date]; }
 }
 
 // ── Mobile transposed monthly table (categories as rows, dates as columns) ──
@@ -804,6 +875,16 @@ function renderMonthlyTableMobile(data) {
   stTr.innerHTML = `<td class="mob-cat-th" style="color:var(--muted)">Status</td>${stCells}`;
   tbody.appendChild(stTr);
 
+  // Sleep row
+  const slTr = document.createElement('tr');
+  const slCells = dates.map(di => {
+    if (di.future) return `<td class="mob-data-cell${di.we?' mob-we':''}"></td>`;
+    const sh = (data.sleep || {})[di.ds] || 0;
+    return `<td class="editable-cell sleep-cell mob-data-cell${sh>0?' cell-sleep':''}" data-date="${di.ds}" data-sleep="1" data-hrs="${sh}">${sh>0?sh:''}</td>`;
+  }).join('');
+  slTr.innerHTML = `<td class="mob-cat-th" style="color:#60a5fa">Sleep</td>${slCells}`;
+  tbody.appendChild(slTr);
+
   // Social Media & Unwanted — group header + 4 rows
   const wgTr = document.createElement('tr');
   wgTr.innerHTML = `<td class="mob-cat-th wasted-group" colspan="${dates.length+1}">Social Media &amp; Unwanted</td>`;
@@ -851,7 +932,7 @@ async function renderMonthlyTable(data) {
   const wastedSubThs  = WASTED_SUBS.map(s => `<th class="wasted-sub">${s}</th>`).join('');
 
   document.getElementById('monthly-thead').innerHTML = `
-    <tr><th rowspan="2">Date</th><th rowspan="2">Day</th>${headerRow1}<th rowspan="2">Total</th><th rowspan="2">Status</th>${wastedGroupTh}</tr>
+    <tr><th rowspan="2">Date</th><th rowspan="2">Day</th>${headerRow1}<th rowspan="2">Total</th><th rowspan="2">Status</th><th rowspan="2" style="color:#60a5fa">Sleep</th>${wastedGroupTh}</tr>
     <tr>${headerRow2}${wastedSubThs}</tr>
   `;
 
@@ -864,6 +945,7 @@ async function renderMonthlyTable(data) {
   const subTotals = Object.fromEntries(FITNESS_SUBS.map(s => [s, 0]));
   const wastedSubTotals = Object.fromEntries(WASTED_SUBS.map(s => [s, 0]));
   let grandTotal  = 0;
+  let sleepColTotal = 0;
 
   for (let day = 1; day <= total; day++) {
     const dt      = new Date(year, mon - 1, day);
@@ -917,6 +999,12 @@ async function renderMonthlyTable(data) {
       : isWeekend                                  ? '<td class="neutral">Weekend</td>'
       :                                              '<td class="bad">No entry</td>';
 
+    const sleepHrs = (data.sleep || {})[dateStr] || 0;
+    sleepColTotal = Math.round((sleepColTotal + sleepHrs) * 100) / 100;
+    const sleepCell = isFuture
+      ? '<td></td>'
+      : `<td class="editable-cell sleep-cell${sleepHrs > 0 ? ' cell-sleep' : ''}" data-date="${dateStr}" data-sleep="1" data-hrs="${sleepHrs}">${sleepHrs > 0 ? sleepHrs : ''}</td>`;
+
     const wbd = getWastedBreakdown(data, dateStr);
     const wastedCells = WASTED_SUBS.map(wcat => {
       const wh = wbd[wcat] || 0;
@@ -934,6 +1022,7 @@ async function renderMonthlyTable(data) {
       ${catCells.join('')}
       <td${dayTotal > 0 ? ' class="cell-hrs"' : ''}>${dayTotal > 0 ? dayTotal : ''}</td>
       ${statusCell}
+      ${sleepCell}
       ${wastedCells}
     `;
     tbody.appendChild(tr);
@@ -947,14 +1036,15 @@ async function renderMonthlyTable(data) {
       : `<td>${colTotals[c] > 0 ? colTotals[c] : ''}</td>`
   ).join('');
   const wastedTotalCells = WASTED_SUBS.map(s => `<td${wastedSubTotals[s] > 0 ? ' style="color:var(--red)"' : ''}>${wastedSubTotals[s] > 0 ? wastedSubTotals[s] : ''}</td>`).join('');
-  totalTr.innerHTML = `<td colspan="2">Total</td>${totalCells}<td>${grandTotal}</td><td></td>${wastedTotalCells}`;
+  const sleepTotCell = `<td${sleepColTotal > 0 ? ' style="color:#60a5fa"' : ''}>${sleepColTotal > 0 ? sleepColTotal : ''}</td>`;
+  totalTr.innerHTML = `<td colspan="2">Total</td>${totalCells}<td>${grandTotal}</td><td></td>${sleepTotCell}${wastedTotalCells}`;
   tbody.appendChild(totalTr);
 
   if (hasFitness) {
     const bd = data.fitnessBreakdown || {};
     const gymDays = Object.values(bd).filter(d => (d.fitGYM || 0) > 0).length;
     const mmaDays = Object.values(bd).filter(d => (d.fitMMA || 0) > 0).length;
-    const colSpan = 2 + (categories.length - 1) + 3 + 2 + WASTED_SUBS.length; // Date,Day + cats(fitness=3) + Total,Status + wasted subs
+    const colSpan = 2 + (categories.length - 1) + 3 + 2 + 1 + WASTED_SUBS.length; // Date,Day + cats(fitness=3) + Total,Status,Sleep + wasted subs
     const fitTr = document.createElement('tr');
     fitTr.className = 'row-fitness-days';
     fitTr.innerHTML = `<td colspan="${colSpan}" style="text-align:center;padding:6px 12px;font-size:13px;color:#86efac;">
@@ -973,6 +1063,7 @@ function attachMonthlyEditHandler(tbody) {
     if (!td || td.querySelector('input')) return;
     const dateStr  = td.dataset.date;
     const wcat     = td.dataset.wcat || null;
+    const isSleep  = 'sleep' in td.dataset;
     const cat      = td.dataset.cat;
     const sub      = td.dataset.sub || null;
     const prevHrs  = parseFloat(td.dataset.hrs) || 0;
@@ -981,7 +1072,7 @@ function attachMonthlyEditHandler(tbody) {
     input.type = 'number'; input.min = '0'; input.max = '24'; input.step = '0.25';
     input.value = prevHrs || ''; input.placeholder = '0';
     input.className = 'cell-edit-input';
-    td.textContent = ''; td.classList.remove('cell-hrs', 'cell-wasted');
+    td.textContent = ''; td.classList.remove('cell-hrs', 'cell-wasted', 'cell-sleep');
     td.appendChild(input);
     input.focus(); input.select();
 
@@ -993,7 +1084,12 @@ function attachMonthlyEditHandler(tbody) {
       const month  = dateStr.slice(0, 7);
       const d      = await getMonthData(month);
       if (newHrs !== prevHrs) {
-        if (wcat) {
+        if (isSleep) {
+          if (!d.sleep) d.sleep = {};
+          if (newHrs > 0) d.sleep[dateStr] = newHrs;
+          else delete d.sleep[dateStr];
+          state.lastMonthlyEdit = { date: dateStr, isSleep: true, prev: prevHrs };
+        } else if (wcat) {
           if (!d.wastedBreakdown) d.wastedBreakdown = {};
           if (!d.wastedBreakdown[dateStr]) d.wastedBreakdown[dateStr] = {};
           if (newHrs > 0) d.wastedBreakdown[dateStr][wcat] = newHrs;
@@ -1041,10 +1137,14 @@ function attachMonthlyEditHandler(tbody) {
 
 async function undoMonthlyEdit() {
   if (!state.lastMonthlyEdit) return;
-  const { date, cat, sub, prev, wcat } = state.lastMonthlyEdit;
+  const { date, cat, sub, prev, wcat, isSleep } = state.lastMonthlyEdit;
   const month = date.slice(0, 7);
   const d = await getMonthData(month);
-  if (wcat) {
+  if (isSleep) {
+    if (!d.sleep) d.sleep = {};
+    if (prev > 0) d.sleep[date] = prev;
+    else delete d.sleep[date];
+  } else if (wcat) {
     if (!d.wastedBreakdown) d.wastedBreakdown = {};
     if (!d.wastedBreakdown[date]) d.wastedBreakdown[date] = {};
     if (prev > 0) d.wastedBreakdown[date][wcat] = prev;
@@ -1124,7 +1224,8 @@ function renderYearlyMobile(allData, months, allCats, today, thead, tbody) {
     const mbd = mData.fitnessBreakdown || {};
     const mGym = Object.values(mbd).filter(d => (d.fitGYM || 0) > 0).length;
     const mMma = Object.values(mbd).filter(d => (d.fitMMA || 0) > 0).length;
-    return { month, workingDays, catDone, mDone: Math.round(mDone * 100) / 100, mWasted, mGym, mMma, comment: mData.yearlyComment || '' };
+    const mSleep = Math.round(Object.values(mData.sleep || {}).reduce((s, h) => s + (h || 0), 0) * 100) / 100;
+    return { month, workingDays, catDone, mDone: Math.round(mDone * 100) / 100, mWasted, mGym, mMma, mSleep, comment: mData.yearlyComment || '' };
   });
 
   const shortMonth = m => { const [y, mo] = m.split('-').map(Number); return new Date(y, mo - 1, 1).toLocaleString('en', {month:'short'}) + " '" + String(y).slice(2); };
@@ -1147,6 +1248,7 @@ function renderYearlyMobile(allData, months, allCats, today, thead, tbody) {
   addRow('Social + Unwanted', mStats.map(m => m.mWasted || ''), 'bad');
   addRow('🏋️ GYM', mStats.map(m => m.mGym || ''));
   addRow('🥋 MMA', mStats.map(m => m.mMma || ''));
+  addRow('😴 Sleep', mStats.map(m => m.mSleep || ''));
 
   // Comments row — editable
   const commentCells = mStats.map(m => {
@@ -1209,13 +1311,14 @@ async function loadYearlyTab() {
         <th style="color:var(--red)">Social + Unwanted</th>
         <th style="color:#86efac">🏋️ GYM Days</th>
         <th style="color:#86efac">🥋 MMA Days</th>
+        <th style="color:#60a5fa">😴 Sleep</th>
         <th style="color:#94a3b8">Comments</th>
       </tr>
     `;
     tbody.innerHTML = '';
 
     const colTotals = Object.fromEntries(allCats.map(c => [c, { done: 0, target: 0 }]));
-    let totalWD = 0, totalDone = 0, totalWasted = 0, totalGym = 0, totalMma = 0;
+    let totalWD = 0, totalDone = 0, totalWasted = 0, totalGym = 0, totalMma = 0, totalSleep = 0;
 
     months.forEach(month => {
       const mData = allData[month];
@@ -1253,6 +1356,7 @@ async function loadYearlyTab() {
       const mbd = mData.fitnessBreakdown || {};
       const mGym = Object.values(mbd).filter(d => (d.fitGYM || 0) > 0).length;
       const mMma = Object.values(mbd).filter(d => (d.fitMMA || 0) > 0).length;
+      const mSleep = Math.round(Object.values(mData.sleep || {}).reduce((s, h) => s + (h || 0), 0) * 100) / 100;
       const comment = mData.yearlyComment || '';
 
       totalWD     += workingDays;
@@ -1260,6 +1364,7 @@ async function loadYearlyTab() {
       totalWasted  = Math.round((totalWasted + mWasted) * 100) / 100;
       totalGym    += mGym;
       totalMma    += mMma;
+      totalSleep   = Math.round((totalSleep + mSleep) * 100) / 100;
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -1270,6 +1375,7 @@ async function loadYearlyTab() {
         <td${mWasted > 0 ? ' class="bad"' : ''}>${mWasted > 0 ? mWasted : ''}</td>
         <td style="color:#86efac">${mGym || ''}</td>
         <td style="color:#86efac">${mMma || ''}</td>
+        <td style="color:#60a5fa">${mSleep || ''}</td>
         <td class="yearly-comment-cell editable-cell" data-month="${month}" title="Click to edit">${comment ? `<span class="yearly-comment-text">${comment}</span>` : '<span class="yearly-comment-placeholder">Add comment…</span>'}</td>
       `;
       tbody.appendChild(tr);
@@ -1287,6 +1393,7 @@ async function loadYearlyTab() {
       <td${totalWasted > 0 ? ' class="bad"' : ''}>${totalWasted > 0 ? totalWasted : ''}</td>
       <td style="color:#86efac">${totalGym}</td>
       <td style="color:#86efac">${totalMma}</td>
+      <td style="color:#60a5fa">${totalSleep || ''}</td>
       <td></td>
     `;
     tbody.appendChild(totalTr);
@@ -1963,9 +2070,10 @@ async function downloadExcel() {
       const ebd = data.fitnessBreakdown || {};
       const gymDays = Object.values(ebd).filter(d => (d.fitGYM||0) > 0).length;
       const mmaDays = Object.values(ebd).filter(d => (d.fitMMA||0) > 0).length;
+      const sleepTotal = Math.round(Object.values(data.sleep||{}).reduce((s,h)=>s+(h||0),0)*100)/100;
       ws.addRow([]);
       const wasteNoteExport = data.wasteNote || '';
-      [['Working days', workingDays],['Productive (hrs)', productive],['Social + Unwanted (hrs)', wastedTotal],['GYM days', gymDays],['MMA days', mmaDays],['Waste note', wasteNoteExport]].forEach(r => {
+      [['Working days', workingDays],['Productive (hrs)', productive],['Social + Unwanted (hrs)', wastedTotal],['GYM days', gymDays],['MMA days', mmaDays],['Sleep (hrs)', sleepTotal],['Waste note', wasteNoteExport]].forEach(r => {
         const row = ws.addRow(r);
         row.getCell(1).font = BOLD_FONT;
         row.getCell(1).fill = GRAY_FILL;
@@ -2028,8 +2136,8 @@ async function downloadExcel() {
         ws.getColumn(6+allCats.length).width = 12;
         ws.getColumn(7+allCats.length).width = 36;
 
-        const hRow = ws.addRow(['Month','Working Days',...allCats,'Total Done','Social + Unwanted','GYM Days','MMA Days','Comments']);
-        styleRow(hRow, 2+allCats.length+5, BLUE_FILL, BLUE_FONT);
+        const hRow = ws.addRow(['Month','Working Days',...allCats,'Total Done','Social + Unwanted','GYM Days','MMA Days','Sleep','Comments']);
+        styleRow(hRow, 2+allCats.length+6, BLUE_FILL, BLUE_FONT);
         const today = todayStr();
         months.forEach(month => {
           const mData = allData[month];
@@ -2050,9 +2158,10 @@ async function downloadExcel() {
           const mbd2 = mData.fitnessBreakdown||{};
           const mGym = Object.values(mbd2).filter(d=>(d.fitGYM||0)>0).length;
           const mMma = Object.values(mbd2).filter(d=>(d.fitMMA||0)>0).length;
+          const mSleep = Math.round(Object.values(mData.sleep||{}).reduce((s,h)=>s+(h||0),0)*100)/100;
           const comment = mData.yearlyComment||'';
-          const row = ws.addRow([formatMonth(month), workingDays, ...catCells, Math.round(mDone*100)/100||'', mWasted||'', mGym||'', mMma||'', comment]);
-          borderRow(row, 2+allCats.length+5);
+          const row = ws.addRow([formatMonth(month), workingDays, ...catCells, Math.round(mDone*100)/100||'', mWasted||'', mGym||'', mMma||'', mSleep||'', comment]);
+          borderRow(row, 2+allCats.length+6);
         });
       }
     } catch(e) { console.error('Yearly failed', e); }
@@ -2123,6 +2232,21 @@ async function downloadExcel() {
         rows.forEach(r => { const row = ws.addRow(r); borderRow(row, 1 + WASTED_SUBS.length); });
       }
     } catch(e) { console.error('Wasted Time failed', e); }
+
+    // ── 7b. Sleep ───────────────────────────────────────────────────────────
+    try {
+      const month = state.mainMonth;
+      const data = await getMonthData(month);
+      const sleep = data.sleep || {};
+      const dates = Object.keys(sleep).filter(d => (sleep[d] || 0) > 0).sort();
+      if (dates.length) {
+        const ws = wb.addWorksheet('E - Sleep');
+        ws.getColumn(1).width = 14; ws.getColumn(2).width = 12;
+        const hRow = ws.addRow(['Date', 'Hours']);
+        styleRow(hRow, 2, BLUE_FILL, BLUE_FONT);
+        dates.forEach(d => { const row = ws.addRow([d, sleep[d]]); borderRow(row, 2); });
+      }
+    } catch(e) { console.error('Sleep failed', e); }
 
     // ── 8. Adjustments ─────────────────────────────────────────────────────
     try {
@@ -2350,6 +2474,16 @@ async function importExcel(input) {
         if (Object.keys(wastedEntries).length) parsed.wastedEntries = wastedEntries;
       }
 
+      // E - Sleep
+      else if (name === 'E - Sleep') {
+        const sleep = {};
+        for (let i = 1; i < rows.length; i++) {
+          const date = sv(rows[i][0]), hours = nv(rows[i][1]);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(date) && hours) sleep[date] = hours;
+        }
+        if (Object.keys(sleep).length) parsed.sleep = sleep;
+      }
+
       // E - Adjustments
       else if (name === 'E - Adjustments') {
         const adjustments = {};
@@ -2416,6 +2550,7 @@ async function importExcel(input) {
     if (parsed.categories)    lines.push(`• ${parsed.categories.length} categories`);
     if (parsed.leaves)        lines.push(`• ${parsed.leaves.length} leave days`);
     if (parsed.wastedEntries) lines.push(`• Wasted time entries`);
+    if (parsed.sleep)         lines.push(`• Sleep for ${Object.keys(parsed.sleep).length} days`);
     if (parsed.adjustments)   lines.push(`• Adjustments for ${Object.keys(parsed.adjustments).length} categories`);
     if (parsed.fmLog)         lines.push(`• ${parsed.fmLog.length} journal entries`);
     if (parsed.habits)        lines.push(`• ${parsed.habits.habits.length} habits + log`);
@@ -2451,6 +2586,7 @@ async function confirmImport() {
     if (parsed.leaves)         monthData.leaves          = parsed.leaves;
     if (parsed.wastedEntries)  monthData.wastedEntries   = parsed.wastedEntries;
     if (parsed.wastedBreakdown) monthData.wastedBreakdown = parsed.wastedBreakdown;
+    if (parsed.sleep)          monthData.sleep           = parsed.sleep;
     if (parsed.adjustments)    monthData.adjustments     = parsed.adjustments;
     if (parsed.monthlyEntries) monthData.entries         = parsed.monthlyEntries.entries;
 
