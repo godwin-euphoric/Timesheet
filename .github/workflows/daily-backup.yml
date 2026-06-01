@@ -2,7 +2,7 @@ name: Daily Excel Backup
 
 on:
   schedule:
-    - cron: '0 2 * * *'   # Updated from the app Settings tab via GitHub API
+    - cron: '30 18 * * *'  # 12:00 AM IST (midnight India time = 18:30 UTC)
   workflow_dispatch:        # Allow manual trigger from GitHub Actions tab
 
 jobs:

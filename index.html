@@ -361,28 +361,9 @@
     </div>
 
     <div class="card">
-      <div class="card-title">🗄 Auto Backup Schedule</div>
-      <p class="hint">Backup runs once daily via GitHub Actions. Changing the time here updates the workflow directly — requires a GitHub PAT with <code>workflow</code> scope.</p>
-      <div style="display:flex;flex-direction:column;gap:14px;max-width:380px;margin-top:10px">
-        <div class="field-group">
-          <label>GitHub Personal Access Token</label>
-          <div style="display:flex;gap:8px">
-            <input type="password" id="github-pat-input" placeholder="ghp_xxxx..." style="flex:1">
-            <button class="btn-secondary" onclick="saveGithubPat()">Save</button>
-          </div>
-          <small style="color:#94a3b8;margin-top:4px;display:block">
-            Create at github.com → Settings → Developer settings → Personal access tokens → Fine-grained → select repo <strong>Timesheet</strong> → enable <strong>Contents: Read &amp; write</strong> and <strong>Actions: Read &amp; write</strong>
-          </small>
-        </div>
-        <div class="field-group">
-          <label>Backup time</label>
-          <select id="backup-hour-select" onchange="saveBackupHour(this.value)" style="width:100%"></select>
-        </div>
-        <p id="backup-status-msg" style="font-size:12px;color:#94a3b8;margin:0"></p>
-      </div>
-      <p class="hint" style="margin-top:10px;color:#94a3b8">
-        IST = UTC + 5:30 &nbsp;|&nbsp; e.g. 2:00 AM UTC = 7:30 AM IST
-      </p>
+      <div class="card-title">🗄 Auto Backup</div>
+      <p class="hint">Your Timesheet data is automatically backed up to Excel every day at <strong>12:00 AM IST</strong> (midnight India time) via GitHub Actions.</p>
+      <p class="hint" style="color:#4ade80;margin-top:6px">✓ Runs daily · Saved to your GitHub repo under <code>backups/</code></p>
     </div>
 
   </div>
@@ -407,7 +388,7 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="app.js?v=22"></script>
+<script src="app.js?v=23"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
