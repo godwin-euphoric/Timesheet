@@ -326,9 +326,13 @@ async function renderSleepAverages(mainData) {
     mDays++;
     mSum += monthSleep[ds] || 0;
   }
+  const sleepColor = avg => avg >= 7 ? '#4ade80' : avg >= 6 ? '#fbbf24' : '#f87171';
   const mAvg = mDays > 0 ? Math.round((mSum / mDays) * 100) / 100 : 0;
   const mEl = document.getElementById('sleep-avg-month');
-  if (mEl) mEl.textContent = mDays > 0 ? `${mAvg} hrs` : '—';
+  if (mEl) {
+    mEl.textContent = mDays > 0 ? `${mAvg} hrs` : '—';
+    mEl.style.color = mDays > 0 ? sleepColor(mAvg) : '';
+  }
 
   // ── Yearly average (Jun 1 → yesterday across all months) ──
   const allData = await getAllMonths();
@@ -342,7 +346,10 @@ async function renderSleepAverages(mainData) {
   const yDays = Math.floor((yesterday - start) / 86400000) + 1;
   const yAvg = yDays > 0 ? Math.round((ySum / yDays) * 100) / 100 : 0;
   const yEl = document.getElementById('sleep-avg-year');
-  if (yEl) yEl.textContent = yDays > 0 ? `${yAvg} hrs` : '—';
+  if (yEl) {
+    yEl.textContent = yDays > 0 ? `${yAvg} hrs` : '—';
+    yEl.style.color = yDays > 0 ? sleepColor(yAvg) : '';
+  }
 }
 
 async function loadMonthlySummary(data) {
