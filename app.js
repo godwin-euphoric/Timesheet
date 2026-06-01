@@ -229,6 +229,24 @@ async function loadMainTab() {
   await loadMonthlySummary(data);
   renderWastedMonthSummary(data);  // also sets wasted chip
   await renderDayEntries();
+  renderMainNotes(data);
+}
+
+let mainNotesTimer = null;
+function renderMainNotes(data) {
+  const ta = document.getElementById('main-notes');
+  if (!ta) return;
+  ta.value = data.notes || '';
+  ta.oninput = () => {
+    clearTimeout(mainNotesTimer);
+    const month = state.mainMonth;
+    mainNotesTimer = setTimeout(async () => {
+      const d = await getMonthData(month);
+      const val = ta.value.trim();
+      if (val) d.notes = val; else delete d.notes;
+      await saveMonthData(month, d);
+    }, 800);
+  };
 }
 
 function loadWastedCategories() {
@@ -2073,7 +2091,8 @@ async function downloadExcel() {
       const sleepTotal = Math.round(Object.values(data.sleep||{}).reduce((s,h)=>s+(h||0),0)*100)/100;
       ws.addRow([]);
       const wasteNoteExport = data.wasteNote || '';
-      [['Working days', workingDays],['Productive (hrs)', productive],['Social + Unwanted (hrs)', wastedTotal],['GYM days', gymDays],['MMA days', mmaDays],['Sleep (hrs)', sleepTotal],['Waste note', wasteNoteExport]].forEach(r => {
+      const notesExport = data.notes || '';
+      [['Working days', workingDays],['Productive (hrs)', productive],['Social + Unwanted (hrs)', wastedTotal],['GYM days', gymDays],['MMA days', mmaDays],['Sleep (hrs)', sleepTotal],['Waste note', wasteNoteExport],['Notes', notesExport]].forEach(r => {
         const row = ws.addRow(r);
         row.getCell(1).font = BOLD_FONT;
         row.getCell(1).fill = GRAY_FILL;
