@@ -224,16 +224,6 @@ async function main() {
   console.log('Fetching data from Firestore...');
   const { allData, userData } = await fetchAllData();
 
-  // Check if this run matches the user's preferred backup hour (UTC)
-  const preferredHour = userData.backupHour !== undefined ? userData.backupHour : 2;
-  const currentHour   = new Date().getUTCHours();
-  if (currentHour !== preferredHour) {
-    console.log(`Skipping: current UTC hour ${currentHour} ≠ preferred hour ${preferredHour}`);
-    await admin.app().delete();
-    return;
-  }
-  console.log(`UTC hour ${currentHour} matches preference — proceeding with backup`);
-
   const monthCount = Object.keys(allData).length;
   console.log(`Found ${monthCount} months of data`);
 
