@@ -1447,12 +1447,13 @@ function renderHabitsTable(habits, habitLog, month) {
   let bodyRows = '';
   habits.forEach((habit, i) => {
     const cells = days.map(d => {
-      const checked = (habitLog[d] || {})[habit] ? 'checked' : '';
+      const st = (habitLog[d] || {})[habit]; // true=done, 'missed'=missed, else blank
+      const stateCls = st === true ? 'hs-done' : st === 'missed' ? 'hs-missed' : 'hs-none';
+      const mark     = st === true ? '✓' : st === 'missed' ? '✗' : '';
       const dt = new Date(d + 'T00:00:00');
       const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
       return `<td class="habit-check-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
-        <input type="checkbox" class="habit-cb" ${checked}
-          onchange="toggleHabit('${d}','${encodeURIComponent(habit)}',this.checked)">
+        <button class="habit-tri ${stateCls}" onclick="cycleHabit(this,'${d}','${encodeURIComponent(habit)}')">${mark}</button>
       </td>`;
     }).join('');
     bodyRows += `
@@ -1485,14 +1486,26 @@ function renderHabitsTable(habits, habitLog, month) {
   table.innerHTML = thead + `<tbody>${bodyRows}</tbody>`;
 }
 
-async function toggleHabit(date, encodedHabit, checked) {
+// Tri-state cycle: blank → done (✓) → missed (✗) → blank
+async function cycleHabit(btn, date, encodedHabit) {
   const habit    = decodeURIComponent(encodedHabit);
   const userData = await getUserData();
   if (!userData.habitLog[date]) userData.habitLog[date] = {};
-  if (checked) userData.habitLog[date][habit] = true;
-  else         delete userData.habitLog[date][habit];
+  const cur = userData.habitLog[date][habit];
+  let next;
+  if (cur === true)        next = 'missed';
+  else if (cur === 'missed') next = null;
+  else                     next = true;
+
+  if (!next) delete userData.habitLog[date][habit];
+  else       userData.habitLog[date][habit] = next;
   if (!Object.keys(userData.habitLog[date]).length) delete userData.habitLog[date];
   await saveUserData({ habitLog: userData.habitLog });
+
+  btn.classList.remove('hs-done', 'hs-missed', 'hs-none');
+  if (next === true)          { btn.classList.add('hs-done');   btn.textContent = '✓'; }
+  else if (next === 'missed') { btn.classList.add('hs-missed'); btn.textContent = '✗'; }
+  else                        { btn.classList.add('hs-none');   btn.textContent = ''; }
 }
 
 async function addHabit() {
@@ -2147,7 +2160,7 @@ async function downloadExcel() {
           styleRow(gridHRow, 1 + habits.length, BLUE_FILL, BLUE_FONT);
           habits.forEach((_, i) => { ws.getColumn(2 + i).width = 20; });
           dates.forEach(d => {
-            const vals = habits.map(h => (habitLog[d]||{})[h] ? 'Yes' : '');
+            const vals = habits.map(h => { const s = (habitLog[d]||{})[h]; return s === true ? 'Yes' : s === 'missed' ? 'Missed' : ''; });
             const row = ws.addRow([d, ...vals]);
             borderRow(row, 1 + habits.length);
           });
@@ -2360,7 +2373,11 @@ async function importExcel(input) {
             if (!logHabits.length) { logHabits = rows[i].slice(1).map(sv).filter(Boolean); continue; }
             if (!first) continue;
             const dayLog = {};
-            logHabits.forEach((h, hi) => { if (sv(rows[i][1+hi]).toLowerCase() === 'yes') dayLog[h] = true; });
+            logHabits.forEach((h, hi) => {
+              const v = sv(rows[i][1+hi]).toLowerCase();
+              if (v === 'yes') dayLog[h] = true;
+              else if (v === 'missed') dayLog[h] = 'missed';
+            });
             if (Object.keys(dayLog).length) habitLog[first] = dayLog;
           }
         }

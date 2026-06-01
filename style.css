@@ -563,24 +563,20 @@ input.habit-edit-input {
 .habit-check-cell { text-align: center; padding: 10px 8px; }
 .habit-check-cell.cell-today { background: rgba(252,211,77,0.05); }
 
-/* Custom checkbox */
-.habit-cb {
-  appearance: none; -webkit-appearance: none;
+/* Tri-state habit button: blank → done (✓) → missed (✗) */
+.habit-tri {
   width: 26px; height: 26px;
   border: 2px solid var(--border); border-radius: 7px;
   background: var(--card2); cursor: pointer;
-  transition: all 0.15s; position: relative;
+  transition: all 0.15s;
   display: block; margin: 0 auto;
+  font-size: 15px; font-weight: 900; line-height: 1;
+  color: #0B1120; padding: 0;
 }
-.habit-cb:hover { border-color: var(--primary); }
-.habit-cb:checked {
-  background: var(--green); border-color: var(--green);
-}
-.habit-cb:checked::after {
-  content: '✓'; position: absolute;
-  top: 50%; left: 50%; transform: translate(-50%, -50%);
-  color: #0B1120; font-size: 15px; font-weight: 900; line-height: 1;
-}
+.habit-tri:hover { border-color: var(--primary); }
+.habit-tri.hs-none   { background: var(--card2); }
+.habit-tri.hs-done   { background: var(--green); border-color: var(--green); color: #0B1120; }
+.habit-tri.hs-missed { background: var(--red);   border-color: var(--red);   color: #fff; }
 
 /* Add row */
 .habit-add-row td { padding: 10px 16px; border-top: 2px dashed var(--border); }
