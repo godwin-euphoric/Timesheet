@@ -360,6 +360,18 @@
       </div>
     </div>
 
+    <div class="card">
+      <div class="card-title">🗄 Auto Backup Schedule</div>
+      <p class="hint">Daily backup runs via GitHub Actions and saves an Excel file to your repo. Pick the UTC hour you want it to run.</p>
+      <div class="field-group" style="max-width:320px">
+        <label>Backup time</label>
+        <select id="backup-hour-select" onchange="saveBackupHour(this.value)" style="width:100%"></select>
+      </div>
+      <p class="hint" style="margin-top:10px;color:#94a3b8">
+        IST = UTC + 5:30 &nbsp;|&nbsp; Tip: pick an off-peak hour (e.g. 2 AM UTC = 7:30 AM IST)
+      </p>
+    </div>
+
   </div>
 </div>
 
@@ -382,7 +394,7 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="app.js?v=20"></script>
+<script src="app.js?v=21"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

@@ -1649,6 +1649,27 @@ async function loadSettingsTab() {
   renderSettingsTable();
   await loadSettingsMonthTable();
   await loadFmCategorySettings();
+  await loadBackupHourSetting();
+}
+
+async function loadBackupHourSetting() {
+  const sel = document.getElementById('backup-hour-select');
+  if (!sel) return;
+  const userData = await getUserData();
+  const saved = userData.backupHour !== undefined ? userData.backupHour : 2;
+  sel.innerHTML = Array.from({ length: 24 }, (_, h) => {
+    const utcStr = `${String(h).padStart(2,'0')}:00 UTC`;
+    const istMin = h * 60 + 330;
+    const istH   = Math.floor(istMin / 60) % 24;
+    const istM   = istMin % 60;
+    const istStr = `${String(istH).padStart(2,'0')}:${String(istM).padStart(2,'0')} IST`;
+    return `<option value="${h}"${h === saved ? ' selected' : ''}>${utcStr}  (${istStr})</option>`;
+  }).join('');
+}
+
+async function saveBackupHour(value) {
+  await saveUserData({ backupHour: parseInt(value) });
+  showToast(`Backup set to ${String(parseInt(value)).padStart(2,'0')}:00 UTC`);
 }
 
 function renderSettingsTable() {
