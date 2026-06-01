@@ -225,9 +225,17 @@ async function loadMainTab() {
   const data = await getMonthData(state.mainMonth);
   loadMainDateDropdown(data);
   loadMainCategories(data);
+  loadWastedCategories();
   await loadMonthlySummary(data);
   renderWastedMonthSummary(data);  // also sets wasted chip
   await renderDayEntries();
+}
+
+function loadWastedCategories() {
+  const sel = document.getElementById('wasted-category');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">-- Select --</option>' +
+    WASTED_SUBS.map(w => `<option value="${w}">${w}</option>`).join('');
 }
 
 function loadMainDateDropdown(data) {
@@ -477,20 +485,23 @@ async function deleteEntryFromLog(date, category) {
 
 async function logWastedTime() {
   const date  = document.getElementById('main-date').value;
+  const wcat  = document.getElementById('wasted-category').value;
   const hours = parseFloat(document.getElementById('wasted-hours').value);
-  const note  = document.getElementById('wasted-note').value.trim();
-  if (!date)                        { showToast('Select a date');         return; }
-  if (isNaN(hours) || hours <= 0)   { showToast('Enter valid hours');     return; }
+  if (!date)                        { showToast('Select a date');     return; }
+  if (!wcat)                        { showToast('Select a category'); return; }
+  if (isNaN(hours) || hours <= 0)   { showToast('Enter valid hours'); return; }
 
+  state.mainDate = date;
   const month = date.slice(0, 7);
   const data  = await getMonthData(month);
-  if (!data.wastedEntries[date]) data.wastedEntries[date] = [];
-  data.wastedEntries[date].push({ hours, note });
+  if (!data.wastedBreakdown) data.wastedBreakdown = {};
+  if (!data.wastedBreakdown[date]) data.wastedBreakdown[date] = {};
+  data.wastedBreakdown[date][wcat] = hours;
+  syncWastedTotal(data, date);
   await saveMonthData(month, data);
 
   document.getElementById('wasted-hours').value = '';
-  document.getElementById('wasted-note').value  = '';
-  showToast('Wasted time logged');
+  showToast(`${wcat} logged`);
   renderWastedMonthSummary(data);
   await renderDayEntries();
 }
@@ -506,14 +517,15 @@ function renderWastedMonthSummary(data) {
   if (el) el.textContent = total + ' hrs';
 }
 
-async function deleteWastedEntry(date, idx) {
+async function deleteWastedEntry(date, wcat) {
   const month = date.slice(0, 7);
   const data  = await getMonthData(month);
-  if (data.wastedEntries[date]) {
-    data.wastedEntries[date].splice(idx, 1);
-    if (!data.wastedEntries[date].length) delete data.wastedEntries[date];
-    await saveMonthData(month, data);
+  if (data.wastedBreakdown && data.wastedBreakdown[date]) {
+    delete data.wastedBreakdown[date][wcat];
+    if (!Object.keys(data.wastedBreakdown[date]).length) delete data.wastedBreakdown[date];
   }
+  syncWastedTotal(data, date);
+  await saveMonthData(month, data);
   showToast('Entry deleted');
   renderWastedMonthSummary(data);
   await renderDayEntries();
@@ -544,7 +556,8 @@ async function renderDayEntries() {
   const data       = await getMonthData(date.slice(0, 7));
   const dayEntries = (data.entries || {})[date] || {};
   const cats       = Object.keys(dayEntries);
-  const wastedDay  = (data.wastedEntries || {})[date] || [];
+  const wbd        = getWastedBreakdown(data, date);
+  const wastedCats = WASTED_SUBS.filter(w => (wbd[w] || 0) > 0);
 
   let html = cats.map(cat => `
     <div style="display:flex;align-items:center;justify-content:space-between;
@@ -557,21 +570,21 @@ async function renderDayEntries() {
     </div>
   `).join('');
 
-  if (wastedDay.length) {
-    html += `<div style="padding:8px 0 2px;font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:0.8px">Wasted</div>`;
-    html += wastedDay.map((e, i) => `
+  if (wastedCats.length) {
+    html += `<div style="padding:8px 0 2px;font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:0.8px">Social Media &amp; Unwanted</div>`;
+    html += wastedCats.map(w => `
       <div style="display:flex;align-items:center;justify-content:space-between;
                   padding:8px 0;border-bottom:1px solid #F1F5F9">
-        <span style="font-size:13px;color:var(--muted)">${e.note || 'No note'}</span>
+        <span style="font-size:13px;color:var(--muted)">${w}</span>
         <div style="display:flex;align-items:center;gap:12px">
-          <span style="font-weight:700;color:var(--red)">${e.hours} hrs</span>
-          <button class="btn-danger" onclick="deleteWastedEntry('${date}',${i})">✕</button>
+          <span style="font-weight:700;color:var(--red)">${wbd[w]} hrs</span>
+          <button class="btn-danger" onclick="deleteWastedEntry('${date}','${w}')">✕</button>
         </div>
       </div>
     `).join('');
   }
 
-  if (!cats.length && !wastedDay.length) {
+  if (!cats.length && !wastedCats.length) {
     list.innerHTML = '<span class="empty-inline">No entries for this date</span>';
     return;
   }
@@ -664,6 +677,35 @@ async function persistLeaves() {
 
 const FITNESS_CAT  = 'Fitness';
 const FITNESS_SUBS = ['fitGYM', 'fitMMA', 'fitOthers'];
+
+// Social Media & Unwanted categories (replaces the old single "Wasted" field)
+const WASTED_SUBS = ['U_Random', 'Insta', 'FB', 'Unwanted'];
+
+// Get a day's wasted breakdown, with legacy fallback (old single total → Unwanted)
+function getWastedBreakdown(data, date) {
+  const bd = (data.wastedBreakdown || {})[date] || {};
+  const hasBreakdown = WASTED_SUBS.some(s => (bd[s] || 0) > 0);
+  if (!hasBreakdown) {
+    const legacy = ((data.wastedEntries || {})[date] || []).reduce((s, e) => s + (e.hours || 0), 0);
+    if (legacy > 0) return { Unwanted: Math.round(legacy * 100) / 100 };
+  }
+  return bd;
+}
+
+// Sum a day's wasted breakdown
+function dayWastedTotal(data, date) {
+  const bd = getWastedBreakdown(data, date);
+  return Math.round(WASTED_SUBS.reduce((s, k) => s + (bd[k] || 0), 0) * 100) / 100;
+}
+
+// After editing wastedBreakdown[date][cat], keep wastedEntries[date] synced as the total
+function syncWastedTotal(d, date) {
+  const bd = (d.wastedBreakdown || {})[date] || {};
+  const total = Math.round(WASTED_SUBS.reduce((s, k) => s + (bd[k] || 0), 0) * 100) / 100;
+  if (!d.wastedEntries) d.wastedEntries = {};
+  if (total > 0) d.wastedEntries[date] = [{ hours: total, note: '' }];
+  else delete d.wastedEntries[date];
+}
 
 // ── Mobile transposed monthly table (categories as rows, dates as columns) ──
 function renderMonthlyTableMobile(data) {
@@ -762,15 +804,21 @@ function renderMonthlyTableMobile(data) {
   stTr.innerHTML = `<td class="mob-cat-th" style="color:var(--muted)">Status</td>${stCells}`;
   tbody.appendChild(stTr);
 
-  // Wasted row
-  const waTr = document.createElement('tr');
-  const waCells = dates.map(di => {
-    if (di.future) return `<td class="mob-data-cell${di.we?' mob-we':''}"></td>`;
-    const wHrs = Math.round((wastedEntries[di.ds]||[]).reduce((s,e)=>s+(e.hours||0),0)*100)/100;
-    return `<td class="editable-cell monthly-wasted-cell mob-data-cell${wHrs>0?' cell-wasted':''}" data-date="${di.ds}" data-wasted="${wHrs}">${wHrs>0?wHrs:''}</td>`;
-  }).join('');
-  waTr.innerHTML = `<td class="mob-cat-th" style="color:var(--red)">Wasted</td>${waCells}`;
-  tbody.appendChild(waTr);
+  // Social Media & Unwanted — group header + 4 rows
+  const wgTr = document.createElement('tr');
+  wgTr.innerHTML = `<td class="mob-cat-th wasted-group" colspan="${dates.length+1}">Social Media &amp; Unwanted</td>`;
+  tbody.appendChild(wgTr);
+  WASTED_SUBS.forEach(wcat => {
+    const tr = document.createElement('tr');
+    const cells = dates.map(di => {
+      if (di.future) return `<td class="mob-data-cell wasted-sub-cell${di.we?' mob-we':''}"></td>`;
+      const bd = getWastedBreakdown(data, di.ds);
+      const hrs = bd[wcat] || 0;
+      return `<td class="editable-cell wasted-sub-cell mob-data-cell${hrs>0?' cell-wasted':''}" data-date="${di.ds}" data-wcat="${wcat}" data-hrs="${hrs}">${hrs>0?hrs:''}</td>`;
+    }).join('');
+    tr.innerHTML = `<td class="mob-cat-th wasted-sub">${wcat}</td>${cells}`;
+    tbody.appendChild(tr);
+  });
 
   attachMonthlyEditHandler(tbody);
 }
@@ -799,9 +847,12 @@ async function renderMonthlyTable(data) {
     ? FITNESS_SUBS.map(s => `<th class="fitness-sub">${s}</th>`).join('')
     : '';
 
+  const wastedGroupTh = `<th colspan="${WASTED_SUBS.length}" class="wasted-group">Social Media &amp; Unwanted</th>`;
+  const wastedSubThs  = WASTED_SUBS.map(s => `<th class="wasted-sub">${s}</th>`).join('');
+
   document.getElementById('monthly-thead').innerHTML = `
-    <tr><th rowspan="2">Date</th><th rowspan="2">Day</th>${headerRow1}<th rowspan="2">Total</th><th rowspan="2">Status</th><th rowspan="2" style="color:var(--red)">Wasted</th></tr>
-    <tr>${headerRow2}</tr>
+    <tr><th rowspan="2">Date</th><th rowspan="2">Day</th>${headerRow1}<th rowspan="2">Total</th><th rowspan="2">Status</th>${wastedGroupTh}</tr>
+    <tr>${headerRow2}${wastedSubThs}</tr>
   `;
 
   const oldTbody = document.getElementById('monthly-tbody');
@@ -811,8 +862,8 @@ async function renderMonthlyTable(data) {
   const tbody = newTbody;
   const colTotals = Object.fromEntries(categories.map(c => [c, 0]));
   const subTotals = Object.fromEntries(FITNESS_SUBS.map(s => [s, 0]));
+  const wastedSubTotals = Object.fromEntries(WASTED_SUBS.map(s => [s, 0]));
   let grandTotal  = 0;
-  let wastedColTotal = 0;
 
   for (let day = 1; day <= total; day++) {
     const dt      = new Date(year, mon - 1, day);
@@ -866,12 +917,14 @@ async function renderMonthlyTable(data) {
       : isWeekend                                  ? '<td class="neutral">Weekend</td>'
       :                                              '<td class="bad">No entry</td>';
 
-    const wastedArr = (data.wastedEntries || {})[dateStr] || [];
-    const wastedHrs = Math.round(wastedArr.reduce((s, e) => s + (e.hours || 0), 0) * 100) / 100;
-    wastedColTotal  = Math.round((wastedColTotal + wastedHrs) * 100) / 100;
-    const wastedCell = isFuture
-      ? '<td></td>'
-      : `<td class="editable-cell monthly-wasted-cell${wastedHrs > 0 ? ' cell-wasted' : ''}" data-date="${dateStr}" data-wasted="${wastedHrs}">${wastedHrs > 0 ? wastedHrs : ''}</td>`;
+    const wbd = getWastedBreakdown(data, dateStr);
+    const wastedCells = WASTED_SUBS.map(wcat => {
+      const wh = wbd[wcat] || 0;
+      wastedSubTotals[wcat] = Math.round((wastedSubTotals[wcat] + wh) * 100) / 100;
+      return isFuture
+        ? '<td class="wasted-sub-cell"></td>'
+        : `<td class="editable-cell wasted-sub-cell${wh > 0 ? ' cell-wasted' : ''}" data-date="${dateStr}" data-wcat="${wcat}" data-hrs="${wh}">${wh > 0 ? wh : ''}</td>`;
+    }).join('');
 
     const tr = document.createElement('tr');
     if (rowClass) tr.className = rowClass;
@@ -881,7 +934,7 @@ async function renderMonthlyTable(data) {
       ${catCells.join('')}
       <td${dayTotal > 0 ? ' class="cell-hrs"' : ''}>${dayTotal > 0 ? dayTotal : ''}</td>
       ${statusCell}
-      ${wastedCell}
+      ${wastedCells}
     `;
     tbody.appendChild(tr);
   }
@@ -893,14 +946,15 @@ async function renderMonthlyTable(data) {
       ? FITNESS_SUBS.map(s => `<td>${subTotals[s] > 0 ? subTotals[s] : ''}</td>`).join('')
       : `<td>${colTotals[c] > 0 ? colTotals[c] : ''}</td>`
   ).join('');
-  totalTr.innerHTML = `<td colspan="2">Total</td>${totalCells}<td>${grandTotal}</td><td></td><td${wastedColTotal > 0 ? ' style="color:var(--red)"' : ''}>${wastedColTotal > 0 ? wastedColTotal : ''}</td>`;
+  const wastedTotalCells = WASTED_SUBS.map(s => `<td${wastedSubTotals[s] > 0 ? ' style="color:var(--red)"' : ''}>${wastedSubTotals[s] > 0 ? wastedSubTotals[s] : ''}</td>`).join('');
+  totalTr.innerHTML = `<td colspan="2">Total</td>${totalCells}<td>${grandTotal}</td><td></td>${wastedTotalCells}`;
   tbody.appendChild(totalTr);
 
   if (hasFitness) {
     const bd = data.fitnessBreakdown || {};
     const gymDays = Object.values(bd).filter(d => (d.fitGYM || 0) > 0).length;
     const mmaDays = Object.values(bd).filter(d => (d.fitMMA || 0) > 0).length;
-    const colSpan = 2 + (categories.length - 1) + 3 + 3; // +3 for Total, Status, Wasted
+    const colSpan = 2 + (categories.length - 1) + 3 + 2 + WASTED_SUBS.length; // Date,Day + cats(fitness=3) + Total,Status + wasted subs
     const fitTr = document.createElement('tr');
     fitTr.className = 'row-fitness-days';
     fitTr.innerHTML = `<td colspan="${colSpan}" style="text-align:center;padding:6px 12px;font-size:13px;color:#86efac;">
@@ -918,10 +972,10 @@ function attachMonthlyEditHandler(tbody) {
     const td = e.target.closest('td.editable-cell');
     if (!td || td.querySelector('input')) return;
     const dateStr  = td.dataset.date;
-    const isWasted = 'wasted' in td.dataset;
+    const wcat     = td.dataset.wcat || null;
     const cat      = td.dataset.cat;
     const sub      = td.dataset.sub || null;
-    const prevHrs  = parseFloat(isWasted ? td.dataset.wasted : td.dataset.hrs) || 0;
+    const prevHrs  = parseFloat(td.dataset.hrs) || 0;
 
     const input = document.createElement('input');
     input.type = 'number'; input.min = '0'; input.max = '24'; input.step = '0.25';
@@ -939,11 +993,14 @@ function attachMonthlyEditHandler(tbody) {
       const month  = dateStr.slice(0, 7);
       const d      = await getMonthData(month);
       if (newHrs !== prevHrs) {
-        if (isWasted) {
-          if (!d.wastedEntries) d.wastedEntries = {};
-          if (newHrs > 0) d.wastedEntries[dateStr] = [{ hours: newHrs, note: '' }];
-          else delete d.wastedEntries[dateStr];
-          state.lastMonthlyEdit = { date: dateStr, isWasted: true, prev: prevHrs };
+        if (wcat) {
+          if (!d.wastedBreakdown) d.wastedBreakdown = {};
+          if (!d.wastedBreakdown[dateStr]) d.wastedBreakdown[dateStr] = {};
+          if (newHrs > 0) d.wastedBreakdown[dateStr][wcat] = newHrs;
+          else delete d.wastedBreakdown[dateStr][wcat];
+          if (!Object.keys(d.wastedBreakdown[dateStr]).length) delete d.wastedBreakdown[dateStr];
+          syncWastedTotal(d, dateStr);
+          state.lastMonthlyEdit = { date: dateStr, wcat, prev: prevHrs };
         } else if (sub) {
           if (!d.fitnessBreakdown) d.fitnessBreakdown = {};
           if (!d.fitnessBreakdown[dateStr]) d.fitnessBreakdown[dateStr] = {};
@@ -984,13 +1041,15 @@ function attachMonthlyEditHandler(tbody) {
 
 async function undoMonthlyEdit() {
   if (!state.lastMonthlyEdit) return;
-  const { date, cat, sub, prev, isWasted } = state.lastMonthlyEdit;
+  const { date, cat, sub, prev, wcat } = state.lastMonthlyEdit;
   const month = date.slice(0, 7);
   const d = await getMonthData(month);
-  if (isWasted) {
-    if (!d.wastedEntries) d.wastedEntries = {};
-    if (prev > 0) d.wastedEntries[date] = [{ hours: prev, note: '' }];
-    else delete d.wastedEntries[date];
+  if (wcat) {
+    if (!d.wastedBreakdown) d.wastedBreakdown = {};
+    if (!d.wastedBreakdown[date]) d.wastedBreakdown[date] = {};
+    if (prev > 0) d.wastedBreakdown[date][wcat] = prev;
+    else { delete d.wastedBreakdown[date][wcat]; if (!Object.keys(d.wastedBreakdown[date]).length) delete d.wastedBreakdown[date]; }
+    syncWastedTotal(d, date);
   } else if (sub) {
     if (!d.fitnessBreakdown) d.fitnessBreakdown = {};
     if (!d.fitnessBreakdown[date]) d.fitnessBreakdown[date] = {};
@@ -1085,7 +1144,7 @@ function renderYearlyMobile(allData, months, allCats, today, thead, tbody) {
   addRow('Working Days', mStats.map(m => m.workingDays));
   allCats.forEach(cat => addRow(cat, mStats.map(m => m.catDone[cat] || '')));
   addRow('Total Done', mStats.map(m => m.mDone || ''), 'good');
-  addRow('Wasted', mStats.map(m => m.mWasted || ''), 'bad');
+  addRow('Social + Unwanted', mStats.map(m => m.mWasted || ''), 'bad');
   addRow('🏋️ GYM', mStats.map(m => m.mGym || ''));
   addRow('🥋 MMA', mStats.map(m => m.mMma || ''));
 
@@ -1147,7 +1206,7 @@ async function loadYearlyTab() {
         <th>Month</th><th>Working Days</th>
         ${allCats.map(c => `<th>${c}</th>`).join('')}
         <th style="color:#4ade80">Total Done</th>
-        <th style="color:var(--red)">Wasted</th>
+        <th style="color:var(--red)">Social + Unwanted</th>
         <th style="color:#86efac">🏋️ GYM Days</th>
         <th style="color:#86efac">🥋 MMA Days</th>
         <th style="color:#94a3b8">Comments</th>
@@ -1893,7 +1952,7 @@ async function downloadExcel() {
       const mmaDays = Object.values(ebd).filter(d => (d.fitMMA||0) > 0).length;
       ws.addRow([]);
       const wasteNoteExport = data.wasteNote || '';
-      [['Working days', workingDays],['Productive (hrs)', productive],['Wasted (hrs)', wastedTotal],['GYM days', gymDays],['MMA days', mmaDays],['Waste note', wasteNoteExport]].forEach(r => {
+      [['Working days', workingDays],['Productive (hrs)', productive],['Social + Unwanted (hrs)', wastedTotal],['GYM days', gymDays],['MMA days', mmaDays],['Waste note', wasteNoteExport]].forEach(r => {
         const row = ws.addRow(r);
         row.getCell(1).font = BOLD_FONT;
         row.getCell(1).fill = GRAY_FILL;
@@ -1956,7 +2015,7 @@ async function downloadExcel() {
         ws.getColumn(6+allCats.length).width = 12;
         ws.getColumn(7+allCats.length).width = 36;
 
-        const hRow = ws.addRow(['Month','Working Days',...allCats,'Total Done','Wasted','GYM Days','MMA Days','Comments']);
+        const hRow = ws.addRow(['Month','Working Days',...allCats,'Total Done','Social + Unwanted','GYM Days','MMA Days','Comments']);
         styleRow(hRow, 2+allCats.length+5, BLUE_FILL, BLUE_FONT);
         const today = todayStr();
         months.forEach(month => {
@@ -2028,21 +2087,27 @@ async function downloadExcel() {
       }
     } catch(e) { console.error('Leaves failed', e); }
 
-    // ── 7. Wasted Time ─────────────────────────────────────────────────────
+    // ── 7. Social Media & Unwanted (breakdown by category) ──────────────────
     try {
       const month = state.mainMonth;
       const data = await getMonthData(month);
-      const wastedEntries = data.wastedEntries || {};
+      const dates = new Set([
+        ...Object.keys(data.wastedBreakdown || {}),
+        ...Object.keys(data.wastedEntries || {})
+      ]);
       const rows = [];
-      Object.entries(wastedEntries).sort(([a],[b])=>a.localeCompare(b)).forEach(([date, arr]) => {
-        arr.forEach(e => rows.push([date, e.hours, e.note || '']));
+      [...dates].sort().forEach(date => {
+        const bd = getWastedBreakdown(data, date);
+        const vals = WASTED_SUBS.map(w => bd[w] || '');
+        if (WASTED_SUBS.some(w => (bd[w] || 0) > 0)) rows.push([date, ...vals]);
       });
       if (rows.length) {
         const ws = wb.addWorksheet('E - Wasted Time');
-        ws.getColumn(1).width = 14; ws.getColumn(2).width = 14; ws.getColumn(3).width = 40;
-        const hRow = ws.addRow(['Date', 'Hours', 'Note']);
-        styleRow(hRow, 3, BLUE_FILL, BLUE_FONT);
-        rows.forEach(r => { const row = ws.addRow(r); borderRow(row, 3); });
+        ws.getColumn(1).width = 14;
+        WASTED_SUBS.forEach((_, i) => { ws.getColumn(2 + i).width = 12; });
+        const hRow = ws.addRow(['Date', ...WASTED_SUBS]);
+        styleRow(hRow, 1 + WASTED_SUBS.length, BLUE_FILL, BLUE_FONT);
+        rows.forEach(r => { const row = ws.addRow(r); borderRow(row, 1 + WASTED_SUBS.length); });
       }
     } catch(e) { console.error('Wasted Time failed', e); }
 
@@ -2241,16 +2306,34 @@ async function importExcel(input) {
         if (leaves.length) parsed.leaves = leaves;
       }
 
-      // E - Wasted Time
+      // E - Wasted Time (Social Media & Unwanted breakdown)
       else if (name === 'E - Wasted Time') {
+        const header = rows[0].map(sv);
+        const isBreakdown = WASTED_SUBS.some(w => header.includes(w));
+        const wastedBreakdown = {};
         const wastedEntries = {};
         for (let i = 1; i < rows.length; i++) {
-          const date = sv(rows[i][0]), hours = nv(rows[i][1]), note = sv(rows[i][2]);
-          if (date && hours) {
-            if (!wastedEntries[date]) wastedEntries[date] = [];
-            wastedEntries[date].push({ hours, note });
+          const date = sv(rows[i][0]);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+          if (isBreakdown) {
+            const bd = {};
+            let tot = 0;
+            WASTED_SUBS.forEach((w, ci) => {
+              const colIdx = header.indexOf(w);
+              const h = colIdx >= 0 ? nv(rows[i][colIdx]) : 0;
+              if (h) { bd[w] = h; tot += h; }
+            });
+            if (Object.keys(bd).length) {
+              wastedBreakdown[date] = bd;
+              wastedEntries[date] = [{ hours: Math.round(tot * 100) / 100, note: '' }];
+            }
+          } else {
+            // legacy format: Date, Hours, Note
+            const hours = nv(rows[i][1]), note = sv(rows[i][2]);
+            if (hours) { wastedEntries[date] = [{ hours, note }]; }
           }
         }
+        if (Object.keys(wastedBreakdown).length) parsed.wastedBreakdown = wastedBreakdown;
         if (Object.keys(wastedEntries).length) parsed.wastedEntries = wastedEntries;
       }
 
@@ -2347,11 +2430,12 @@ async function confirmImport() {
     // Load existing month doc to merge into
     const monthData = await getMonthData(month);
 
-    if (parsed.categories)    monthData.categories    = parsed.categories;
-    if (parsed.leaves)        monthData.leaves        = parsed.leaves;
-    if (parsed.wastedEntries) monthData.wastedEntries = parsed.wastedEntries;
-    if (parsed.adjustments)   monthData.adjustments   = parsed.adjustments;
-    if (parsed.monthlyEntries) monthData.entries      = parsed.monthlyEntries.entries;
+    if (parsed.categories)     monthData.categories      = parsed.categories;
+    if (parsed.leaves)         monthData.leaves          = parsed.leaves;
+    if (parsed.wastedEntries)  monthData.wastedEntries   = parsed.wastedEntries;
+    if (parsed.wastedBreakdown) monthData.wastedBreakdown = parsed.wastedBreakdown;
+    if (parsed.adjustments)    monthData.adjustments     = parsed.adjustments;
+    if (parsed.monthlyEntries) monthData.entries         = parsed.monthlyEntries.entries;
 
     await saveMonthData(month, monthData);
 
