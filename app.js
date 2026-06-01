@@ -326,13 +326,26 @@ async function renderSleepAverages(mainData) {
     mDays++;
     mSum += monthSleep[ds] || 0;
   }
-  const sleepColor = avg => avg >= 7 ? '#4ade80' : avg >= 6 ? '#fbbf24' : '#f87171';
+  // Colour the chip background based on the average
+  const sleepBg = avg => avg >= 7 ? '#166534' : avg >= 6 ? '#854d0e' : '#7f1d1d';
+  function paintChip(chipId, avg, show) {
+    const chip = document.getElementById(chipId);
+    if (!chip) return;
+    if (show) {
+      chip.style.background = sleepBg(avg);
+      chip.style.color = '#fff';
+      chip.style.borderColor = 'transparent';
+    } else {
+      chip.style.background = '';
+      chip.style.color = '';
+      chip.style.borderColor = '';
+    }
+  }
+
   const mAvg = mDays > 0 ? Math.round((mSum / mDays) * 100) / 100 : 0;
   const mEl = document.getElementById('sleep-avg-month');
-  if (mEl) {
-    mEl.textContent = mDays > 0 ? `${mAvg} hrs` : '—';
-    mEl.style.color = mDays > 0 ? sleepColor(mAvg) : '';
-  }
+  if (mEl) mEl.textContent = mDays > 0 ? `${mAvg} hrs` : '—';
+  paintChip('sleep-avg-month-chip', mAvg, mDays > 0);
 
   // ── Yearly average (Jun 1 → yesterday across all months) ──
   const allData = await getAllMonths();
@@ -346,10 +359,8 @@ async function renderSleepAverages(mainData) {
   const yDays = Math.floor((yesterday - start) / 86400000) + 1;
   const yAvg = yDays > 0 ? Math.round((ySum / yDays) * 100) / 100 : 0;
   const yEl = document.getElementById('sleep-avg-year');
-  if (yEl) {
-    yEl.textContent = yDays > 0 ? `${yAvg} hrs` : '—';
-    yEl.style.color = yDays > 0 ? sleepColor(yAvg) : '';
-  }
+  if (yEl) yEl.textContent = yDays > 0 ? `${yAvg} hrs` : '—';
+  paintChip('sleep-avg-year-chip', yAvg, yDays > 0);
 }
 
 async function loadMonthlySummary(data) {
