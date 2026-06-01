@@ -1,0 +1,41 @@
+name: Daily Excel Backup
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 2 AM UTC every day (adjust as needed)
+  workflow_dispatch:        # Allow manual trigger from GitHub Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # needed to commit the backup file
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: scripts/package.json
+
+      - name: Install dependencies
+        run: npm install --prefix scripts
+
+      - name: Run backup script
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_USER_UID: ${{ secrets.FIREBASE_USER_UID }}
+        run: node scripts/backup.js
+
+      - name: Commit backup to repo
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add backups/
+          git diff --staged --quiet && echo "No changes to commit" || \
+            git commit -m "Auto backup $(date -u +%Y-%m-%d)"
+          git push
