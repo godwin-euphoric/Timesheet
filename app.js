@@ -402,11 +402,13 @@ async function loadMonthlySummary(data) {
 
   const adjustments  = data.adjustments || {};
   let totalCompleted = 0, totalTarget = 0, totalPending = 0;
+  let fmssCompleted  = null;
 
   data.categories.forEach(c => {
     let completed = 0;
     Object.values(entries).forEach(dayE => { completed += dayE[c.category] || 0; });
     completed        = Math.round(completed * 100) / 100;
+    if (/fm\s*-?\s*ss/i.test(c.category)) fmssCompleted = completed;
     const target     = Math.round(c.daily_target * workingDays * 100) / 100;
     const adjustment = Math.round((adjustments[c.category] || 0) * 100) / 100;
     const pending    = Math.round((target - completed + adjustment) * 100) / 100;
@@ -443,6 +445,9 @@ async function loadMonthlySummary(data) {
     <td class="${totalPending > 0 ? 'bad' : 'good'}"><strong>${totalPending}</strong></td>
   `;
   tbody.appendChild(totalTr);
+
+  const fmssEl = document.getElementById('fmss-hours-chip');
+  if (fmssEl) fmssEl.textContent = fmssCompleted !== null ? `${fmssCompleted} hrs` : '—';
 
   // Stats row below table (wasted, working days, productive)
   const wastedEntries = data.wastedEntries || {};
