@@ -307,12 +307,11 @@ function loadMainCategories(data) {
   });
 }
 
-// Sleep averages: total sleep ÷ elapsed days (month start / Jun 1 → yesterday)
+// Sleep averages: total sleep ÷ elapsed days (month start / Jun 1 → today, inclusive)
 async function renderSleepAverages(mainData) {
   const todayD = new Date();
-  const yesterday = new Date(todayD.getFullYear(), todayD.getMonth(), todayD.getDate() - 1);
   const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const yStr = ymd(yesterday);
+  const tStr = ymd(todayD);
 
   // ── Monthly average (for the Main tab month) ──
   const month = state.mainMonth;
@@ -322,7 +321,7 @@ async function renderSleepAverages(mainData) {
   const monthEnd = daysInMonth(my, mm);
   for (let d = 1; d <= monthEnd; d++) {
     const ds = `${month}-${String(d).padStart(2,'0')}`;
-    if (ds > yStr) break;            // only days up to yesterday
+    if (ds > tStr) break;            // up to and including today
     mDays++;
     mSum += monthSleep[ds] || 0;
   }
@@ -347,16 +346,17 @@ async function renderSleepAverages(mainData) {
   if (mEl) mEl.textContent = mDays > 0 ? `${mAvg} hrs` : '—';
   paintChip('sleep-avg-month-chip', mAvg, mDays > 0);
 
-  // ── Yearly average (Jun 1 → yesterday across all months) ──
+  // ── Yearly average (Jun 1 → today across all months, inclusive) ──
   const allData = await getAllMonths();
   let ySum = 0;
   Object.entries(allData).forEach(([, d]) => {
     Object.entries(d.sleep || {}).forEach(([date, h]) => {
-      if (date >= SLEEP_AVG_START && date <= yStr) ySum += h || 0;
+      if (date >= SLEEP_AVG_START && date <= tStr) ySum += h || 0;
     });
   });
   const start = new Date(SLEEP_AVG_START + 'T00:00:00');
-  const yDays = Math.floor((yesterday - start) / 86400000) + 1;
+  const todayMid = new Date(todayD.getFullYear(), todayD.getMonth(), todayD.getDate());
+  const yDays = Math.floor((todayMid - start) / 86400000) + 1;
   const yAvg = yDays > 0 ? Math.round((ySum / yDays) * 100) / 100 : 0;
   const yEl = document.getElementById('sleep-avg-year');
   if (yEl) yEl.textContent = yDays > 0 ? `${yAvg} hrs` : '—';
@@ -918,7 +918,7 @@ function renderMonthlyTableMobile(data) {
     const sh = (data.sleep || {})[di.ds] || 0;
     return `<td class="editable-cell sleep-cell mob-data-cell${sh>0?' cell-sleep':''}" data-date="${di.ds}" data-sleep="1" data-hrs="${sh}">${sh>0?sh:''}</td>`;
   }).join('');
-  slTr.innerHTML = `<td class="mob-cat-th" style="color:#60a5fa">Sleep</td>${slCells}`;
+  slTr.innerHTML = `<td class="mob-cat-th" style="color:#60a5fa">Sleep (Yestr)</td>${slCells}`;
   tbody.appendChild(slTr);
 
   // Social Media & Unwanted — group header + 4 rows
@@ -968,7 +968,7 @@ async function renderMonthlyTable(data) {
   const wastedSubThs  = WASTED_SUBS.map(s => `<th class="wasted-sub">${s}</th>`).join('');
 
   document.getElementById('monthly-thead').innerHTML = `
-    <tr><th rowspan="2">Date</th><th rowspan="2">Day</th>${headerRow1}<th rowspan="2">Total</th><th rowspan="2">Status</th><th rowspan="2" style="color:#60a5fa">Sleep</th>${wastedGroupTh}</tr>
+    <tr><th rowspan="2">Date</th><th rowspan="2">Day</th>${headerRow1}<th rowspan="2">Total</th><th rowspan="2">Status</th><th rowspan="2" style="color:#60a5fa">Sleep (Yestr)</th>${wastedGroupTh}</tr>
     <tr>${headerRow2}${wastedSubThs}</tr>
   `;
 
@@ -1260,8 +1260,9 @@ function renderYearlyMobile(allData, months, allCats, today, thead, tbody) {
     const mbd = mData.fitnessBreakdown || {};
     const mGym = Object.values(mbd).filter(d => (d.fitGYM || 0) > 0).length;
     const mMma = Object.values(mbd).filter(d => (d.fitMMA || 0) > 0).length;
-    const mSleep = Math.round(Object.values(mData.sleep || {}).reduce((s, h) => s + (h || 0), 0) * 100) / 100;
-    return { month, workingDays, catDone, mDone: Math.round(mDone * 100) / 100, mWasted, mGym, mMma, mSleep, comment: mData.yearlyComment || '' };
+    const mSleepSum = Math.round(Object.values(mData.sleep || {}).reduce((s, h) => s + (h || 0), 0) * 100) / 100;
+    const mSleepAvg = endDay > 0 ? Math.round((mSleepSum / endDay) * 100) / 100 : 0;
+    return { month, workingDays, catDone, mDone: Math.round(mDone * 100) / 100, mWasted, mGym, mMma, mSleepAvg, comment: mData.yearlyComment || '' };
   });
 
   const shortMonth = m => { const [y, mo] = m.split('-').map(Number); return new Date(y, mo - 1, 1).toLocaleString('en', {month:'short'}) + " '" + String(y).slice(2); };
@@ -1284,7 +1285,7 @@ function renderYearlyMobile(allData, months, allCats, today, thead, tbody) {
   addRow('Social + Unwanted', mStats.map(m => m.mWasted || ''), 'bad');
   addRow('🏋️ GYM', mStats.map(m => m.mGym || ''));
   addRow('🥋 MMA', mStats.map(m => m.mMma || ''));
-  addRow('😴 Sleep', mStats.map(m => m.mSleep || ''));
+  addRow('😴 Sleep Avg', mStats.map(m => m.mSleepAvg || ''));
 
   // Comments row — editable
   const commentCells = mStats.map(m => {
@@ -1347,7 +1348,7 @@ async function loadYearlyTab() {
         <th style="color:var(--red)">Social + Unwanted</th>
         <th style="color:#86efac">🏋️ GYM Days</th>
         <th style="color:#86efac">🥋 MMA Days</th>
-        <th style="color:#60a5fa">😴 Sleep</th>
+        <th style="color:#60a5fa">😴 Sleep Avg</th>
         <th style="color:#94a3b8">Comments</th>
       </tr>
     `;
@@ -1392,7 +1393,8 @@ async function loadYearlyTab() {
       const mbd = mData.fitnessBreakdown || {};
       const mGym = Object.values(mbd).filter(d => (d.fitGYM || 0) > 0).length;
       const mMma = Object.values(mbd).filter(d => (d.fitMMA || 0) > 0).length;
-      const mSleep = Math.round(Object.values(mData.sleep || {}).reduce((s, h) => s + (h || 0), 0) * 100) / 100;
+      const mSleepSum = Math.round(Object.values(mData.sleep || {}).reduce((s, h) => s + (h || 0), 0) * 100) / 100;
+      const mSleepAvg = endDay > 0 ? Math.round((mSleepSum / endDay) * 100) / 100 : 0;
       const comment = mData.yearlyComment || '';
 
       totalWD     += workingDays;
@@ -1400,7 +1402,7 @@ async function loadYearlyTab() {
       totalWasted  = Math.round((totalWasted + mWasted) * 100) / 100;
       totalGym    += mGym;
       totalMma    += mMma;
-      totalSleep   = Math.round((totalSleep + mSleep) * 100) / 100;
+      totalSleep   = Math.round((totalSleep + mSleepSum) * 100) / 100;
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -1411,11 +1413,18 @@ async function loadYearlyTab() {
         <td${mWasted > 0 ? ' class="bad"' : ''}>${mWasted > 0 ? mWasted : ''}</td>
         <td style="color:#86efac">${mGym || ''}</td>
         <td style="color:#86efac">${mMma || ''}</td>
-        <td style="color:#60a5fa">${mSleep || ''}</td>
+        <td style="color:#60a5fa">${mSleepAvg || ''}</td>
         <td class="yearly-comment-cell editable-cell" data-month="${month}" title="Click to edit">${comment ? `<span class="yearly-comment-text">${comment}</span>` : '<span class="yearly-comment-placeholder">Add comment…</span>'}</td>
       `;
       tbody.appendChild(tr);
     });
+
+    // Year sleep average: total sleep ÷ days from tracking start → today (inclusive)
+    const _sStart = new Date(SLEEP_AVG_START + 'T00:00:00');
+    const _now = new Date();
+    const _todayMid = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate());
+    const _yearDays = Math.floor((_todayMid - _sStart) / 86400000) + 1;
+    const yearSleepAvg = _yearDays > 0 ? Math.round((totalSleep / _yearDays) * 100) / 100 : 0;
 
     const totalTr = document.createElement('tr');
     totalTr.className = 'row-total';
@@ -1429,7 +1438,7 @@ async function loadYearlyTab() {
       <td${totalWasted > 0 ? ' class="bad"' : ''}>${totalWasted > 0 ? totalWasted : ''}</td>
       <td style="color:#86efac">${totalGym}</td>
       <td style="color:#86efac">${totalMma}</td>
-      <td style="color:#60a5fa">${totalSleep || ''}</td>
+      <td style="color:#60a5fa">${yearSleepAvg || ''}</td>
       <td></td>
     `;
     tbody.appendChild(totalTr);
