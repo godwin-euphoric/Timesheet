@@ -383,8 +383,8 @@ async function loadMonthlySummary(data) {
   }
   document.getElementById('working-days-count').textContent = workingDays;
 
-  // Sleep averages (per elapsed day, up to yesterday)
-  await renderSleepAverages(data);
+  // Sleep averages (per elapsed day, up to yesterday) — never let this block the summary
+  try { await renderSleepAverages(data); } catch (e) { console.error('Sleep averages failed', e); }
 
   // Productive hours chip
   let totalProductive = 0;
