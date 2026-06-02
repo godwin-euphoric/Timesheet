@@ -1,4 +1,4 @@
-const CACHE = 'timesheet-v3';
+const CACHE = 'timesheet-v4';
 const ASSETS = ['/', '/Timesheet/', '/Timesheet/index.html', '/Timesheet/style.css', '/Timesheet/app.js', '/Timesheet/icon.svg'];
 
 self.addEventListener('install', e => {
