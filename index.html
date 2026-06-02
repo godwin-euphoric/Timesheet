@@ -14,6 +14,18 @@
 </head>
 <body>
 
+<div id="global-error" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#7f1d1d;color:#fff;padding:10px 14px;font:13px/1.5 monospace;white-space:pre-wrap;max-height:40vh;overflow:auto"></div>
+<script>
+  window.addEventListener('error', function(e){
+    var d=document.getElementById('global-error');
+    if(d){ d.style.display='block'; d.textContent='⚠ ERROR: '+(e.message||e.error)+'\n'+((e.error&&e.error.stack)||('at '+e.filename+':'+e.lineno)); }
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var d=document.getElementById('global-error');
+    if(d){ d.style.display='block'; d.textContent='⚠ PROMISE ERROR: '+((e.reason&&(e.reason.stack||e.reason.message))||e.reason); }
+  });
+</script>
+
 <!-- ══ Auth Screen ═══════════════════════════════════════════════════════════ -->
 <div id="auth-screen" class="auth-screen">
   <div class="auth-card">
