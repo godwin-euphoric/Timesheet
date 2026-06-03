@@ -305,6 +305,10 @@ function loadMainCategories(data) {
     opt.value = c.category; opt.textContent = c.category;
     sel.appendChild(opt);
   });
+  // Sleep is a separate metric, but loggable here too
+  const sleepOpt = document.createElement('option');
+  sleepOpt.value = '__SLEEP__'; sleepOpt.textContent = '😴 Sleep';
+  sel.appendChild(sleepOpt);
 }
 
 // Sleep averages: total sleep ÷ elapsed days (month start / Jun 1 → today, inclusive)
@@ -417,9 +421,11 @@ async function loadMonthlySummary(data) {
     totalTarget     += target;
     totalPending    += pending;
 
+    const focused = (data.focusedCategories || []).includes(c.category);
     const tr = document.createElement('tr');
+    if (focused) tr.className = 'row-focused';
     tr.innerHTML = `
-      <td class="cb-col"><input type="checkbox" class="row-focus-cb" onchange="this.closest('tr').classList.toggle('row-focused',this.checked)"></td>
+      <td class="cb-col"><input type="checkbox" class="row-focus-cb" ${focused ? 'checked' : ''} onchange="toggleRowFocus('${encodeURIComponent(c.category)}', this)"></td>
       <td>${c.category}</td>
       <td class="cell-hrs">${completed}</td>
       <td>${target}</td>
@@ -523,6 +529,19 @@ async function loadMonthlySummary(data) {
   });
 }
 
+// Persist which summary rows are highlighted (per month)
+async function toggleRowFocus(encCat, cb) {
+  const cat = decodeURIComponent(encCat);
+  cb.closest('tr').classList.toggle('row-focused', cb.checked);
+  const month = state.mainMonth;
+  const d = await getMonthData(month);
+  let list = d.focusedCategories || [];
+  if (cb.checked) { if (!list.includes(cat)) list.push(cat); }
+  else { list = list.filter(c => c !== cat); }
+  d.focusedCategories = list;
+  await saveMonthData(month, d);
+}
+
 async function undoMainAdjustment() {
   if (!state.lastAdjustment) return;
   const { month, cat, prev } = state.lastAdjustment;
@@ -549,7 +568,10 @@ async function logEntry() {
   const month = date.slice(0, 7);
   const data = await getMonthData(month);
   const hrs = parseFloat(hoursVal);
-  if (FITNESS_SUBS.includes(category)) {
+  if (category === '__SLEEP__') {
+    if (!data.sleep) data.sleep = {};
+    data.sleep[date] = hrs;
+  } else if (FITNESS_SUBS.includes(category)) {
     if (!data.fitnessBreakdown) data.fitnessBreakdown = {};
     if (!data.fitnessBreakdown[date]) data.fitnessBreakdown[date] = {};
     data.fitnessBreakdown[date][category] = hrs;
@@ -658,6 +680,7 @@ async function renderDayEntries() {
   const cats       = Object.keys(dayEntries);
   const wbd        = getWastedBreakdown(data, date);
   const wastedCats = WASTED_SUBS.filter(w => (wbd[w] || 0) > 0);
+  const sleepHrs   = (data.sleep || {})[date] || 0;
 
   let html = cats.map(cat => `
     <div style="display:flex;align-items:center;justify-content:space-between;
@@ -684,12 +707,34 @@ async function renderDayEntries() {
     `).join('');
   }
 
-  if (!cats.length && !wastedCats.length) {
+  if (sleepHrs > 0) {
+    html += `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:8px 0;border-bottom:1px solid #F1F5F9">
+        <span style="font-size:13px;color:#60a5fa">😴 Sleep</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-weight:700;color:#60a5fa">${sleepHrs} hrs</span>
+          <button class="btn-danger" onclick="deleteSleepEntry('${date}')">✕</button>
+        </div>
+      </div>`;
+  }
+
+  if (!cats.length && !wastedCats.length && sleepHrs <= 0) {
     list.innerHTML = '<span class="empty-inline">No entries for this date</span>';
     return;
   }
 
   list.innerHTML = html;
+}
+
+async function deleteSleepEntry(date) {
+  const month = date.slice(0, 7);
+  const data  = await getMonthData(month);
+  if (data.sleep) { delete data.sleep[date]; }
+  await saveMonthData(month, data);
+  showToast('Sleep entry deleted');
+  await loadMonthlySummary(data);
+  await renderDayEntries();
 }
 
 // ══════════════════════════════════════════════════════════════════════════

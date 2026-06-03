@@ -113,7 +113,7 @@
       </div>
       <div class="table-scroll">
         <table class="mini-table">
-          <thead><tr><th class="cb-col"></th><th>Category</th><th>Completed</th><th>Target</th><th>Adjust</th><th>Pending</th></tr></thead>
+          <thead><tr><th class="cb-col"></th><th>Category</th><th>Done</th><th>Target</th><th>Adjust</th><th>Pending</th></tr></thead>
           <tbody id="entries-tbody"><tr><td colspan="6" class="empty">No categories yet</td></tr></tbody>
         </table>
       </div>
@@ -194,10 +194,7 @@
 
     <div class="card">
       <div class="summary-card-header" style="margin-bottom:12px">
-        <div class="leave-section" style="margin-bottom:0;flex:1">
-          <span class="leave-label">Leaves marked:</span>
-          <div id="leave-tags" class="leave-tags"><span class="empty-inline">None</span></div>
-        </div>
+        <div style="flex:1"></div>
         <button id="monthly-undo-btn" class="btn-undo hidden" onclick="undoMonthlyEdit()">↩ Undo Edit</button>
       </div>
       <div class="table-scroll">
@@ -205,6 +202,10 @@
           <thead id="monthly-thead"></thead>
           <tbody id="monthly-tbody"></tbody>
         </table>
+      </div>
+      <div class="leave-section" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <span class="leave-label">Leaves marked:</span>
+        <div id="leave-tags" class="leave-tags"><span class="empty-inline">None</span></div>
       </div>
     </div>
 
@@ -395,7 +396,7 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="app.js?v=33"></script>
+<script src="app.js?v=34"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
