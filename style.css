@@ -472,15 +472,6 @@ td.wasted-sub-cell:hover { background: #3a1a1a !important; }
 td.mob-cat-th.wasted-group { color: #f87171; }
 td.mob-cat-th.wasted-sub   { color: #fca5a5; font-size: 12px; }
 
-/* ══ Category reorder buttons ════════════════════════════════════════════════ */
-.cat-reorder { display: inline-flex; flex-direction: column; gap: 1px; margin-right: 8px; vertical-align: middle; }
-.cat-reorder button {
-  width: 18px; height: 13px; line-height: 11px; padding: 0;
-  font-size: 9px; border: 1px solid var(--border); border-radius: 3px;
-  background: var(--card2); color: var(--muted); cursor: pointer;
-}
-.cat-reorder button:hover { color: var(--primary-h); border-color: var(--primary); }
-
 /* ══ Main Notes box ══════════════════════════════════════════════════════════ */
 .main-notes-input {
   width: 100%; min-height: 120px; resize: vertical;
@@ -773,11 +764,15 @@ textarea#fm-notes:focus {
   .top-controls { flex-direction: row; flex-wrap: wrap; align-items: stretch; gap: 8px; }
   .main-top-spacer { display: none; }
 
-  /* Month + Date — one row, share width, no overlap */
-  .ctrl-pair:not(.ctrl-pair-chips) { order: 1; flex: 1 1 100%; width: auto; display: flex; gap: 8px; }
-  .ctrl-pair:not(.ctrl-pair-chips) .field-group { flex: 1 1 0; min-width: 0; }
+  /* Month + Date — one row, two equal columns that can shrink (no overlap) */
+  .ctrl-pair:not(.ctrl-pair-chips) {
+    order: 1; flex: 1 1 100%; width: auto;
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px;
+  }
+  .ctrl-pair:not(.ctrl-pair-chips) .field-group { min-width: 0; width: auto; }
   .ctrl-pair input[type="month"], .ctrl-pair select {
-    width: 100%; min-width: 0; box-sizing: border-box; padding-left: 8px; padding-right: 4px;
+    width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+    padding-left: 8px; padding-right: 4px;
   }
 
   /* Row: stopwatch (left) + workdays (right) */
@@ -816,11 +811,11 @@ textarea#fm-notes:focus {
   .mstat-label { font-size: 10px; }
   .mstat-val { font-size: 16px; }
 
-  /* ── Main tab: Log Hours before the summary ──────────────────────────────── */
+  /* ── Main tab: summary first, then both logging sections below it ────────── */
   #tab-main.active { display: flex; flex-direction: column; }
   #tab-main > .top-controls         { order: 1; }
-  #tab-main > .log-row              { order: 2; }
-  #tab-main > #main-summary-card    { order: 3; }
+  #tab-main > #main-summary-card    { order: 2; }
+  #tab-main > .log-row              { order: 3; }
   #tab-main > #main-dayentries-card { order: 4; }
   #tab-main > #main-notes-card      { order: 5; }
 
