@@ -790,19 +790,21 @@ textarea#fm-notes:focus {
   .stat-chip-red   { order: 5; flex: 1 1 calc(33.333% - 6px); }
   #fmss-chip       { order: 6; flex: 1 1 calc(33.333% - 6px); }
 
-  /* card-style chips (Productive / Social / FM-SS) */
-  .chip-card { flex-direction: column; align-items: flex-start; height: auto; padding: 10px 10px; gap: 2px; }
+  /* card-style chips (Productive / Social / FM-SS) — 3 across, so labels may wrap */
+  .chip-card { flex-direction: column; align-items: flex-start; height: auto; padding: 9px 8px; gap: 2px; min-width: 0; overflow: hidden; }
   .chip-card .chip-box { display: none; }
-  .chip-card .chip-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.75; white-space: nowrap; }
-  .chip-card strong { font-size: 17px; font-weight: 800; line-height: 1.2; }
+  .chip-card .chip-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.75; white-space: normal; line-height: 1.25; }
+  .chip-card strong { font-size: 15px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
 
   /* Row: Movie + Story */
   #movie-chip { order: 7; flex: 1 1 calc(50% - 4px); justify-content: center; }
   #story-chip { order: 8; flex: 1 1 calc(50% - 4px); justify-content: center; }
 
-  /* Row: Sleep (M) + Sleep (Y) */
-  #sleep-avg-month-chip { order: 9;  flex: 1 1 calc(50% - 4px); justify-content: center; }
-  #sleep-avg-year-chip  { order: 10; flex: 1 1 calc(50% - 4px); justify-content: center; }
+  /* Row: Sleep (M) + Sleep (Y) — keep value on one line */
+  #sleep-avg-month-chip { order: 9;  flex: 1 1 calc(50% - 4px); justify-content: center; gap: 6px; }
+  #sleep-avg-year-chip  { order: 10; flex: 1 1 calc(50% - 4px); justify-content: center; gap: 6px; }
+  #sleep-avg-month-chip strong, #sleep-avg-year-chip strong { white-space: nowrap; }
+  #movie-chip strong, #story-chip strong, #workdays-chip strong { white-space: nowrap; }
 
   /* short labels on mobile */
   .wd-full, .sl-full { display: none; }
