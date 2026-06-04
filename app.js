@@ -408,7 +408,7 @@ async function loadMonthlySummary(data) {
   let totalCompleted = 0, totalTarget = 0, totalPending = 0;
   let fmssCompleted  = null;
 
-  data.categories.forEach(c => {
+  data.categories.forEach((c, ci) => {
     let completed = 0;
     Object.values(entries).forEach(dayE => { completed += dayE[c.category] || 0; });
     completed        = Math.round(completed * 100) / 100;
@@ -426,7 +426,7 @@ async function loadMonthlySummary(data) {
     if (focused) tr.className = 'row-focused';
     tr.innerHTML = `
       <td class="cb-col"><input type="checkbox" class="row-focus-cb" ${focused ? 'checked' : ''} onchange="toggleRowFocus('${encodeURIComponent(c.category)}', this)"></td>
-      <td>${c.category}</td>
+      <td><span class="cat-reorder"><button onclick="moveCategory(${ci},-1)" title="Move up">▲</button><button onclick="moveCategory(${ci},1)" title="Move down">▼</button></span>${c.category}</td>
       <td class="cell-hrs">${completed}</td>
       <td>${target}</td>
       <td><input type="number" class="inline-input sm adjust-input" data-cat="${c.category}"
@@ -454,6 +454,20 @@ async function loadMonthlySummary(data) {
 
   const fmssEl = document.getElementById('fmss-hours-chip');
   if (fmssEl) fmssEl.textContent = fmssCompleted !== null ? `${fmssCompleted} hrs` : '—';
+
+  // Movie & Story counts for the month (from FM log)
+  const ud = await getUserData();
+  let movieCount = 0, storyCount = 0;
+  (ud.fmLog || []).forEach(e => {
+    if (e.date && e.date.startsWith(month)) {
+      if (/movie/i.test(e.type || '')) movieCount++;
+      if (/story/i.test(e.type || '')) storyCount++;
+    }
+  });
+  const movieEl = document.getElementById('movie-count-chip');
+  const storyEl = document.getElementById('story-count-chip');
+  if (movieEl) movieEl.textContent = movieCount;
+  if (storyEl) storyEl.textContent = storyCount;
 
   // Stats row below table (wasted, working days, productive)
   const wastedEntries = data.wastedEntries || {};
@@ -529,6 +543,19 @@ async function loadMonthlySummary(data) {
   });
 }
 
+// Reorder categories from the Main summary (persisted per month)
+async function moveCategory(idx, dir) {
+  const month = state.mainMonth;
+  const d = await getMonthData(month);
+  const cats = d.categories || [];
+  const ni = idx + dir;
+  if (ni < 0 || ni >= cats.length) return;
+  [cats[idx], cats[ni]] = [cats[ni], cats[idx]];
+  d.categories = cats;
+  await saveMonthData(month, d);
+  await loadMonthlySummary(d);
+}
+
 // Persist which summary rows are highlighted (per month)
 async function toggleRowFocus(encCat, cb) {
   const cat = decodeURIComponent(encCat);
@@ -568,17 +595,18 @@ async function logEntry() {
   const month = date.slice(0, 7);
   const data = await getMonthData(month);
   const hrs = parseFloat(hoursVal);
+  const add = (prev) => Math.round(((prev || 0) + hrs) * 100) / 100;
   if (category === '__SLEEP__') {
     if (!data.sleep) data.sleep = {};
-    data.sleep[date] = hrs;
+    data.sleep[date] = add(data.sleep[date]);
   } else if (FITNESS_SUBS.includes(category)) {
     if (!data.fitnessBreakdown) data.fitnessBreakdown = {};
     if (!data.fitnessBreakdown[date]) data.fitnessBreakdown[date] = {};
-    data.fitnessBreakdown[date][category] = hrs;
+    data.fitnessBreakdown[date][category] = add(data.fitnessBreakdown[date][category]);
     syncFitnessTotal(data, date);
   } else {
     if (!data.entries[date]) data.entries[date] = {};
-    data.entries[date][category] = hrs;
+    data.entries[date][category] = add(data.entries[date][category]);
   }
   await saveMonthData(month, data);
 

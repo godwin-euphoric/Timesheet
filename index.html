@@ -81,32 +81,38 @@
           <select id="main-date"></select>
         </div>
       </div>
-      <div class="field-group" style="flex:1"></div>
+      <div class="field-group main-top-spacer" style="flex:1"></div>
       <div class="stopwatch-chip">
         <span class="sw-display" id="sw-display">00:00:00</span>
         <button class="sw-btn sw-start" id="sw-toggle" onclick="swToggle()">▶</button>
         <button class="sw-btn sw-reset" onclick="swReset()">↺</button>
       </div>
       <div class="ctrl-pair ctrl-pair-chips">
-        <div class="stat-chip stat-chip-green">
+        <div class="stat-chip stat-chip-green chip-card">
           <span class="chip-box chip-box-green"></span>
           <span class="chip-label">Productive</span>
           <strong id="productive-hours-chip">—</strong>
         </div>
-        <div class="stat-chip stat-chip-red">
+        <div class="stat-chip stat-chip-red chip-card">
           <span class="chip-box chip-box-red"></span>
           <span class="chip-label">Social + Unwanted</span>
           <strong id="wasted-hours-chip">—</strong>
         </div>
       </div>
-      <div class="stat-chip">📚 FM - SS&nbsp;&nbsp;<strong id="fmss-hours-chip">—</strong></div>
-      <div class="stat-chip">Working days so far&nbsp;&nbsp;<strong id="working-days-count">—</strong></div>
-      <div class="stat-chip" id="sleep-avg-month-chip">😴 Avg Sleep / day (Month)&nbsp;&nbsp;<strong id="sleep-avg-month">—</strong></div>
-      <div class="stat-chip" id="sleep-avg-year-chip">😴 Avg Sleep / day (Year)&nbsp;&nbsp;<strong id="sleep-avg-year">—</strong></div>
+      <div class="stat-chip chip-card" id="fmss-chip">
+        <span class="chip-box" style="background:#a78bfa"></span>
+        <span class="chip-label">📚 FM - SS</span>
+        <strong id="fmss-hours-chip">—</strong>
+      </div>
+      <div class="stat-chip" id="movie-chip">🎬 Movie&nbsp;&nbsp;<strong id="movie-count-chip">—</strong></div>
+      <div class="stat-chip" id="story-chip">📖 Story&nbsp;&nbsp;<strong id="story-count-chip">—</strong></div>
+      <div class="stat-chip" id="workdays-chip"><span class="wd-full">Working days so far</span><span class="wd-short">Workdays</span>&nbsp;&nbsp;<strong id="working-days-count">—</strong></div>
+      <div class="stat-chip" id="sleep-avg-month-chip"><span class="sl-full">😴 Avg Sleep / day (Month)</span><span class="sl-short">😴 Sleep (M)</span>&nbsp;&nbsp;<strong id="sleep-avg-month">—</strong></div>
+      <div class="stat-chip" id="sleep-avg-year-chip"><span class="sl-full">😴 Avg Sleep / day (Year)</span><span class="sl-short">😴 Sleep (Y)</span>&nbsp;&nbsp;<strong id="sleep-avg-year">—</strong></div>
     </div>
 
     <!-- Month Summary — before log controls -->
-    <div class="card">
+    <div class="card" id="main-summary-card">
       <div class="summary-card-header">
         <div class="entries-label" id="entries-date-label" style="margin-bottom:0">Month Summary</div>
         <button id="main-undo-btn" class="btn-undo hidden" onclick="undoMainAdjustment()">↩ Undo Adjustment</button>
@@ -162,12 +168,12 @@
 
     </div><!-- end log-row -->
 
-    <div class="card">
+    <div class="card" id="main-dayentries-card">
       <div class="entries-label" id="day-entries-label">Today's Entries</div>
       <div id="day-entries-list"><span class="empty-inline">No entries for this date</span></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="main-notes-card">
       <div class="card-title">📝 Notes</div>
       <textarea id="main-notes" class="main-notes-input" placeholder="Notes for this month..."></textarea>
     </div>
@@ -396,7 +402,7 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="app.js?v=34"></script>
+<script src="app.js?v=35"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
