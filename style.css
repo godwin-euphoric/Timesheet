@@ -805,8 +805,7 @@ textarea#fm-notes:focus {
 
   /* Row: Sleep (M) + AI — keep value on one line */
   #sleep-avg-month-chip { order: 9;  flex: 1 1 calc(50% - 4px); justify-content: center; gap: 6px; }
-  #ai-chip              { order: 10; flex: 1 1 calc(50% - 4px); justify-content: center; gap: 6px; }
-  #sleep-avg-month-chip strong, #ai-chip strong { white-space: nowrap; }
+  #sleep-avg-month-chip strong { white-space: nowrap; }
   #movie-chip strong, #story-chip strong, #workdays-chip strong { white-space: nowrap; }
 
   /* short labels on mobile */

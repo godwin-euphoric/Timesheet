@@ -409,7 +409,6 @@ async function loadMonthlySummary(data) {
   const adjustments  = data.adjustments || {};
   let totalCompleted = 0, totalTarget = 0, totalPending = 0;
   let fmssCompleted  = null;
-  let aiPending      = 0;   // combined pending for AI categories (AI-Office + AI-Study)
 
   data.categories.forEach((c, ci) => {
     let completed = 0;
@@ -421,7 +420,6 @@ async function loadMonthlySummary(data) {
     const adjustment = zeroTarget ? 0 : Math.round((adjustments[c.category] || 0) * 100) / 100;
     const pending    = zeroTarget ? 0 : Math.round((target - completed + adjustment) * 100) / 100;
     const onTrack    = pending <= 0;
-    if (/^ai\b/i.test(c.category)) aiPending += pending;
     totalCompleted  += completed;
     totalTarget     += target;
     totalPending    += pending;
@@ -467,8 +465,6 @@ async function loadMonthlySummary(data) {
   if (fmssEl) fmssEl.textContent = fmssCompleted !== null ? `${fmssCompleted} hrs` : '—';
 
   // AI pending chip (AI-Office + AI-Study), floored at 0
-  const aiEl = document.getElementById('ai-pending-chip');
-  if (aiEl) aiEl.textContent = `${Math.max(0, Math.round(aiPending * 100) / 100)} hrs`;
 
   // Movie & Story counts for the month (from FM log)
   const ud = await getUserData();
@@ -1364,7 +1360,8 @@ function renderYearlyMobile(allData, months, allCats, today, thead, tbody) {
     const catDone = {};
     let mDone = 0;
     allCats.forEach(cat => {
-      let done = 0; Object.values(ents).forEach(dayE => { done += dayE[cat] || 0; }); done = Math.round(done * 100) / 100;
+      const ck = _catCanon(cat);
+      let done = 0; Object.values(ents).forEach(dayE => { Object.entries(dayE).forEach(([k, v]) => { if (_catCanon(k) === ck) done += v || 0; }); }); done = Math.round(done * 100) / 100;
       catDone[cat] = done; mDone += done;
     });
     let mWasted = 0; Object.values(mData.wastedEntries || {}).forEach(arr => arr.forEach(e => { mWasted += e.hours || 0; })); mWasted = Math.round(mWasted * 100) / 100;
@@ -1445,7 +1442,12 @@ async function loadYearlyTab() {
     thead.innerHTML = '';
     tbody.innerHTML = '<tr><td colspan="3" class="empty">No data for this year yet.</td></tr>';
   } else {
-    const allCats = [...new Set(months.flatMap(m => (allData[m].categories || []).map(c => c.category)))];
+    const _catDisp = new Map();
+    months.forEach(m => (allData[m].categories || []).forEach(c => {
+      const k = _catCanon(c.category);
+      if (k && !_catDisp.has(k)) _catDisp.set(k, _catClean(c.category));
+    }));
+    const allCats = [..._catDisp.values()];
 
     if (window.innerWidth <= 768) {
       renderYearlyMobile(allData, months, allCats, today, thead, tbody);
@@ -1481,14 +1483,16 @@ async function loadYearlyTab() {
         if (dt.getDay() !== 0 && dt.getDay() !== 6 && !leavesSet.has(ds)) workingDays++;
       }
 
-      const catMap  = Object.fromEntries((mData.categories || []).map(c => [c.category, c.daily_target]));
+      const catMap = {};
+      (mData.categories || []).forEach(c => { const k = _catCanon(c.category); if (catMap[k] === undefined) catMap[k] = c.daily_target || 0; });
       const entries = mData.entries || {};
       let mDone = 0;
 
       const cells = allCats.map(cat => {
-        const target = Math.round((catMap[cat] || 0) * workingDays * 100) / 100;
+        const ck = _catCanon(cat);
+        const target = Math.round((catMap[ck] || 0) * workingDays * 100) / 100;
         let done = 0;
-        Object.values(entries).forEach(dayE => { done += dayE[cat] || 0; });
+        Object.values(entries).forEach(dayE => { Object.entries(dayE).forEach(([k, v]) => { if (_catCanon(k) === ck) done += v || 0; }); });
         done = Math.round(done * 100) / 100;
         colTotals[cat].done   += done;
         colTotals[cat].target += target;
@@ -2172,7 +2176,7 @@ async function scanOrphans() {
 
 // Normalise category names + entry keys across ALL months, merging look-alike duplicates
 // (collapses internal/edge spaces, unifies dash characters, ignores case) — globally consistent
-const _catClean = s => (s || '').replace(/[‐-―−]/g, '-').replace(/\s+/g, ' ').trim();
+const _catClean = s => (s || '').replace(/[​-‍﻿]/g, '').replace(/[‐-―−]/g, '-').replace(/\s+/g, ' ').trim();
 const _catCanon = s => _catClean(s).toLowerCase();
 
 async function normalizeCategories() {
