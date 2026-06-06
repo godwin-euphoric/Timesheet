@@ -409,6 +409,7 @@ async function loadMonthlySummary(data) {
   const adjustments  = data.adjustments || {};
   let totalCompleted = 0, totalTarget = 0, totalPending = 0;
   let fmssCompleted  = null;
+  let aiPending      = 0;   // combined pending for AI categories (AI-Office + AI-Study)
 
   data.categories.forEach((c, ci) => {
     let completed = 0;
@@ -419,6 +420,7 @@ async function loadMonthlySummary(data) {
     const adjustment = Math.round((adjustments[c.category] || 0) * 100) / 100;
     const pending    = Math.round((target - completed + adjustment) * 100) / 100;
     const onTrack    = pending <= 0;
+    if (/^ai\b/i.test(c.category)) aiPending += pending;
     totalCompleted  += completed;
     totalTarget     += target;
     totalPending    += pending;
@@ -461,6 +463,10 @@ async function loadMonthlySummary(data) {
 
   const fmssEl = document.getElementById('fmss-hours-chip');
   if (fmssEl) fmssEl.textContent = fmssCompleted !== null ? `${fmssCompleted} hrs` : '—';
+
+  // AI pending chip (AI-Office + AI-Study), floored at 0
+  const aiEl = document.getElementById('ai-pending-chip');
+  if (aiEl) aiEl.textContent = `${Math.max(0, Math.round(aiPending * 100) / 100)} hrs`;
 
   // Movie & Story counts for the month (from FM log)
   const ud = await getUserData();
@@ -2160,6 +2166,48 @@ async function scanOrphans() {
       <button class="btn-danger" onclick="deleteOrphan('${o.month}','${encodeURIComponent(o.cat)}')">Delete</button>
     </div>
   `).join('');
+}
+
+// Trim whitespace from category names + entry keys across all months, merging duplicates
+async function normalizeCategories() {
+  if (!confirm('Trim spaces and merge duplicate category names across ALL months? (Your daily backups keep the old data.)')) return;
+  const all = await getAllMonths();
+  let changed = 0;
+  for (const [month, d] of Object.entries(all)) {
+    let touched = false;
+
+    // 1. Category list: trim names, merge duplicates (keep first daily_target)
+    if (Array.isArray(d.categories)) {
+      const seen = new Map();
+      d.categories.forEach(c => {
+        const name = (c.category || '').trim();
+        if (!name) return;
+        if (!seen.has(name)) seen.set(name, { category: name, daily_target: c.daily_target });
+      });
+      const newCats = [...seen.values()];
+      if (JSON.stringify(newCats) !== JSON.stringify(d.categories)) { d.categories = newCats; touched = true; }
+    }
+
+    // 2. Entry keys: trim + merge per date
+    if (d.entries) {
+      Object.keys(d.entries).forEach(date => {
+        const day = d.entries[date];
+        const merged = {};
+        let dayChanged = false;
+        Object.entries(day).forEach(([k, v]) => {
+          const nk = k.trim();
+          if (nk !== k) dayChanged = true;
+          merged[nk] = Math.round(((merged[nk] || 0) + (v || 0)) * 100) / 100;
+        });
+        if (dayChanged) { d.entries[date] = merged; touched = true; }
+      });
+    }
+
+    if (touched) { await saveMonthData(month, d); changed++; }
+  }
+  showToast(changed ? `Cleaned ${changed} month(s)` : 'Nothing to clean');
+  if (state.mainMonth) await loadMainTab();
+  await scanOrphans();
 }
 
 async function deleteOrphan(month, encCat) {

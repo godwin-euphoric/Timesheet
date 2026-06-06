@@ -803,10 +803,10 @@ textarea#fm-notes:focus {
   #movie-chip { order: 7; flex: 1 1 calc(50% - 4px); justify-content: center; }
   #story-chip { order: 8; flex: 1 1 calc(50% - 4px); justify-content: center; }
 
-  /* Row: Sleep (M) + Sleep (Y) — keep value on one line */
+  /* Row: Sleep (M) + AI — keep value on one line */
   #sleep-avg-month-chip { order: 9;  flex: 1 1 calc(50% - 4px); justify-content: center; gap: 6px; }
-  #sleep-avg-year-chip  { order: 10; flex: 1 1 calc(50% - 4px); justify-content: center; gap: 6px; }
-  #sleep-avg-month-chip strong, #sleep-avg-year-chip strong { white-space: nowrap; }
+  #ai-chip              { order: 10; flex: 1 1 calc(50% - 4px); justify-content: center; gap: 6px; }
+  #sleep-avg-month-chip strong, #ai-chip strong { white-space: nowrap; }
   #movie-chip strong, #story-chip strong, #workdays-chip strong { white-space: nowrap; }
 
   /* short labels on mobile */
