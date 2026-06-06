@@ -417,8 +417,9 @@ async function loadMonthlySummary(data) {
     completed        = Math.round(completed * 100) / 100;
     if (/fm\s*-?\s*ss/i.test(c.category)) fmssCompleted = completed;
     const target     = Math.round(c.daily_target * workingDays * 100) / 100;
-    const adjustment = Math.round((adjustments[c.category] || 0) * 100) / 100;
-    const pending    = Math.round((target - completed + adjustment) * 100) / 100;
+    const zeroTarget = (c.daily_target || 0) === 0;
+    const adjustment = zeroTarget ? 0 : Math.round((adjustments[c.category] || 0) * 100) / 100;
+    const pending    = zeroTarget ? 0 : Math.round((target - completed + adjustment) * 100) / 100;
     const onTrack    = pending <= 0;
     if (/^ai\b/i.test(c.category)) aiPending += pending;
     totalCompleted  += completed;
@@ -438,8 +439,9 @@ async function loadMonthlySummary(data) {
       <td><span class="drag-handle" title="Drag to reorder">⠿</span>${c.category}</td>
       <td class="cell-hrs">${completed}</td>
       <td>${target}</td>
-      <td><input type="number" class="inline-input sm adjust-input" data-cat="${c.category}"
-           value="${adjustment || ''}" step="0.25" placeholder="0" style="width:60px"></td>
+      <td>${zeroTarget
+        ? `<input type="number" class="inline-input sm" value="0" disabled style="width:60px;opacity:0.45">`
+        : `<input type="number" class="inline-input sm adjust-input" data-cat="${c.category}" value="${adjustment || ''}" step="0.25" placeholder="0" style="width:60px">`}</td>
       <td class="${onTrack ? 'good' : 'bad'}">${pending}</td>
     `;
     tbody.appendChild(tr);
