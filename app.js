@@ -2170,42 +2170,61 @@ async function scanOrphans() {
   `).join('');
 }
 
-// Trim whitespace from category names + entry keys across all months, merging duplicates
+// Normalise category names + entry keys across ALL months, merging look-alike duplicates
+// (collapses internal/edge spaces, unifies dash characters, ignores case) — globally consistent
+const _catClean = s => (s || '').replace(/[‐-―−]/g, '-').replace(/\s+/g, ' ').trim();
+const _catCanon = s => _catClean(s).toLowerCase();
+
 async function normalizeCategories() {
-  if (!confirm('Trim spaces and merge duplicate category names across ALL months? (Your daily backups keep the old data.)')) return;
+  if (!confirm('Merge duplicate / look-alike category names (extra spaces, dash style, casing) across ALL months? Your daily backups keep the old data.')) return;
   const all = await getAllMonths();
+  const months = Object.keys(all).sort();
+
+  // Build ONE canonical display name per category (first occurrence across months wins)
+  const display = new Map(); // canon -> display name
+  months.forEach(m => (all[m].categories || []).forEach(c => {
+    const k = _catCanon(c.category);
+    if (k && !display.has(k)) display.set(k, _catClean(c.category));
+  }));
+  months.forEach(m => Object.values(all[m].entries || {}).forEach(day => Object.keys(day).forEach(k => {
+    const ck = _catCanon(k);
+    if (ck && !display.has(ck)) display.set(ck, _catClean(k));
+  })));
+
   let changed = 0;
-  for (const [month, d] of Object.entries(all)) {
+  for (const m of months) {
+    const d = all[m];
     let touched = false;
 
-    // 1. Category list: trim names, merge duplicates (keep first daily_target)
+    // 1. Category list — dedupe by canonical key, use the global display name
     if (Array.isArray(d.categories)) {
-      const seen = new Map();
+      const seen = new Set();
+      const newCats = [];
       d.categories.forEach(c => {
-        const name = (c.category || '').trim();
-        if (!name) return;
-        if (!seen.has(name)) seen.set(name, { category: name, daily_target: c.daily_target });
+        const k = _catCanon(c.category);
+        if (!k || seen.has(k)) return;
+        seen.add(k);
+        newCats.push({ category: display.get(k), daily_target: c.daily_target });
       });
-      const newCats = [...seen.values()];
       if (JSON.stringify(newCats) !== JSON.stringify(d.categories)) { d.categories = newCats; touched = true; }
     }
 
-    // 2. Entry keys: trim + merge per date
+    // 2. Entry keys — remap to canonical display name + merge hours
     if (d.entries) {
       Object.keys(d.entries).forEach(date => {
         const day = d.entries[date];
         const merged = {};
         let dayChanged = false;
         Object.entries(day).forEach(([k, v]) => {
-          const nk = k.trim();
-          if (nk !== k) dayChanged = true;
-          merged[nk] = Math.round(((merged[nk] || 0) + (v || 0)) * 100) / 100;
+          const name = display.get(_catCanon(k)) || _catClean(k);
+          if (name !== k) dayChanged = true;
+          merged[name] = Math.round(((merged[name] || 0) + (v || 0)) * 100) / 100;
         });
         if (dayChanged) { d.entries[date] = merged; touched = true; }
       });
     }
 
-    if (touched) { await saveMonthData(month, d); changed++; }
+    if (touched) { await saveMonthData(m, d); changed++; }
   }
   showToast(changed ? `Cleaned ${changed} month(s)` : 'Nothing to clean');
   if (state.mainMonth) await loadMainTab();
