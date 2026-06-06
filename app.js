@@ -390,9 +390,11 @@ async function loadMonthlySummary(data) {
   // Sleep averages (per elapsed day, up to yesterday) — never let this block the summary
   try { await renderSleepAverages(data); } catch (e) { console.error('Sleep averages failed', e); }
 
-  // Productive hours chip
+  // Productive hours chip — sum only current categories (matches the table total)
   let totalProductive = 0;
-  Object.values(entries).forEach(dayE => Object.values(dayE).forEach(h => { totalProductive += h; }));
+  (data.categories || []).forEach(c => {
+    Object.values(entries).forEach(dayE => { totalProductive += dayE[c.category] || 0; });
+  });
   totalProductive = Math.round(totalProductive * 100) / 100;
   document.getElementById('productive-hours-chip').textContent = totalProductive + ' hrs';
 
