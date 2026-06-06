@@ -426,7 +426,7 @@ async function loadMonthlySummary(data) {
     if (focused) tr.className = 'row-focused';
     tr.innerHTML = `
       <td class="cb-col"><input type="checkbox" class="row-focus-cb" ${focused ? 'checked' : ''} onchange="toggleRowFocus('${encodeURIComponent(c.category)}', this)"></td>
-      <td>${c.category}</td>
+      <td><span class="cat-reorder"><button onclick="moveCategory(${ci},-1)" title="Move up">▲</button><button onclick="moveCategory(${ci},1)" title="Move down">▼</button></span>${c.category}</td>
       <td class="cell-hrs">${completed}</td>
       <td>${target}</td>
       <td><input type="number" class="inline-input sm adjust-input" data-cat="${c.category}"
@@ -541,6 +541,19 @@ async function loadMonthlySummary(data) {
       renderWastedMonthSummary(d);
     });
   });
+}
+
+// Reorder categories from the Main summary (persisted per month)
+async function moveCategory(idx, dir) {
+  const month = state.mainMonth;
+  const d = await getMonthData(month);
+  const cats = d.categories || [];
+  const ni = idx + dir;
+  if (ni < 0 || ni >= cats.length) return;
+  [cats[idx], cats[ni]] = [cats[ni], cats[idx]];
+  d.categories = cats;
+  await saveMonthData(month, d);
+  await loadMonthlySummary(d);
 }
 
 // Persist which summary rows are highlighted (per month)
