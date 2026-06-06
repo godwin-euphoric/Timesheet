@@ -472,14 +472,10 @@ td.wasted-sub-cell:hover { background: #3a1a1a !important; }
 td.mob-cat-th.wasted-group { color: #f87171; }
 td.mob-cat-th.wasted-sub   { color: #fca5a5; font-size: 12px; }
 
-/* ══ Category reorder buttons (Main summary) ═════════════════════════════════ */
-.cat-reorder { display: inline-flex; flex-direction: column; gap: 1px; margin-right: 8px; vertical-align: middle; }
-.cat-reorder button {
-  width: 18px; height: 13px; line-height: 11px; padding: 0;
-  font-size: 9px; border: 1px solid var(--border); border-radius: 3px;
-  background: var(--card2); color: var(--muted); cursor: pointer;
-}
-.cat-reorder button:hover { color: var(--primary-h); border-color: var(--primary); }
+/* ══ Category drag-reorder (Main summary) ════════════════════════════════════ */
+.cat-row .drag-handle { margin-right: 8px; vertical-align: middle; }
+tr.cat-row.dragging { opacity: 0.4; }
+tr.cat-row.drag-over td { border-top: 2px solid var(--primary); background: var(--primary-l); }
 
 /* ══ Main Notes box ══════════════════════════════════════════════════════════ */
 .main-notes-input {

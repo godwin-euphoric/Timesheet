@@ -425,10 +425,15 @@ async function loadMonthlySummary(data) {
 
     const focused = (data.focusedCategories || []).includes(c.category);
     const tr = document.createElement('tr');
-    if (focused) tr.className = 'row-focused';
+    tr.className = `cat-row${focused ? ' row-focused' : ''}`;
+    tr.draggable = true;
+    tr.ondragstart = (e) => catDragStart(e, ci);
+    tr.ondragover  = (e) => catDragOver(e, ci);
+    tr.ondrop      = (e) => catDrop(e, ci);
+    tr.ondragend   = catDragEnd;
     tr.innerHTML = `
       <td class="cb-col"><input type="checkbox" class="row-focus-cb" ${focused ? 'checked' : ''} onchange="toggleRowFocus('${encodeURIComponent(c.category)}', this)"></td>
-      <td><span class="cat-reorder"><button onclick="moveCategory(${ci},-1)" title="Move up">▲</button><button onclick="moveCategory(${ci},1)" title="Move down">▼</button></span>${c.category}</td>
+      <td><span class="drag-handle" title="Drag to reorder">⠿</span>${c.category}</td>
       <td class="cell-hrs">${completed}</td>
       <td>${target}</td>
       <td><input type="number" class="inline-input sm adjust-input" data-cat="${c.category}"
@@ -545,14 +550,32 @@ async function loadMonthlySummary(data) {
   });
 }
 
-// Reorder categories from the Main summary (persisted per month)
-async function moveCategory(idx, dir) {
+// Drag-reorder categories in the Main summary (like the habits tab), persisted per month
+let dragSrcCatIdx = null;
+function catDragStart(e, index) {
+  dragSrcCatIdx = index;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => e.currentTarget.classList.add('dragging'), 0);
+}
+function catDragOver(e, index) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('#entries-tbody .cat-row').forEach((r, i) => {
+    r.classList.toggle('drag-over', i === index && i !== dragSrcCatIdx);
+  });
+}
+function catDragEnd() {
+  document.querySelectorAll('#entries-tbody .cat-row').forEach(r => r.classList.remove('dragging', 'drag-over'));
+  dragSrcCatIdx = null;
+}
+async function catDrop(e, index) {
+  e.preventDefault();
+  if (dragSrcCatIdx === null || dragSrcCatIdx === index) return;
   const month = state.mainMonth;
   const d = await getMonthData(month);
   const cats = d.categories || [];
-  const ni = idx + dir;
-  if (ni < 0 || ni >= cats.length) return;
-  [cats[idx], cats[ni]] = [cats[ni], cats[idx]];
+  const [moved] = cats.splice(dragSrcCatIdx, 1);
+  cats.splice(index, 0, moved);
   d.categories = cats;
   await saveMonthData(month, d);
   await loadMonthlySummary(d);
@@ -2106,6 +2129,53 @@ async function saveFmCategories() {
   await saveUserData({ fmCategories: [...state.fmCatMeta] });
   showToast('FM categories saved');
   setSaveState('fm-cat-save-btn', false);
+}
+
+// ── Data cleanup: find/remove entries under categories no longer in the list ──
+async function scanOrphans() {
+  const box = document.getElementById('orphan-results');
+  box.innerHTML = '<span class="empty-inline">Scanning…</span>';
+  const all = await getAllMonths();
+  const orphans = [];
+  Object.entries(all).forEach(([month, d]) => {
+    const cats = new Set((d.categories || []).map(c => c.category));
+    cats.add(FITNESS_CAT); // Fitness total is a valid synced key
+    const sums = {};
+    Object.values(d.entries || {}).forEach(dayE => {
+      Object.entries(dayE).forEach(([k, v]) => {
+        if (!cats.has(k)) sums[k] = Math.round(((sums[k] || 0) + (v || 0)) * 100) / 100;
+      });
+    });
+    Object.entries(sums).forEach(([cat, hrs]) => orphans.push({ month, cat, hrs }));
+  });
+
+  if (!orphans.length) {
+    box.innerHTML = '<span class="empty-inline" style="color:#4ade80">✓ No orphan entries found — everything is tidy.</span>';
+    return;
+  }
+  orphans.sort((a, b) => a.month.localeCompare(b.month) || a.cat.localeCompare(b.cat));
+  box.innerHTML = orphans.map(o => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px"><strong>${formatMonth(o.month)}</strong> · ${o.cat} · <span style="color:var(--amber)">${o.hrs} hrs</span></span>
+      <button class="btn-danger" onclick="deleteOrphan('${o.month}','${encodeURIComponent(o.cat)}')">Delete</button>
+    </div>
+  `).join('');
+}
+
+async function deleteOrphan(month, encCat) {
+  const cat = decodeURIComponent(encCat);
+  if (!confirm(`Delete all "${cat}" entries in ${formatMonth(month)}? This cannot be undone.`)) return;
+  const d = await getMonthData(month);
+  Object.keys(d.entries || {}).forEach(date => {
+    if (d.entries[date][cat] !== undefined) {
+      delete d.entries[date][cat];
+      if (!Object.keys(d.entries[date]).length) delete d.entries[date];
+    }
+  });
+  await saveMonthData(month, d);
+  showToast(`Removed "${cat}"`);
+  if (month === state.mainMonth) await loadMonthlySummary(d);
+  await scanOrphans();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
