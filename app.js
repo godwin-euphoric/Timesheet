@@ -3358,7 +3358,7 @@ async function callGemini(promptText) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: { temperature: 0.15, maxOutputTokens: 1024 }
+            generationConfig: { temperature: 0.15, maxOutputTokens: 8192 }
           })
         }
       );
@@ -3398,12 +3398,21 @@ Return ONLY valid JSON array, no markdown, no explanation:
 
   const raw = await callGemini(prompt);
   const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
-  try { return JSON.parse(cleaned); }
-  catch {
-    const m = cleaned.match(/\[[\s\S]*?\]/);
-    if (m) return JSON.parse(m[0]);
-    throw new Error('AI returned unparseable response: ' + cleaned.slice(0, 200));
-  }
+
+  // 1. Full parse
+  try { return JSON.parse(cleaned); } catch {}
+
+  // 2. Extract complete [...] block
+  const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+  if (arrMatch) { try { return JSON.parse(arrMatch[0]); } catch {} }
+
+  // 3. Truncated response — extract every complete {...} object inside the array
+  const objMatches = [...cleaned.matchAll(/\{[^{}]*\}/g)].map(m => {
+    try { return JSON.parse(m[0]); } catch { return null; }
+  }).filter(Boolean);
+  if (objMatches.length) return objMatches;
+
+  throw new Error('AI returned unparseable response: ' + cleaned.slice(0, 200));
 }
 
 // ── Error modal ────────────────────────────────────────────────────────────
