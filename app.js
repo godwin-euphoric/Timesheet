@@ -44,6 +44,10 @@ const state = {
   userDataCache:    null, // user-level doc (fmCategories, fmLog)
   lastAdjustment:   null,
   lastMonthlyEdit:  null,
+  // Diet tab
+  dietDate:         todayStr(),
+  dietMonthCache:   {},
+  dietSettings:     null,
 };
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -107,6 +111,8 @@ auth.onAuthStateChanged(user => {
   state.cache = {};
   state.allMonthsCache = null;
   state.userDataCache  = null;
+  state.dietMonthCache = {};
+  state.dietSettings   = null;
 
   if (user) {
     document.getElementById('auth-screen').classList.add('hidden');
@@ -213,7 +219,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, diet: loadDietTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -1988,6 +1994,7 @@ async function loadSettingsTab() {
   renderSettingsTable();
   await loadSettingsMonthTable();
   await loadFmCategorySettings();
+  await populateDietSettingsFields();
   setSaveState('settings-save-btn', false);
 }
 
@@ -3263,4 +3270,607 @@ function updatePlannerColName(pi, bi, ci, value) {
 function updatePlannerCell(pi, bi, ri, ci, value) {
   state.planners[pi].blocks[bi].rows[ri]['c' + ci] = value;
   schedulePlannerSave();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  DIET TAB
+// ══════════════════════════════════════════════════════════════════════════
+
+const DIET_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+const DIET_CIRC  = 2 * Math.PI * 52; // ≈ 326.73
+
+// ── Firestore ──────────────────────────────────────────────────────────────
+
+function dietMonthRef(month) {
+  return db.collection('users').doc(state.user.uid).collection('diet_months').doc(month);
+}
+
+async function getDietMonthData(month) {
+  if (state.dietMonthCache[month]) return state.dietMonthCache[month];
+  const doc  = await dietMonthRef(month).get();
+  const data = doc.exists ? doc.data() : { days: {} };
+  if (!data.days) data.days = {};
+  state.dietMonthCache[month] = data;
+  return data;
+}
+
+async function saveDietMonthData(month, data) {
+  await dietMonthRef(month).set(data);
+  state.dietMonthCache[month] = data;
+}
+
+// ── Settings ───────────────────────────────────────────────────────────────
+
+async function loadDietSettings() {
+  const ud = await getUserData();
+  state.dietSettings = {
+    gender:        ud.dietGender        || '',
+    geminiApiKey:  ud.dietGeminiKey     || '',
+    calorieTarget: ud.dietCalorieTarget || 0,
+  };
+  return state.dietSettings;
+}
+
+async function saveDietSettings() {
+  const gender  = document.getElementById('diet-gender').value;
+  const key     = document.getElementById('diet-gemini-key').value.trim();
+  const calGoal = parseInt(document.getElementById('diet-calorie-target').value, 10) || 0;
+  if (!gender) { showToast('Select a gender'); return; }
+  if (!key)    { showToast('Enter a Gemini API key'); return; }
+  await saveUserData({ dietGender: gender, dietGeminiKey: key, dietCalorieTarget: calGoal });
+  if (!state.dietSettings) state.dietSettings = {};
+  Object.assign(state.dietSettings, { gender, geminiApiKey: key, calorieTarget: calGoal });
+  showToast('Diet settings saved');
+}
+
+function toggleGeminiKeyVisibility() {
+  const inp = document.getElementById('diet-gemini-key');
+  const btn = document.getElementById('diet-key-toggle');
+  if (inp.type === 'password') { inp.type = 'text';     btn.textContent = 'Hide'; }
+  else                         { inp.type = 'password'; btn.textContent = 'Show'; }
+}
+
+async function populateDietSettingsFields() {
+  const ud = await getUserData();
+  const genderEl = document.getElementById('diet-gender');
+  const keyEl    = document.getElementById('diet-gemini-key');
+  const tgtEl    = document.getElementById('diet-calorie-target');
+  if (genderEl) genderEl.value = ud.dietGender        || '';
+  if (keyEl)    keyEl.value    = ud.dietGeminiKey      || '';
+  if (tgtEl)    tgtEl.value   = ud.dietCalorieTarget  || '';
+}
+
+// ── Gemini AI ──────────────────────────────────────────────────────────────
+
+function dietSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function callGemini(promptText) {
+  const key = state.dietSettings?.geminiApiKey;
+  if (!key) throw new Error('Gemini API key not configured in Diet Settings.');
+  let lastErr;
+  for (let mi = 0; mi < DIET_MODELS.length; mi++) {
+    const model = DIET_MODELS[mi];
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: { temperature: 0.15, maxOutputTokens: 1024 }
+          })
+        }
+      );
+      if (!res.ok) {
+        const errTxt = await res.text();
+        if (res.status >= 500) {
+          lastErr = new Error(`${model} ${res.status}: ${errTxt}`);
+          if (mi < DIET_MODELS.length - 1) await dietSleep(1000);
+          continue;
+        }
+        throw new Error(`Gemini ${model} error ${res.status}: ${errTxt}`);
+      }
+      const json = await res.json();
+      return json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } catch (e) {
+      lastErr = e;
+      if (mi < DIET_MODELS.length - 1) await dietSleep(1000);
+    }
+  }
+  throw lastErr || new Error('All Gemini models failed.');
+}
+
+async function parseFoodWithAI(text) {
+  const prompt = `You are a nutrition expert. Parse the food description below and return ONLY a JSON array.
+
+Rules:
+- Do NOT split compound food names (e.g. "paneer sandwich" stays as one item)
+- Split ONLY at commas or "and"/"&" between clearly distinct foods
+- Extract quantity from input (default 1 if not specified)
+- Return nutrition PER UNIT so quantity can be adjusted later
+- Use realistic average values for Indian and common foods
+
+Food input: "${text}"
+
+Return ONLY valid JSON array, no markdown, no explanation:
+[{"name":"<name>","quantity":<number>,"unit":"<piece|cup|bowl|slice|serving|g|ml>","calories_per_unit":<number>,"protein_g_per_unit":<number>,"carbs_g_per_unit":<number>,"fat_g_per_unit":<number>,"fibre_g_per_unit":<number>}]`;
+
+  const raw = await callGemini(prompt);
+  const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+  try { return JSON.parse(cleaned); }
+  catch {
+    const m = cleaned.match(/\[[\s\S]*?\]/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error('AI returned unparseable response: ' + cleaned.slice(0, 200));
+  }
+}
+
+// ── Error modal ────────────────────────────────────────────────────────────
+
+let _dietLastError = null;
+
+function showDietError(err, context) {
+  _dietLastError = {
+    message:     err.message || String(err),
+    provider:    'Gemini',
+    modelsTried: DIET_MODELS.join(', '),
+    timestamp:   new Date().toISOString(),
+    context:     context || '',
+    stack:       err.stack || '',
+  };
+  document.getElementById('diet-error-body').textContent =
+    `Error: ${_dietLastError.message}\n\n` +
+    `Provider: ${_dietLastError.provider}\n` +
+    `Models tried: ${_dietLastError.modelsTried}\n` +
+    `Time: ${_dietLastError.timestamp}\n` +
+    (_dietLastError.context ? `Context: ${_dietLastError.context}\n` : '') +
+    (_dietLastError.stack ? `\nStack:\n${_dietLastError.stack}` : '');
+  document.getElementById('diet-error-modal').classList.remove('hidden');
+}
+
+function closeDietErrorModal() {
+  document.getElementById('diet-error-modal').classList.add('hidden');
+}
+
+async function copyDietError() {
+  if (!_dietLastError) return;
+  await navigator.clipboard.writeText(JSON.stringify(_dietLastError, null, 2));
+  showToast('Error details copied');
+}
+
+// ── Calorie target ─────────────────────────────────────────────────────────
+
+function getCalorieTarget() {
+  const s = state.dietSettings;
+  if (s?.calorieTarget > 0) return s.calorieTarget;
+  if (s?.gender === 'male')   return 2000;
+  if (s?.gender === 'female') return 1600;
+  return 1800;
+}
+
+// ── Diet tab load ──────────────────────────────────────────────────────────
+
+async function loadDietTab() {
+  await loadDietSettings();
+  await populateDietSettingsFields();
+  const { geminiApiKey, gender } = state.dietSettings;
+  const gate    = document.getElementById('diet-gate');
+  const content = document.getElementById('diet-content');
+  if (!geminiApiKey || !gender) {
+    gate.classList.remove('hidden');
+    content.classList.add('hidden');
+    return;
+  }
+  gate.classList.add('hidden');
+  content.classList.remove('hidden');
+  await renderDietDay(state.dietDate);
+  setTimeout(renderDietCharts, 80);
+}
+
+// ── Date label ─────────────────────────────────────────────────────────────
+
+function formatDietDateLabel(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt  = new Date(y, m - 1, d);
+  const DAY = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  return `${DAY[dt.getDay()]}, ${MON[m-1]} ${d}`;
+}
+
+// ── Day rendering ──────────────────────────────────────────────────────────
+
+async function renderDietDay(dateStr) {
+  const month  = dateStr.slice(0, 7);
+  const mData  = await getDietMonthData(month);
+  const foods  = (mData.days[dateStr] || {}).foods || [];
+  const target = getCalorieTarget();
+  document.getElementById('diet-date-label').textContent = formatDietDateLabel(dateStr);
+  renderDietSummary(foods, target);
+  renderFoodCards(foods, dateStr);
+}
+
+function dietCalcTotals(foods) {
+  let kcal = 0, protein = 0, carbs = 0, fat = 0, fibre = 0;
+  for (const f of foods) {
+    const q = f.quantity || 1;
+    kcal    += (f.calories_per_unit  || 0) * q;
+    protein += (f.protein_g_per_unit || 0) * q;
+    carbs   += (f.carbs_g_per_unit   || 0) * q;
+    fat     += (f.fat_g_per_unit     || 0) * q;
+    fibre   += (f.fibre_g_per_unit   || 0) * q;
+  }
+  return {
+    kcal:    Math.round(kcal),
+    protein: Math.round(protein * 10) / 10,
+    carbs:   Math.round(carbs   * 10) / 10,
+    fat:     Math.round(fat     * 10) / 10,
+    fibre:   Math.round(fibre   * 10) / 10,
+  };
+}
+
+function renderDietSummary(foods, target) {
+  const t   = dietCalcTotals(foods);
+  const pct = target > 0 ? t.kcal / target : 0;
+
+  // Ring fill & color
+  const offset = DIET_CIRC * (1 - Math.min(pct, 1));
+  const ringEl = document.getElementById('diet-ring-progress');
+  ringEl.style.strokeDashoffset = offset;
+  let ringColor = '#C8FF00';
+  if      (pct >= 1)    ringColor = '#F87171';
+  else if (pct >= 0.75) ringColor = '#F59E0B';
+  ringEl.style.stroke = ringColor;
+
+  // Card border tint at 100%+
+  document.querySelector('.diet-summary-card').style.borderColor =
+    pct >= 1 ? 'rgba(248,113,113,0.5)' : '';
+
+  // Center text
+  document.getElementById('diet-consumed-num').textContent = t.kcal;
+  document.getElementById('diet-target-num').textContent   = target;
+
+  // Stats
+  document.getElementById('diet-stat-consumed').textContent = t.kcal;
+  document.getElementById('diet-stat-burnt').textContent    = 0;
+  document.getElementById('diet-stat-net').textContent      = t.kcal;
+
+  // Macros
+  document.getElementById('diet-protein').textContent = t.protein + 'g';
+  document.getElementById('diet-carbs').textContent   = t.carbs   + 'g';
+  document.getElementById('diet-fat').textContent     = t.fat     + 'g';
+  document.getElementById('diet-fibre').textContent   = t.fibre   + 'g';
+
+  renderDietWarning(pct, t.kcal, target);
+}
+
+function renderDietWarning(pct, kcal, target) {
+  const banner = document.getElementById('diet-warning-banner');
+  if (pct >= 1) {
+    banner.className = 'diet-warning diet-warning-red';
+    banner.textContent = `⚠️ You've hit your ${target} kcal daily target!`;
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+  } else if (pct >= 0.75) {
+    banner.className = 'diet-warning diet-warning-yellow';
+    banner.textContent = `ℹ️ You're at ${Math.round(pct * 100)}% of your daily target`;
+  } else {
+    banner.className = 'diet-warning hidden';
+    return;
+  }
+}
+
+// ── Food cards ─────────────────────────────────────────────────────────────
+
+function renderFoodCards(foods, dateStr) {
+  const list = document.getElementById('diet-food-list');
+  if (!foods.length) {
+    list.innerHTML = '<div class="diet-empty">Nothing logged yet — add your first meal</div>';
+    return;
+  }
+  const ds = escHtml(dateStr);
+  list.innerHTML = foods.map(f => {
+    const q       = f.quantity || 1;
+    const kcal    = Math.round((f.calories_per_unit  || 0) * q);
+    const protein = Math.round((f.protein_g_per_unit || 0) * q * 10) / 10;
+    const carbs   = Math.round((f.carbs_g_per_unit   || 0) * q * 10) / 10;
+    const fat     = Math.round((f.fat_g_per_unit     || 0) * q * 10) / 10;
+    const fibre   = Math.round((f.fibre_g_per_unit   || 0) * q * 10) / 10;
+    return `<div class="diet-food-card" id="diet-card-${f.id}">
+  <div class="diet-food-card-top">
+    <div class="diet-food-meta">
+      <div class="diet-food-name">${escHtml(f.name)}</div>
+      <div class="diet-food-time">${escHtml(f.logged_at || '')}</div>
+    </div>
+    <div class="diet-food-qty-row">
+      <input class="diet-qty-input" type="number" value="${q}" min="0.5" step="0.5"
+             onchange="updateDietQuantity('${ds}','${f.id}',parseFloat(this.value)||0.5)">
+      <span class="diet-qty-unit">${escHtml(f.unit || '')}</span>
+      <button class="diet-food-del" onclick="deleteDietFood('${ds}','${f.id}')">×</button>
+    </div>
+  </div>
+  <div class="diet-macro-pills">
+    <div class="diet-macro-pill"><span>${kcal}</span> kcal</div>
+    <div class="diet-macro-pill"><span>${protein}g</span> protein</div>
+    <div class="diet-macro-pill"><span>${carbs}g</span> carbs</div>
+    <div class="diet-macro-pill"><span>${fat}g</span> fat</div>
+    <div class="diet-macro-pill"><span>${fibre}g</span> fibre</div>
+  </div>
+</div>`;
+  }).join('');
+}
+
+// ── Log food ───────────────────────────────────────────────────────────────
+
+async function logDietFood() {
+  const inp  = document.getElementById('diet-food-input');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  const spinner = document.getElementById('diet-ai-spinner');
+  const sendBtn = document.getElementById('diet-send-btn');
+  inp.value         = '';
+  spinner.classList.remove('hidden');
+  sendBtn.disabled  = true;
+
+  try {
+    const items = await parseFoodWithAI(text);
+    if (!items?.length) { showToast('AI could not parse that — try again'); return; }
+
+    const now   = new Date();
+    const tTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const month = state.dietDate.slice(0, 7);
+    const mData = await getDietMonthData(month);
+    if (!mData.days[state.dietDate]) mData.days[state.dietDate] = { foods: [] };
+
+    for (const item of items) {
+      mData.days[state.dietDate].foods.push({
+        id:                pId(),
+        name:              (item.name            || 'Unknown').trim(),
+        quantity:          parseFloat(item.quantity)            || 1,
+        unit:              (item.unit             || 'serving').trim(),
+        calories_per_unit: parseFloat(item.calories_per_unit)  || 0,
+        protein_g_per_unit:parseFloat(item.protein_g_per_unit) || 0,
+        carbs_g_per_unit:  parseFloat(item.carbs_g_per_unit)   || 0,
+        fat_g_per_unit:    parseFloat(item.fat_g_per_unit)     || 0,
+        fibre_g_per_unit:  parseFloat(item.fibre_g_per_unit)   || 0,
+        logged_at:         tTime,
+      });
+    }
+
+    await saveDietMonthData(month, mData);
+    await renderDietDay(state.dietDate);
+    renderDietCharts();
+    showToast('Logged: ' + items.map(i => i.name).join(', '));
+  } catch (e) {
+    showDietError(e, `Input: "${text}"`);
+  } finally {
+    spinner.classList.add('hidden');
+    sendBtn.disabled = false;
+  }
+}
+
+async function updateDietQuantity(dateStr, id, qty) {
+  if (!qty || qty < 0.5) return;
+  const month = dateStr.slice(0, 7);
+  const mData = await getDietMonthData(month);
+  const item  = (mData.days[dateStr]?.foods || []).find(f => f.id === id);
+  if (!item) return;
+  item.quantity = qty;
+  await saveDietMonthData(month, mData);
+  await renderDietDay(dateStr);
+}
+
+async function deleteDietFood(dateStr, id) {
+  const month = dateStr.slice(0, 7);
+  const mData = await getDietMonthData(month);
+  const day   = mData.days[dateStr];
+  if (!day) return;
+  day.foods = (day.foods || []).filter(f => f.id !== id);
+  await saveDietMonthData(month, mData);
+  await renderDietDay(dateStr);
+  renderDietCharts();
+}
+
+// ── Date navigation ────────────────────────────────────────────────────────
+
+function dietPrevDay() {
+  const [y, m, d] = state.dietDate.split('-').map(Number);
+  const dt  = new Date(y, m - 1, d - 1);
+  state.dietDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  renderDietDay(state.dietDate);
+}
+
+function dietNextDay() {
+  const [y, m, d] = state.dietDate.split('-').map(Number);
+  const dt   = new Date(y, m - 1, d + 1);
+  const next = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  if (next > todayStr()) { showToast("Can't go to a future date"); return; }
+  state.dietDate = next;
+  renderDietDay(state.dietDate);
+}
+
+// ── Voice input ────────────────────────────────────────────────────────────
+
+let _dietRecognition = null;
+let _dietMicActive   = false;
+
+function dietStartMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showToast('Voice input not supported in this browser'); return; }
+  if (_dietMicActive) { _dietRecognition?.stop(); return; }
+
+  _dietRecognition = new SR();
+  _dietRecognition.lang = 'en-IN';
+  _dietRecognition.interimResults = false;
+  _dietRecognition.maxAlternatives = 1;
+
+  const micBtn = document.getElementById('diet-mic-btn');
+  micBtn.classList.add('recording');
+  _dietMicActive = true;
+
+  _dietRecognition.onresult = e => {
+    document.getElementById('diet-food-input').value = e.results[0][0].transcript;
+  };
+  _dietRecognition.onend   = () => { micBtn.classList.remove('recording'); _dietMicActive = false; };
+  _dietRecognition.onerror = () => { micBtn.classList.remove('recording'); _dietMicActive = false; };
+  _dietRecognition.start();
+}
+
+// ── Share ──────────────────────────────────────────────────────────────────
+
+async function shareDietSummary() {
+  const dateStr = state.dietDate;
+  const month   = dateStr.slice(0, 7);
+  const mData   = await getDietMonthData(month);
+  const foods   = (mData.days[dateStr] || {}).foods || [];
+  const t       = dietCalcTotals(foods);
+  const target  = getCalorieTarget();
+  const pct     = target > 0 ? Math.round(t.kcal / target * 100) : 0;
+  const dateLabel = formatDietDateLabel(dateStr);
+
+  const text =
+    `🥗 Diet Log — ${dateLabel}\n\n` +
+    `🔥 Calories: ${t.kcal} / ${target} kcal (${pct}%)\n` +
+    `💪 Protein: ${t.protein}g   🌾 Carbs: ${t.carbs}g   🧈 Fat: ${t.fat}g   🥦 Fibre: ${t.fibre}g\n\n` +
+    (foods.length
+      ? 'Foods logged:\n' + foods.map(f =>
+          `• ${f.name} × ${f.quantity} ${f.unit} — ${Math.round((f.calories_per_unit||0)*f.quantity)} kcal`
+        ).join('\n')
+      : 'No foods logged yet.') +
+    '\n\n📱 Tracked with Timesheet';
+
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Diet Log', text }); return; } catch {}
+  }
+  window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+}
+
+// ── Bar charts ─────────────────────────────────────────────────────────────
+
+async function renderDietCharts() {
+  await renderDietMonthlyChart();
+  await renderDietYearlyChart();
+}
+
+async function renderDietMonthlyChart() {
+  const canvas = document.getElementById('diet-monthly-chart');
+  if (!canvas || !canvas.offsetParent) return;
+  const month     = state.dietDate.slice(0, 7);
+  const [y, m]    = month.split('-').map(Number);
+  const daysInMon = new Date(y, m, 0).getDate();
+  const mData     = await getDietMonthData(month);
+  const days      = mData.days || {};
+
+  const labels = [], values = [];
+  for (let d = 1; d <= daysInMon; d++) {
+    const ds = `${month}-${String(d).padStart(2,'0')}`;
+    labels.push(d);
+    values.push(dietCalcTotals((days[ds] || {}).foods || []).kcal);
+  }
+
+  document.getElementById('diet-monthly-chart-label').textContent = formatMonth(month);
+  drawDietBarChart(canvas, labels, values, getCalorieTarget(), parseInt(state.dietDate.split('-')[2], 10));
+}
+
+async function renderDietYearlyChart() {
+  const canvas = document.getElementById('diet-yearly-chart');
+  if (!canvas || !canvas.offsetParent) return;
+  const year    = parseInt(state.dietDate.slice(0, 4), 10);
+  const now     = new Date();
+  const curMon  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const MON_S   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const labels = [], values = [];
+  for (let m = 1; m <= 12; m++) {
+    const month = `${year}-${String(m).padStart(2,'0')}`;
+    if (month > curMon) break;
+    const mData = await getDietMonthData(month);
+    const days  = mData.days || {};
+    let total   = 0;
+    for (const ds of Object.keys(days)) total += dietCalcTotals((days[ds] || {}).foods || []).kcal;
+    labels.push(MON_S[m-1]);
+    values.push(total);
+  }
+
+  document.getElementById('diet-yearly-chart-label').textContent = year;
+  drawDietBarChart(canvas, labels, values, 0, -1);
+}
+
+function drawDietBarChart(canvas, labels, values, targetLine, highlightDay) {
+  const dpr  = window.devicePixelRatio || 1;
+  const W    = (canvas.parentElement?.clientWidth || 600);
+  const H    = 200;
+  canvas.width        = W * dpr;
+  canvas.height       = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const PL = 46, PR = 14, PT = 16, PB = 28;
+  const cW  = W - PL - PR;
+  const cH  = H - PT - PB;
+  const max = Math.max(...values, targetLine > 0 ? targetLine : 0, 1);
+  const bW  = Math.max(4, Math.floor(cW / labels.length) - 4);
+
+  // Grid lines + y-labels
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const gy = PT + cH - (cH * i / 4);
+    ctx.beginPath(); ctx.moveTo(PL, gy); ctx.lineTo(W - PR, gy); ctx.stroke();
+    const val = Math.round(max * i / 4);
+    ctx.fillStyle = 'rgba(122,144,176,0.7)';
+    ctx.font = '9px -apple-system,sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(val >= 1000 ? (Math.round(val/100)/10) + 'k' : val, PL - 4, gy + 3);
+  }
+
+  // Target dashed line
+  if (targetLine > 0) {
+    const ty = PT + cH - (cH * Math.min(targetLine, max) / max);
+    ctx.strokeStyle = 'rgba(200,255,0,0.3)';
+    ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(PL, ty); ctx.lineTo(W - PR, ty); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Bars
+  labels.forEach((label, i) => {
+    const val    = values[i] || 0;
+    const x      = PL + (cW * i / labels.length) + (cW / labels.length - bW) / 2;
+    const barH   = val > 0 ? Math.max(2, cH * val / max) : 0;
+    const by     = PT + cH - barH;
+    const isHigh = i + 1 === highlightDay;
+
+    let alpha = isHigh ? 1 : 0.65;
+    let color;
+    if (targetLine > 0 && val >= targetLine)        color = `rgba(248,113,113,${alpha})`;
+    else if (targetLine > 0 && val >= targetLine*0.75) color = `rgba(245,158,11,${alpha})`;
+    else                                             color = `rgba(200,255,0,${alpha})`;
+
+    ctx.fillStyle = color;
+    if (barH > 4) {
+      const r = Math.min(3, bW/2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, by);
+      ctx.lineTo(x + bW - r, by);
+      ctx.quadraticCurveTo(x + bW, by, x + bW, by + r);
+      ctx.lineTo(x + bW, by + barH);
+      ctx.lineTo(x, by + barH);
+      ctx.lineTo(x, by + r);
+      ctx.quadraticCurveTo(x, by, x + r, by);
+      ctx.fill();
+    } else if (barH > 0) {
+      ctx.fillRect(x, by, bW, barH);
+    }
+
+    // X label
+    ctx.fillStyle = isHigh ? '#C8FF00' : 'rgba(122,144,176,0.65)';
+    ctx.font = '9px -apple-system,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x + bW / 2, H - PB + 12);
+  });
 }
