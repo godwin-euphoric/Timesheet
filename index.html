@@ -477,8 +477,10 @@
           <input type="number" id="diet-calorie-target" placeholder="e.g. 1800" min="500" max="6000" step="50">
         </div>
       </div>
-      <div style="margin-top:16px">
+      <div style="margin-top:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
         <button class="btn-primary" onclick="saveDietSettings()">Save Diet Settings</button>
+        <button class="btn-secondary" id="diet-connect-btn" onclick="connectGoogleSheets()">Connect Google Sheets</button>
+        <span id="diet-sheets-status" style="font-size:13px;color:#7A90B0">Not connected</span>
       </div>
     </div>
 

@@ -100,14 +100,44 @@ function showToast(msg, ms = 2500) {
 
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  provider.addScope('https://www.googleapis.com/auth/spreadsheets');
   provider.setCustomParameters({ prompt: 'select_account' });
-  auth.signInWithPopup(provider)
-    .then(result => {
-      const token = result.credential?.accessToken;
-      if (token) { state.googleAccessToken = token; sessionStorage.setItem('g_sheets_token', token); }
-    })
-    .catch(e => showToast('Sign-in failed: ' + e.message));
+  auth.signInWithPopup(provider).catch(e => showToast('Sign-in failed: ' + e.message));
+}
+
+async function connectGoogleSheets() {
+  const btn = document.getElementById('diet-connect-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Connecting…'; }
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+    // prompt:consent forces Google to show the full consent screen and return a fresh token
+    provider.setCustomParameters({ prompt: 'consent', access_type: 'online' });
+    const result = await (auth.currentUser
+      ? auth.currentUser.reauthenticateWithPopup(provider)
+      : auth.signInWithPopup(provider));
+    const token = result.credential?.accessToken;
+    if (!token) throw new Error('No access token returned — try again');
+    state.googleAccessToken = token;
+    sessionStorage.setItem('g_sheets_token', token);
+    renderSheetsStatus();
+    showToast('Google Sheets connected!');
+  } catch (e) {
+    showToast('Failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Connect Google Sheets'; }
+  }
+}
+
+function renderSheetsStatus() {
+  const el = document.getElementById('diet-sheets-status');
+  if (!el) return;
+  if (state.googleAccessToken) {
+    el.textContent = '✓ Connected';
+    el.style.color = '#4ADE80';
+  } else {
+    el.textContent = 'Not connected';
+    el.style.color = '#7A90B0';
+  }
 }
 
 function doSignOut() {
@@ -2005,6 +2035,7 @@ async function loadSettingsTab() {
   await loadSettingsMonthTable();
   await loadFmCategorySettings();
   await populateDietSettingsFields();
+  renderSheetsStatus();
   setSaveState('settings-save-btn', false);
 }
 
@@ -3473,6 +3504,7 @@ function getCalorieTarget() {
 async function loadDietTab() {
   await loadDietSettings();
   await populateDietSettingsFields();
+  renderSheetsStatus();
   const { geminiApiKey, gender } = state.dietSettings;
   const gate    = document.getElementById('diet-gate');
   const content = document.getElementById('diet-content');
@@ -3928,13 +3960,9 @@ async function _sheetsApi(method, path, body) {
 }
 
 async function _refreshSheetsToken() {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-  const result = await auth.signInWithPopup(provider);
-  const token  = result.credential?.accessToken;
-  if (!token) throw new Error('Could not get Google access token.');
-  state.googleAccessToken = token;
-  sessionStorage.setItem('g_sheets_token', token);
+  // Token expired — use the same flow as connectGoogleSheets (prompt:consent guarantees a fresh token)
+  await connectGoogleSheets();
+  if (!state.googleAccessToken) throw new Error('Google Sheets not authorized. Click "Connect Google Sheets" in Settings.');
 }
 
 function _colLetter(idx) {
