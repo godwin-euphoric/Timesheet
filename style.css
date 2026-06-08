@@ -1157,7 +1157,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .diet-stat-burnt > span:last-child { color: var(--lime); }
 
 .diet-macros-row {
-  display: grid; grid-template-columns: repeat(4,1fr); gap: 8px;
+  display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; flex: 1;
 }
 .macro-tile {
   background: var(--card2); border: 1px solid var(--border);
@@ -1315,8 +1315,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 
 /* Mobile */
 @media (max-width: 640px) {
-  .diet-macros-row { grid-template-columns: repeat(2,1fr); }
-  .diet-summary-top { gap: 14px; }
+  .diet-summary-top { gap: 12px; }
   .diet-food-qty-row { flex-wrap: wrap; gap: 5px; }
   .settings-diet-form { flex-direction: column; }
 }

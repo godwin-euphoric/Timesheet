@@ -200,6 +200,7 @@
         <button class="diet-date-arrow" onclick="dietPrevDay()">&#8592;</button>
         <span id="diet-date-label">MON, JUN 8</span>
         <button class="diet-date-arrow" onclick="dietNextDay()">&#8594;</button>
+        <button class="btn-secondary" id="diet-sync-btn" onclick="backfillDietToSheets()" style="margin-left:auto;font-size:12px;height:32px;padding:0 12px" title="Sync all diet data from Jun 8 to Google Sheets">↑ Sync to Sheet</button>
       </div>
 
       <!-- Calorie summary card -->
@@ -219,12 +220,12 @@
               <small>of <span id="diet-target-num">1800</span> kcal</small>
             </div>
           </div>
-        </div>
-        <div class="diet-macros-row">
-          <div class="macro-tile"><strong id="diet-protein">0g</strong><small>PROTEIN</small></div>
-          <div class="macro-tile"><strong id="diet-carbs">0g</strong><small>CARBS</small></div>
-          <div class="macro-tile"><strong id="diet-fat">0g</strong><small>FAT</small></div>
-          <div class="macro-tile"><strong id="diet-fibre">0g</strong><small>FIBRE</small></div>
+          <div class="diet-macros-row">
+            <div class="macro-tile"><strong id="diet-protein">0g</strong><small>PROTEIN</small></div>
+            <div class="macro-tile"><strong id="diet-carbs">0g</strong><small>CARBS</small></div>
+            <div class="macro-tile"><strong id="diet-fat">0g</strong><small>FAT</small></div>
+            <div class="macro-tile"><strong id="diet-fibre">0g</strong><small>FIBRE</small></div>
+          </div>
         </div>
       </div>
 

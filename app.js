@@ -48,6 +48,8 @@ const state = {
   dietDate:         todayStr(),
   dietMonthCache:   {},
   dietSettings:     null,
+  // Google Sheets sync
+  googleAccessToken: sessionStorage.getItem('g_sheets_token') || null,
 };
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -98,8 +100,14 @@ function showToast(msg, ms = 2500) {
 
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
+  provider.addScope('https://www.googleapis.com/auth/spreadsheets');
   provider.setCustomParameters({ prompt: 'select_account' });
-  auth.signInWithPopup(provider).catch(e => showToast('Sign-in failed: ' + e.message));
+  auth.signInWithPopup(provider)
+    .then(result => {
+      const token = result.credential?.accessToken;
+      if (token) { state.googleAccessToken = token; sessionStorage.setItem('g_sheets_token', token); }
+    })
+    .catch(e => showToast('Sign-in failed: ' + e.message));
 }
 
 function doSignOut() {
@@ -111,8 +119,10 @@ auth.onAuthStateChanged(user => {
   state.cache = {};
   state.allMonthsCache = null;
   state.userDataCache  = null;
-  state.dietMonthCache = {};
-  state.dietSettings   = null;
+  state.dietMonthCache   = {};
+  state.dietSettings     = null;
+  state.googleAccessToken = null;
+  sessionStorage.removeItem('g_sheets_token');
 
   if (user) {
     document.getElementById('auth-screen').classList.add('hidden');
@@ -3644,6 +3654,8 @@ async function logDietFood() {
     await saveDietMonthData(month, mData);
     await renderDietDay(state.dietDate);
     renderDietCharts();
+    const totalKcal = dietCalcTotals(mData.days[state.dietDate].foods || []).kcal;
+    syncDietToSheets(state.dietDate, totalKcal);
     showToast('Logged: ' + items.map(i => i.name).join(', '));
   } catch (e) {
     showDietError(e, `Input: "${text}"`);
@@ -3662,6 +3674,8 @@ async function updateDietQuantity(dateStr, id, qty) {
   item.quantity = qty;
   await saveDietMonthData(month, mData);
   await renderDietDay(dateStr);
+  const kcal = dietCalcTotals(mData.days[dateStr]?.foods || []).kcal;
+  syncDietToSheets(dateStr, kcal);
 }
 
 async function deleteDietFood(dateStr, id) {
@@ -3673,6 +3687,8 @@ async function deleteDietFood(dateStr, id) {
   await saveDietMonthData(month, mData);
   await renderDietDay(dateStr);
   renderDietCharts();
+  const kcal = dietCalcTotals(day.foods || []).kcal;
+  syncDietToSheets(dateStr, kcal);
 }
 
 // ── Date navigation ────────────────────────────────────────────────────────
@@ -3877,4 +3893,172 @@ function drawDietBarChart(canvas, labels, values, targetLine, highlightDay) {
     ctx.textAlign = 'center';
     ctx.fillText(label, x + bW / 2, H - PB + 12);
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  GOOGLE SHEETS SYNC
+// ══════════════════════════════════════════════════════════════════════════
+
+const SHEETS_SPREADSHEET_ID = '1JmMzo9yRr6JOj96rQ0sObNEx35xJtgQ_';
+const SHEETS_GID             = 1255882756;
+const SHEETS_OWNER_EMAIL     = 'godwin.euphoric@gmail.com';
+
+let _sheetMeta = null; // cached: { sheetTitle, dateColIdx, kcalColIdx, rows }
+
+async function ensureGoogleToken() {
+  if (state.googleAccessToken) return state.googleAccessToken;
+  throw new Error('Google Sheets not authorized. Sign out and sign in again to grant access.');
+}
+
+async function _sheetsApi(method, path, body) {
+  const token = await ensureGoogleToken();
+  const base  = `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_SPREADSHEET_ID}`;
+  const res   = await fetch(base + path, {
+    method,
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 401) {
+    // Token expired — re-auth silently (Google skips consent for already-approved scope)
+    await _refreshSheetsToken();
+    return _sheetsApi(method, path, body);
+  }
+  if (!res.ok) throw new Error(`Sheets API ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+async function _refreshSheetsToken() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+  const result = await auth.signInWithPopup(provider);
+  const token  = result.credential?.accessToken;
+  if (!token) throw new Error('Could not get Google access token.');
+  state.googleAccessToken = token;
+  sessionStorage.setItem('g_sheets_token', token);
+}
+
+function _colLetter(idx) {
+  let s = '', n = idx + 1;
+  while (n > 0) { s = String.fromCharCode(64 + ((n - 1) % 26 + 1)) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
+function _parseCellDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;                     // ISO
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {                            // DD/MM/YYYY
+    const [d, m, y] = s.split('/'); return `${y}-${m}-${d}`;
+  }
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {                        // M/D/YYYY
+    const [m, d, y] = s.split('/');
+    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  // Google Sheets serial number
+  const num = parseFloat(s);
+  if (!isNaN(num) && num > 40000) {
+    const dt = new Date(Date.UTC(1899, 11, 30) + num * 86400000);
+    return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
+  }
+  return null;
+}
+
+async function _loadSheetMeta() {
+  if (_sheetMeta) return _sheetMeta;
+
+  // 1. Get sheet title from gid
+  const meta   = await _sheetsApi('GET', '?fields=sheets.properties');
+  const sheet  = (meta.sheets || []).find(s => s.properties.sheetId === SHEETS_GID);
+  if (!sheet) throw new Error(`Sheet with gid=${SHEETS_GID} not found.`);
+  const sheetTitle = sheet.properties.title;
+
+  // 2. Read all values
+  const data = await _sheetsApi('GET', `/values/${encodeURIComponent(sheetTitle)}!A:Z`);
+  const rows = data.values || [];
+  if (!rows.length) throw new Error('Sheet is empty.');
+
+  // 3. Locate date column and Godwin-calorie column in header row
+  const header = rows[0].map(h => String(h || '').toLowerCase());
+  let dateColIdx = header.findIndex(h => h.includes('date'));
+  if (dateColIdx < 0) dateColIdx = 0;
+
+  // Find column containing "godwin" in the header
+  const kcalColIdx = header.findIndex(h => h.includes('godwin'));
+  if (kcalColIdx < 0) throw new Error('No column with "Godwin" found in sheet header row.');
+
+  _sheetMeta = { sheetTitle, dateColIdx, kcalColIdx, rows };
+  return _sheetMeta;
+}
+
+async function syncDietToSheets(dateStr, kcal) {
+  if (state.user?.email !== SHEETS_OWNER_EMAIL) return; // only for godwin
+
+  try {
+    const { sheetTitle, dateColIdx, kcalColIdx, rows } = await _loadSheetMeta();
+
+    // Find the row that matches dateStr
+    let rowIdx = -1;
+    for (let i = 1; i < rows.length; i++) {
+      if (_parseCellDate(rows[i]?.[dateColIdx]) === dateStr) { rowIdx = i; break; }
+    }
+    if (rowIdx < 0) {
+      showToast(`Date ${dateStr} not found in sheet — skipped`);
+      return false;
+    }
+
+    const cellRef = `${sheetTitle}!${_colLetter(kcalColIdx)}${rowIdx + 1}`;
+    await _sheetsApi('PUT', `/values/${encodeURIComponent(cellRef)}?valueInputOption=RAW`, {
+      values: [[kcal]],
+    });
+    _sheetMeta = null; // invalidate cache so next call re-reads fresh rows
+    return true;
+  } catch (e) {
+    console.error('Sheets sync error:', e);
+    showToast('Sheets sync failed: ' + e.message);
+    return false;
+  }
+}
+
+async function backfillDietToSheets() {
+  if (state.user?.email !== SHEETS_OWNER_EMAIL) {
+    showToast('Sheets sync is only enabled for ' + SHEETS_OWNER_EMAIL);
+    return;
+  }
+
+  const btn = document.getElementById('diet-sync-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
+
+  try {
+    const startDate = '2026-06-08';
+    const today     = todayStr();
+    let   synced    = 0;
+
+    // Iterate month by month from 2026-06 to current month
+    let [y, m] = [2026, 6];
+    const [ey, em] = today.slice(0, 7).split('-').map(Number);
+
+    while (y < ey || (y === ey && m <= em)) {
+      const month = `${y}-${String(m).padStart(2, '0')}`;
+      const mData = await getDietMonthData(month);
+      const dates = Object.keys(mData.days || {}).sort();
+
+      for (const dateStr of dates) {
+        if (dateStr < startDate || dateStr > today) continue;
+        const kcal = dietCalcTotals((mData.days[dateStr].foods || [])).kcal;
+        if (kcal > 0) {
+          const ok = await syncDietToSheets(dateStr, kcal);
+          if (ok) { synced++; showToast(`Synced ${dateStr}: ${kcal} kcal`); }
+          await dietSleep(400); // throttle to avoid rate limits
+        }
+      }
+
+      m++; if (m > 12) { y++; m = 1; }
+    }
+
+    showToast(`✓ Synced ${synced} day${synced !== 1 ? 's' : ''} to Google Sheets`);
+  } catch (e) {
+    showToast('Backfill failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↑ Sync to Sheet'; }
+  }
 }
