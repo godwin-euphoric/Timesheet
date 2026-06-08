@@ -3539,11 +3539,6 @@ function renderDietSummary(foods, target) {
   document.getElementById('diet-consumed-num').textContent = t.kcal;
   document.getElementById('diet-target-num').textContent   = target;
 
-  // Stats
-  document.getElementById('diet-stat-consumed').textContent = t.kcal;
-  document.getElementById('diet-stat-burnt').textContent    = 0;
-  document.getElementById('diet-stat-net').textContent      = t.kcal;
-
   // Macros
   document.getElementById('diet-protein').textContent = t.protein + 'g';
   document.getElementById('diet-carbs').textContent   = t.carbs   + 'g';
