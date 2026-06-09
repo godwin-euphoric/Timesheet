@@ -3803,6 +3803,9 @@ async function shareDietSummary() {
   const card = document.querySelector('.diet-summary-card');
   if (!card || typeof html2canvas === 'undefined') { showToast('Share unavailable'); return; }
 
+  const hideEls = card.querySelectorAll('.diet-share-btn, .diet-sync-day-btn');
+  hideEls.forEach(el => el.style.visibility = 'hidden');
+
   showToast('Preparing image…');
   try {
     const cvs = await html2canvas(card, {
@@ -3813,6 +3816,7 @@ async function shareDietSummary() {
       allowTaint: true,
     });
 
+    hideEls.forEach(el => el.style.visibility = '');
     cvs.toBlob(async blob => {
       const file = new File([blob], `diet-${state.dietDate}.png`, { type: 'image/png' });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
@@ -3825,6 +3829,7 @@ async function shareDietSummary() {
       document.body.removeChild(a); URL.revokeObjectURL(url);
     }, 'image/png');
   } catch (e) {
+    hideEls.forEach(el => el.style.visibility = '');
     showToast('Image capture failed');
     console.error(e);
   }
