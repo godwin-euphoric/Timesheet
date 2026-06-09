@@ -476,11 +476,13 @@
           <label>Daily Calorie Target</label>
           <input type="number" id="diet-calorie-target" placeholder="e.g. 1800" min="500" max="6000" step="50">
         </div>
+        <div class="field-group" style="flex:1;min-width:260px">
+          <label>Google Sheets Script URL <span style="font-weight:400;color:var(--muted)">(from Apps Script deploy)</span></label>
+          <input type="url" id="diet-sheets-url" placeholder="https://script.google.com/macros/s/...">
+        </div>
       </div>
-      <div style="margin-top:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div style="margin-top:16px">
         <button class="btn-primary" onclick="saveDietSettings()">Save Diet Settings</button>
-        <button class="btn-secondary" id="diet-connect-btn" onclick="connectGoogleSheets()">Connect Google Sheets</button>
-        <span id="diet-sheets-status" style="font-size:13px;color:#7A90B0">Not connected</span>
       </div>
     </div>
 
