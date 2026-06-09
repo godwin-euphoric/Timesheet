@@ -3543,6 +3543,8 @@ async function renderDietDay(dateStr) {
   document.getElementById('diet-date-label').textContent = formatDietDateLabel(dateStr);
   renderDietSummary(foods, target);
   renderFoodCards(foods, dateStr);
+  const syncBtn = document.getElementById('diet-sync-day-btn');
+  if (syncBtn) syncBtn.classList.remove('synced');
 }
 
 function dietCalcTotals(foods) {
@@ -3690,8 +3692,6 @@ async function logDietFood() {
     await saveDietMonthData(month, mData);
     await renderDietDay(state.dietDate);
     renderDietCharts();
-    const totalKcal = dietCalcTotals(mData.days[state.dietDate].foods || []).kcal;
-    syncDietToSheets(state.dietDate, totalKcal);
     showToast('Logged: ' + items.map(i => i.name).join(', '));
   } catch (e) {
     showDietError(e, `Input: "${text}"`);
@@ -3710,8 +3710,6 @@ async function updateDietQuantity(dateStr, id, qty) {
   item.quantity = qty;
   await saveDietMonthData(month, mData);
   await renderDietDay(dateStr);
-  const kcal = dietCalcTotals(mData.days[dateStr]?.foods || []).kcal;
-  syncDietToSheets(dateStr, kcal);
 }
 
 async function deleteDietFood(dateStr, id) {
@@ -3723,8 +3721,6 @@ async function deleteDietFood(dateStr, id) {
   await saveDietMonthData(month, mData);
   await renderDietDay(dateStr);
   renderDietCharts();
-  const kcal = dietCalcTotals(day.foods || []).kcal;
-  syncDietToSheets(dateStr, kcal);
 }
 
 // ── Date navigation ────────────────────────────────────────────────────────
@@ -3934,6 +3930,21 @@ function drawDietBarChart(canvas, labels, values, targetLine, highlightDay) {
 // ══════════════════════════════════════════════════════════════════════════
 //  GOOGLE SHEETS SYNC  (via Google Apps Script web app — no OAuth needed)
 // ══════════════════════════════════════════════════════════════════════════
+
+async function syncDayToSheets() {
+  if (!state.dietSettings?.sheetsUrl) {
+    showToast('Set Google Sheets Script URL in Settings first');
+    return;
+  }
+  const btn = document.getElementById('diet-sync-day-btn');
+  if (btn) btn.style.opacity = '0.5';
+  const month = state.dietDate.slice(0, 7);
+  const mData = await getDietMonthData(month);
+  const kcal  = dietCalcTotals((mData.days[state.dietDate]?.foods || [])).kcal;
+  await syncDietToSheets(state.dietDate, kcal);
+  if (btn) { btn.style.opacity = '1'; btn.classList.add('synced'); }
+  showToast('Synced to Sheet');
+}
 
 async function syncDietToSheets(dateStr, kcal) {
   const url = state.dietSettings?.sheetsUrl;
