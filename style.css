@@ -1239,44 +1239,41 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 @keyframes d-spin { to { transform: rotate(360deg); } }
 
-/* Food list */
-.diet-food-list  { display: flex; flex-direction: column; gap: 10px; }
+/* Food table */
+.diet-food-list { overflow-x: auto; }
 .diet-empty { color: var(--muted); font-size: 14px; text-align: center; padding: 28px 0; }
-
-/* Food card */
-.diet-food-card {
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 12px 14px;
+.diet-food-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.diet-food-table th {
+  font-size: 10px; font-weight: 600; letter-spacing: .06em;
+  color: var(--muted); text-align: right; padding: 0 8px 8px;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
 }
-.diet-food-card-top {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 8px; margin-bottom: 10px;
+.diet-food-table th:first-child,
+.diet-food-table th:nth-child(2) { text-align: left; }
+.diet-food-table td {
+  padding: 7px 8px; vertical-align: middle;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
 }
-.diet-food-meta { flex: 1; min-width: 0; }
-.diet-food-name { font-weight: 600; font-size: 14px; text-transform: capitalize; }
-.diet-food-time { font-size: 11px; color: var(--muted); margin-top: 2px; }
-.diet-food-qty-row { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.diet-food-table tr:last-child td { border-bottom: none; }
+.col-name { font-weight: 600; text-transform: capitalize; min-width: 110px; }
+.col-time { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.col-num  { text-align: right; white-space: nowrap; color: var(--muted); }
+.col-kcal { text-align: right; white-space: nowrap; color: var(--lime); font-weight: 700; }
+.col-qty  { white-space: nowrap; }
 .diet-qty-input {
-  width: 62px; height: 28px; text-align: center;
+  width: 52px; height: 28px; text-align: center;
   background: var(--card2); border: 1px solid var(--border);
   border-radius: 6px; color: var(--text); font-size: 13px; outline: none;
   transition: border-color 0.15s;
 }
 .diet-qty-input:focus { border-color: var(--lime); }
-.diet-qty-unit { font-size: 12px; color: var(--muted); }
+.diet-qty-unit { font-size: 11px; color: var(--muted); margin-left: 4px; }
 .diet-food-del {
   background: none; border: none; color: var(--muted); cursor: pointer;
-  font-size: 18px; padding: 0 4px; border-radius: 4px;
-  transition: color 0.15s; line-height: 1; flex-shrink: 0;
+  font-size: 16px; padding: 0 2px; border-radius: 4px;
+  transition: color 0.15s; line-height: 1;
 }
 .diet-food-del:hover { color: var(--red); }
-.diet-macro-pills { display: flex; gap: 6px; flex-wrap: wrap; }
-.diet-macro-pill {
-  background: var(--card2); border: 1px solid var(--border);
-  border-radius: 20px; padding: 2px 10px;
-  font-size: 11px; color: var(--muted); white-space: nowrap;
-}
-.diet-macro-pill span { color: var(--text); font-weight: 600; }
 
 /* Charts */
 .diet-chart-card { margin-bottom: 20px; }

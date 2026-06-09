@@ -3620,35 +3620,34 @@ function renderFoodCards(foods, dateStr) {
     return;
   }
   const ds = escHtml(dateStr);
-  list.innerHTML = foods.map(f => {
+  const rows = foods.map(f => {
     const q       = f.quantity || 1;
     const kcal    = Math.round((f.calories_per_unit  || 0) * q);
     const protein = Math.round((f.protein_g_per_unit || 0) * q * 10) / 10;
     const carbs   = Math.round((f.carbs_g_per_unit   || 0) * q * 10) / 10;
     const fat     = Math.round((f.fat_g_per_unit     || 0) * q * 10) / 10;
-    const fibre   = Math.round((f.fibre_g_per_unit   || 0) * q * 10) / 10;
-    return `<div class="diet-food-card" id="diet-card-${f.id}">
-  <div class="diet-food-card-top">
-    <div class="diet-food-meta">
-      <div class="diet-food-name">${escHtml(f.name)}</div>
-      <div class="diet-food-time">${escHtml(f.logged_at || '')}</div>
-    </div>
-    <div class="diet-food-qty-row">
-      <input class="diet-qty-input" type="number" value="${q}" min="0.5" step="0.5"
-             onchange="updateDietQuantity('${ds}','${f.id}',parseFloat(this.value)||0.5)">
-      <span class="diet-qty-unit">${escHtml(f.unit || '')}</span>
-      <button class="diet-food-del" onclick="deleteDietFood('${ds}','${f.id}')">×</button>
-    </div>
-  </div>
-  <div class="diet-macro-pills">
-    <div class="diet-macro-pill"><span>${kcal}</span> kcal</div>
-    <div class="diet-macro-pill"><span>${protein}g</span> protein</div>
-    <div class="diet-macro-pill"><span>${carbs}g</span> carbs</div>
-    <div class="diet-macro-pill"><span>${fat}g</span> fat</div>
-    <div class="diet-macro-pill"><span>${fibre}g</span> fibre</div>
-  </div>
-</div>`;
+    return `<tr id="diet-card-${f.id}">
+  <td class="col-name">${escHtml(f.name)}</td>
+  <td class="col-time">${escHtml(f.logged_at || '')}</td>
+  <td class="col-qty">
+    <input class="diet-qty-input" type="number" value="${q}" min="0.5" step="0.5"
+           onchange="updateDietQuantity('${ds}','${f.id}',parseFloat(this.value)||0.5)">
+    <span class="diet-qty-unit">${escHtml(f.unit || '')}</span>
+  </td>
+  <td class="col-kcal">${kcal}</td>
+  <td class="col-num">${protein}g</td>
+  <td class="col-num">${carbs}g</td>
+  <td class="col-num">${fat}g</td>
+  <td><button class="diet-food-del" onclick="deleteDietFood('${ds}','${f.id}')">×</button></td>
+</tr>`;
   }).join('');
+  list.innerHTML = `<table class="diet-food-table">
+  <thead><tr>
+    <th>FOOD</th><th>TIME</th><th>QTY</th>
+    <th>KCAL</th><th>P</th><th>C</th><th>F</th><th></th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>`;
 }
 
 // ── Log food ───────────────────────────────────────────────────────────────
