@@ -110,11 +110,11 @@ async function connectGoogleSheets() {
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-    // prompt:consent forces Google to show the full consent screen and return a fresh token
-    provider.setCustomParameters({ prompt: 'consent', access_type: 'online' });
-    const result = await (auth.currentUser
-      ? auth.currentUser.reauthenticateWithPopup(provider)
-      : auth.signInWithPopup(provider));
+    // prompt:consent + select_account lets the user pick ANY Google account
+    // (independent of the Firebase login account)
+    provider.setCustomParameters({ prompt: 'consent select_account' });
+    // Always use signInWithPopup so any Google account can be chosen for Sheets access
+    const result = await auth.signInWithPopup(provider);
     const token = result.credential?.accessToken;
     if (!token) throw new Error('No access token returned — try again');
     state.googleAccessToken = token;
@@ -4019,7 +4019,7 @@ async function _loadSheetMeta() {
 }
 
 async function syncDietToSheets(dateStr, kcal) {
-  if (state.user?.email !== SHEETS_OWNER_EMAIL) return; // only for godwin
+  if (!state.googleAccessToken) return; // skip silently if Sheets not connected
 
   try {
     const { sheetTitle, dateColIdx, kcalColIdx, rows } = await _loadSheetMeta();
@@ -4048,8 +4048,8 @@ async function syncDietToSheets(dateStr, kcal) {
 }
 
 async function backfillDietToSheets() {
-  if (state.user?.email !== SHEETS_OWNER_EMAIL) {
-    showToast('Sheets sync is only enabled for ' + SHEETS_OWNER_EMAIL);
+  if (!state.googleAccessToken) {
+    showToast('Connect Google Sheets first (Settings → Diet Settings)');
     return;
   }
 
