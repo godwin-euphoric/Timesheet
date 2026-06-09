@@ -1267,7 +1267,28 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   transition: border-color 0.15s;
 }
 .diet-qty-input:focus { border-color: var(--lime); }
+.diet-qty-input::-webkit-outer-spin-button,
+.diet-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.diet-qty-input[type=number] { -moz-appearance: textfield; }
 .diet-qty-unit { font-size: 11px; color: var(--muted); margin-left: 4px; }
+.diet-total-row td { border-top: 1px solid var(--border); font-weight: 600; padding-top: 9px; }
+.diet-total-label { color: var(--muted); font-size: 10px; letter-spacing: .06em; }
+.diet-weight-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 0 4px; border-top: 1px solid var(--border); margin-top: 12px;
+}
+.diet-weight-label { font-size: 13px; color: var(--muted); flex-shrink: 0; }
+.diet-weight-input {
+  width: 80px; height: 32px; text-align: center;
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 14px; outline: none;
+  transition: border-color 0.15s;
+}
+.diet-weight-input:focus { border-color: var(--lime); }
+.diet-weight-input::-webkit-outer-spin-button,
+.diet-weight-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.diet-weight-input[type=number] { -moz-appearance: textfield; }
+.diet-weight-save-btn { height: 32px; padding: 0 14px; font-size: 12px; }
 .diet-food-del {
   background: none; border: none; color: var(--muted); cursor: pointer;
   font-size: 16px; padding: 0 2px; border-radius: 4px;

@@ -3543,8 +3543,22 @@ async function renderDietDay(dateStr) {
   document.getElementById('diet-date-label').textContent = formatDietDateLabel(dateStr);
   renderDietSummary(foods, target);
   renderFoodCards(foods, dateStr);
+  const wi = document.getElementById('diet-weight-input');
+  if (wi) wi.value = (mData.days[dateStr]?.weight) || '';
   const syncBtn = document.getElementById('diet-sync-day-btn');
   if (syncBtn) syncBtn.classList.remove('synced');
+}
+
+async function saveDayWeight() {
+  const kg = parseFloat(document.getElementById('diet-weight-input')?.value);
+  if (!kg || kg <= 0) { showToast('Enter a valid weight'); return; }
+  const month = state.dietDate.slice(0, 7);
+  const mData = await getDietMonthData(month);
+  if (!mData.days[state.dietDate]) mData.days[state.dietDate] = {};
+  mData.days[state.dietDate].weight = kg;
+  await saveDietMonthData(month, mData);
+  renderDietCharts();
+  showToast('Weight saved: ' + kg + ' kg');
 }
 
 function dietCalcTotals(foods) {
@@ -3641,12 +3655,28 @@ function renderFoodCards(foods, dateStr) {
   <td><button class="diet-food-del" onclick="deleteDietFood('${ds}','${f.id}')">×</button></td>
 </tr>`;
   }).join('');
+  const totals = foods.reduce((t, f) => {
+    const q = f.quantity || 1;
+    t.kcal    += Math.round((f.calories_per_unit  || 0) * q);
+    t.protein += (f.protein_g_per_unit || 0) * q;
+    t.carbs   += (f.carbs_g_per_unit   || 0) * q;
+    t.fat     += (f.fat_g_per_unit     || 0) * q;
+    return t;
+  }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
   list.innerHTML = `<table class="diet-food-table">
   <thead><tr>
     <th>FOOD</th><th>TIME</th><th>QTY</th>
     <th>KCAL</th><th>P</th><th>C</th><th>F</th><th></th>
   </tr></thead>
   <tbody>${rows}</tbody>
+  <tfoot><tr class="diet-total-row">
+    <td colspan="3"><span class="diet-total-label">TOTAL</span></td>
+    <td class="col-kcal">${totals.kcal}</td>
+    <td class="col-num">${Math.round(totals.protein * 10) / 10}g</td>
+    <td class="col-num">${Math.round(totals.carbs * 10) / 10}g</td>
+    <td class="col-num">${Math.round(totals.fat * 10) / 10}g</td>
+    <td></td>
+  </tr></tfoot>
 </table>`;
 }
 
@@ -3799,6 +3829,7 @@ async function shareDietSummary() {
 // ── Bar charts ─────────────────────────────────────────────────────────────
 
 async function renderDietCharts() {
+  await renderWeightChart();
   await renderDietMonthlyChart();
   await renderDietYearlyChart();
 }
@@ -3844,7 +3875,105 @@ async function renderDietYearlyChart() {
   }
 
   document.getElementById('diet-yearly-chart-label').textContent = year;
-  drawDietBarChart(canvas, labels, values, 0, -1);
+  drawDietLineChart(canvas, labels, values, 'kcal');
+}
+
+async function renderWeightChart() {
+  const card = document.getElementById('diet-weight-chart-card');
+  const canvas = document.getElementById('diet-weight-chart');
+  if (!canvas) return;
+
+  let y = 2026, m = 6;
+  const today = todayStr();
+  const [ey, em] = today.slice(0, 7).split('-').map(Number);
+  const entries = [];
+
+  while (y < ey || (y === ey && m <= em)) {
+    const month = `${y}-${String(m).padStart(2, '0')}`;
+    const mData = await getDietMonthData(month);
+    for (const [ds, dd] of Object.entries(mData.days || {})) {
+      if (dd.weight > 0) entries.push({ ds, w: dd.weight });
+    }
+    m++; if (m > 12) { y++; m = 1; }
+  }
+  entries.sort((a, b) => a.ds.localeCompare(b.ds));
+
+  if (!entries.length) { if (card) card.style.display = 'none'; return; }
+  if (card) card.style.display = '';
+
+  const labels  = entries.map(e => e.ds.slice(5));
+  const weights = entries.map(e => e.w);
+  document.getElementById('diet-weight-chart-label').textContent = entries[0].ds.slice(0, 7) + ' – ' + entries[entries.length - 1].ds.slice(0, 7);
+  drawDietLineChart(canvas, labels, weights, 'kg');
+}
+
+function drawDietLineChart(canvas, labels, values, unit) {
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.parentElement?.clientWidth || 600;
+  const H   = 180;
+  canvas.width        = W * dpr;
+  canvas.height       = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const PL = 46, PR = 14, PT = 16, PB = 28;
+  const cW = W - PL - PR, cH = H - PT - PB;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const pad = (max - min) * 0.15 || 1;
+  const lo  = min - pad, hi = max + pad;
+  const n   = labels.length;
+
+  const px = i => PL + (n === 1 ? cW / 2 : (cW * i / (n - 1)));
+  const py = v => PT + cH - (cH * (v - lo) / (hi - lo));
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const gy = PT + cH * i / 4;
+    ctx.beginPath(); ctx.moveTo(PL, gy); ctx.lineTo(W - PR, gy); ctx.stroke();
+    const val = hi - (hi - lo) * i / 4;
+    ctx.fillStyle = 'rgba(122,144,176,0.7)';
+    ctx.font = '9px -apple-system,sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(val * 10) / 10, PL - 4, gy + 3);
+  }
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(200,255,0,0.8)';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  values.forEach((v, i) => { i === 0 ? ctx.moveTo(px(i), py(v)) : ctx.lineTo(px(i), py(v)); });
+  ctx.stroke();
+
+  // Fill under line
+  ctx.beginPath();
+  values.forEach((v, i) => { i === 0 ? ctx.moveTo(px(i), py(v)) : ctx.lineTo(px(i), py(v)); });
+  ctx.lineTo(px(n - 1), PT + cH);
+  ctx.lineTo(px(0), PT + cH);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(200,255,0,0.07)';
+  ctx.fill();
+
+  // Dots + x-labels
+  values.forEach((v, i) => {
+    ctx.beginPath();
+    ctx.arc(px(i), py(v), 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#C8FF00';
+    ctx.fill();
+    if (n <= 12 || i % Math.ceil(n / 12) === 0) {
+      ctx.fillStyle = 'rgba(122,144,176,0.7)';
+      ctx.font = '9px -apple-system,sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(labels[i], px(i), H - PB + 14);
+    }
+  });
 }
 
 function drawDietBarChart(canvas, labels, values, targetLine, highlightDay) {

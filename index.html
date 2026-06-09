@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Timesheet</title>
-  <link rel="stylesheet" href="style.css?v=49">
+  <link rel="stylesheet" href="style.css?v=50">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -254,6 +254,24 @@
         <div id="diet-food-list" class="diet-food-list">
           <div class="diet-empty">Nothing logged yet — add your first meal</div>
         </div>
+        <div class="diet-weight-row">
+          <span class="diet-weight-label">Weight</span>
+          <input type="number" id="diet-weight-input" class="diet-weight-input"
+                 step="0.1" min="20" max="300" placeholder="kg"
+                 onkeydown="if(event.key==='Enter')saveDayWeight()">
+          <button class="btn-secondary diet-weight-save-btn" onclick="saveDayWeight()">Save</button>
+        </div>
+      </div>
+
+      <!-- Weight line chart -->
+      <div class="card diet-chart-card" id="diet-weight-chart-card" style="display:none">
+        <div class="diet-chart-header">
+          <div class="card-title" style="margin:0">Weight</div>
+          <span class="diet-chart-sub" id="diet-weight-chart-label"></span>
+        </div>
+        <div class="diet-chart-wrap">
+          <canvas id="diet-weight-chart"></canvas>
+        </div>
       </div>
 
       <!-- Monthly bar chart -->
@@ -267,7 +285,7 @@
         </div>
       </div>
 
-      <!-- Yearly bar chart -->
+      <!-- Yearly line chart -->
       <div class="card diet-chart-card">
         <div class="diet-chart-header">
           <div class="card-title" style="margin:0">Yearly Calories</div>
@@ -560,7 +578,7 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="app.js?v=49"></script>
+<script src="app.js?v=50"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
