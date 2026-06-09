@@ -3800,30 +3800,34 @@ function dietStartMic() {
 // ── Share ──────────────────────────────────────────────────────────────────
 
 async function shareDietSummary() {
-  const dateStr = state.dietDate;
-  const month   = dateStr.slice(0, 7);
-  const mData   = await getDietMonthData(month);
-  const foods   = (mData.days[dateStr] || {}).foods || [];
-  const t       = dietCalcTotals(foods);
-  const target  = getCalorieTarget();
-  const pct     = target > 0 ? Math.round(t.kcal / target * 100) : 0;
-  const dateLabel = formatDietDateLabel(dateStr);
+  const card = document.querySelector('.diet-summary-card');
+  if (!card || typeof html2canvas === 'undefined') { showToast('Share unavailable'); return; }
 
-  const text =
-    `🥗 Diet Log — ${dateLabel}\n\n` +
-    `🔥 Calories: ${t.kcal} / ${target} kcal (${pct}%)\n` +
-    `💪 Protein: ${t.protein}g   🌾 Carbs: ${t.carbs}g   🧈 Fat: ${t.fat}g   🥦 Fibre: ${t.fibre}g\n\n` +
-    (foods.length
-      ? 'Foods logged:\n' + foods.map(f =>
-          `• ${f.name} × ${f.quantity} ${f.unit} — ${Math.round((f.calories_per_unit||0)*f.quantity)} kcal`
-        ).join('\n')
-      : 'No foods logged yet.') +
-    '\n\n📱 Tracked with Timesheet';
+  showToast('Preparing image…');
+  try {
+    const cvs = await html2canvas(card, {
+      backgroundColor: '#151F32',
+      scale: 2,
+      logging: false,
+      useCORS: true,
+      allowTaint: true,
+    });
 
-  if (navigator.share) {
-    try { await navigator.share({ title: 'Diet Log', text }); return; } catch {}
+    cvs.toBlob(async blob => {
+      const file = new File([blob], `diet-${state.dietDate}.png`, { type: 'image/png' });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: 'Diet Summary' }); return; }
+        catch (e) { if (e.name === 'AbortError') return; }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement('a'), { href: url, download: `diet-${state.dietDate}.png` });
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    }, 'image/png');
+  } catch (e) {
+    showToast('Image capture failed');
+    console.error(e);
   }
-  window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
 }
 
 // ── Bar charts ─────────────────────────────────────────────────────────────
