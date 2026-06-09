@@ -3943,10 +3943,9 @@ async function syncDietToSheets(dateStr, kcal) {
     const params = new URLSearchParams({ date: dateStr, kcal: Math.round(kcal), colKey: 'godwin' });
     const res  = await fetch(`${url}?${params}`);
     const text = await res.text();
-    if (!text.startsWith('ok')) console.warn('Sheets sync response:', text);
-    else console.log('Sheets sync:', text);
+    return text;
   } catch (e) {
-    console.error('Sheets sync error:', e);
+    return 'FETCH ERROR: ' + e.message;
   }
 }
 
@@ -3977,7 +3976,8 @@ async function backfillDietToSheets() {
         if (dateStr < startDate || dateStr > today) continue;
         const kcal = dietCalcTotals((mData.days[dateStr].foods || [])).kcal;
         if (kcal > 0) {
-          await syncDietToSheets(dateStr, kcal);
+          const reply = await syncDietToSheets(dateStr, kcal);
+          if (synced === 0) alert('GAS response for ' + dateStr + ': ' + reply);
           synced++;
           await dietSleep(300);
         }
