@@ -4078,17 +4078,17 @@ async function syncDayToSheets() {
   showToast('Synced to Sheet');
 }
 
-async function syncDietToSheets(dateStr, kcal) {
+function syncDietToSheets(dateStr, kcal) {
   const url = state.dietSettings?.sheetsUrl;
-  if (!url) return;
+  if (!url) return Promise.resolve();
 
-  try {
-    const params = new URLSearchParams({ date: dateStr, kcal: Math.round(kcal), colKey: 'godwin' });
-    await fetch(`${url}?${params}`, { mode: 'no-cors' });
-    return 'sent';
-  } catch (e) {
-    return 'FETCH ERROR: ' + e.message;
-  }
+  const params = new URLSearchParams({ date: dateStr, kcal: Math.round(kcal), colKey: 'godwin' });
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = img.onerror = () => resolve();
+    img.src = `${url}?${params}`;
+    setTimeout(resolve, 6000);
+  });
 }
 
 async function backfillDietToSheets() {
