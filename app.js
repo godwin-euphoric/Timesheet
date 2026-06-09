@@ -122,7 +122,7 @@ async function connectGoogleSheets() {
     renderSheetsStatus();
     showToast('Google Sheets connected!');
   } catch (e) {
-    showToast('Failed: ' + e.message);
+    showDietError(e, 'connectGoogleSheets');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Connect Google Sheets'; }
   }
@@ -4041,8 +4041,7 @@ async function syncDietToSheets(dateStr, kcal) {
     _sheetMeta = null; // invalidate cache so next call re-reads fresh rows
     return true;
   } catch (e) {
-    console.error('Sheets sync error:', e);
-    showToast('Sheets sync failed: ' + e.message);
+    showDietError(e, `syncDietToSheets(${dateStr}, ${kcal})`);
     return false;
   }
 }
