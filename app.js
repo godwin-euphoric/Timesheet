@@ -3937,17 +3937,14 @@ function drawDietBarChart(canvas, labels, values, targetLine, highlightDay) {
 
 async function syncDietToSheets(dateStr, kcal) {
   const url = state.dietSettings?.sheetsUrl;
-  if (!url) return; // not configured — skip silently
+  if (!url) return;
 
   try {
-    // GAS web app accepts POST; mode:no-cors avoids CORS preflight
-    await fetch(url, {
-      method: 'POST',
-      mode:   'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ date: dateStr, kcal, colKey: 'godwin' }),
-    });
-    // no-cors = opaque response, can't read it — GAS executes fine
+    const params = new URLSearchParams({ date: dateStr, kcal: Math.round(kcal), colKey: 'godwin' });
+    const res  = await fetch(`${url}?${params}`);
+    const text = await res.text();
+    if (!text.startsWith('ok')) console.warn('Sheets sync response:', text);
+    else console.log('Sheets sync:', text);
   } catch (e) {
     console.error('Sheets sync error:', e);
   }
