@@ -3701,7 +3701,8 @@ async function logDietFood() {
     const tTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const month = state.dietDate.slice(0, 7);
     const mData = await getDietMonthData(month);
-    if (!mData.days[state.dietDate]) mData.days[state.dietDate] = { foods: [] };
+    if (!mData.days[state.dietDate]) mData.days[state.dietDate] = {};
+    if (!mData.days[state.dietDate].foods) mData.days[state.dietDate].foods = [];
 
     for (const item of items) {
       mData.days[state.dietDate].foods.push({
