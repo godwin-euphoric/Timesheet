@@ -3430,10 +3430,14 @@ async function parseFoodWithAI(text) {
   const prompt = `You are a nutrition expert. Parse the food description below and return ONLY a JSON array.
 
 Rules:
-- Do NOT split compound food names (e.g. "paneer sandwich" stays as one item)
+- Do NOT split compound food names (e.g. "paneer butter masala" stays as one item)
 - Split ONLY at commas or "and"/"&" between clearly distinct foods
 - Extract quantity from input (default 1 if not specified)
-- Return nutrition PER UNIT so quantity can be adjusted later
+- CRITICAL: all _per_unit fields must be for EXACTLY 1 unit (1 piece, 1 bowl, 1 g, 1 ml, etc.)
+- If unit is "g" or "ml": calories_per_unit = calories in 1 gram or 1 ml (e.g. rice = 1.3 kcal/g, so calories_per_unit=1.3)
+- If unit is "piece/bowl/cup/serving": calories_per_unit = calories in that one item
+- Example: "200g paneer butter masala" → quantity=200, unit="g", calories_per_unit=1.5 (NOT 300)
+- Example: "2 chapathi" → quantity=2, unit="piece", calories_per_unit=90 (for 1 chapathi)
 - Use realistic average values for Indian and common foods
 
 Food input: "${text}"
