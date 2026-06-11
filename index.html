@@ -441,7 +441,7 @@
   <!-- ══ SETTINGS ══════════════════════════════════════════════════════════ -->
   <div id="tab-settings" class="tab-content">
 
-    <div class="top-controls">
+    <div class="top-controls settings-ts-only">
       <div class="field-group">
         <label>Month</label>
         <input type="month" id="settings-month">
@@ -449,7 +449,7 @@
       <button class="btn-secondary" onclick="copyFromPrevMonth()">Copy from Previous Month</button>
     </div>
 
-    <div class="card">
+    <div class="card settings-ts-only">
       <div class="card-title">Categories &amp; Daily Targets</div>
       <p class="hint">Set how many hours per day you aim to spend on each category this month.</p>
       <table class="data-table" style="margin-bottom:12px">
@@ -466,7 +466,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card settings-ts-only">
       <div class="card-title">FM Categories</div>
       <p class="hint">Add categories for your FM Log tab (e.g. Book, Movie, Story, Podcast).</p>
       <table class="data-table" style="margin-bottom:12px">
@@ -482,7 +482,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card settings-diet-only">
       <div class="card-title">🥗 Diet Settings</div>
       <p class="hint">Required to enable the Diet tab. The API key is stored in your account and never leaves your browser.</p>
       <div class="settings-diet-form">
@@ -503,7 +503,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card settings-ts-only">
       <div class="card-title">🧹 Data Cleanup</div>
       <p class="hint">Find logged hours stored under category names that are no longer in your category list (e.g. renamed or deleted categories). These count toward old totals but aren't shown in the summary.</p>
       <button class="btn-secondary" onclick="scanOrphans()">Scan for orphan entries</button>
@@ -521,7 +521,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card settings-ts-only">
       <div class="card-title">Target Hours — Category vs Month</div>
       <p class="hint">Daily target hours set for each category across months.</p>
       <div class="table-scroll">
@@ -532,7 +532,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card settings-ts-only">
       <div class="card-title">🗄 Auto Backup</div>
       <p class="hint">Your Timesheet data is automatically backed up to Excel every day at <strong>12:00 AM IST</strong> (midnight India time) via GitHub Actions.</p>
       <p class="hint" style="color:#4ade80;margin-top:6px">✓ Runs daily · Saved to your GitHub repo under <code>backups/</code></p>

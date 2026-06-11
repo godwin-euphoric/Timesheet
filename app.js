@@ -1984,23 +1984,37 @@ async function deleteFmEntry(id) {
 // ══════════════════════════════════════════════════════════════════════════
 
 async function loadSettingsTab() {
-  const data = await getMonthData(state.settingsMonth);
-  state.settingsMetadata = data.categories.map(c => ({ ...c }));
-
-  if (!state.settingsMetadata.length) {
-    const allData    = await getAllMonths();
-    const prevMonths = Object.keys(allData).filter(m => m < state.settingsMonth).sort().reverse();
-    if (prevMonths.length && allData[prevMonths[0]].categories?.length) {
-      state.settingsMetadata = allData[prevMonths[0]].categories.map(c => ({ ...c }));
-      showToast("Showing previous month's targets — save to apply.");
+  applySettingsVisibility();
+  const role = state.userRole;
+  if (!role || role === 'both' || isAdmin()) {
+    const data = await getMonthData(state.settingsMonth);
+    state.settingsMetadata = data.categories.map(c => ({ ...c }));
+    if (!state.settingsMetadata.length) {
+      const allData    = await getAllMonths();
+      const prevMonths = Object.keys(allData).filter(m => m < state.settingsMonth).sort().reverse();
+      if (prevMonths.length && allData[prevMonths[0]].categories?.length) {
+        state.settingsMetadata = allData[prevMonths[0]].categories.map(c => ({ ...c }));
+        showToast("Showing previous month's targets — save to apply.");
+      }
     }
+    renderSettingsTable();
+    await loadSettingsMonthTable();
+    await loadFmCategorySettings();
+    setSaveState('settings-save-btn', false);
   }
-  renderSettingsTable();
-  await loadSettingsMonthTable();
-  await loadFmCategorySettings();
   await populateDietSettingsFields();
-  renderSheetsStatus();
-  setSaveState('settings-save-btn', false);
+}
+
+function applySettingsVisibility() {
+  const role = state.userRole;
+  const dietOnly = role === 'diet';
+  const tsOnly   = role === 'timesheet';
+  document.querySelectorAll('.settings-ts-only').forEach(el => {
+    el.style.display = tsOnly || !role || role === 'both' || isAdmin() ? '' : 'none';
+  });
+  document.querySelectorAll('.settings-diet-only').forEach(el => {
+    el.style.display = dietOnly || !role || role === 'both' || isAdmin() ? '' : 'none';
+  });
 }
 
 // Toggle a save button between gray (clean) and blue (unsaved changes)
