@@ -4099,6 +4099,11 @@ async function checkUserAccess() {
   if (isAdmin()) {
     document.getElementById('tab-btn-admin')?.classList.remove('hidden');
     hideAccessGate();
+    // Ensure admin appears in the users list and leaderboard
+    db.collection('user_roles').doc(state.user.uid).set({
+      uid: state.user.uid, email: state.user.email,
+      displayName: state.user.displayName || '', role: 'admin',
+    }, { merge: true }).catch(() => {});
     return 'admin';
   }
   try {
@@ -4189,6 +4194,7 @@ async function requestAccess() {
 
 async function loadAdminTab() {
   if (!isAdmin()) return;
+  await updateDietStats();  // ensure admin's own stats are current
   await Promise.all([loadPendingRequests(), loadAllUsers(), loadDietLeaderboard()]);
 }
 
@@ -4256,19 +4262,24 @@ async function loadAllUsers() {
     const snap = await db.collection('user_roles').get();
     if (snap.empty) { container.innerHTML = '<span class="empty-inline">No users yet</span>'; return; }
     const rows = snap.docs.map(doc => {
-      const d = doc.data();
+      const d       = doc.data();
+      const isSelf  = d.uid === state.user?.uid;
+      const roleCell = isSelf
+        ? `<strong style="color:var(--lime)">Admin</strong>`
+        : `<select id="user-role-${d.uid}">
+            <option value="timesheet"${d.role==='timesheet'?' selected':''}>Timesheet only</option>
+            <option value="diet"${d.role==='diet'?' selected':''}>Diet only</option>
+            <option value="both"${d.role==='both'?' selected':''}>Both</option>
+          </select>`;
+      const actionCell = isSelf
+        ? `<span style="font-size:12px;color:var(--muted)">—</span>`
+        : `<button class="btn-secondary admin-btn" onclick="saveUserRoleAdmin('${d.uid}','${escHtml(d.email)}','${escHtml(d.displayName||'')}')">Save</button>
+           <button class="admin-remove-btn" onclick="removeUser('${d.uid}','${escHtml(d.email)}')" title="Remove user">✕</button>`;
       return `<tr id="user-row-${d.uid}">
         <td>${escHtml(d.displayName || '—')}</td>
         <td>${escHtml(d.email)}</td>
-        <td><select id="user-role-${d.uid}">
-          <option value="timesheet"${d.role==='timesheet'?' selected':''}>Timesheet only</option>
-          <option value="diet"${d.role==='diet'?' selected':''}>Diet only</option>
-          <option value="both"${d.role==='both'?' selected':''}>Both</option>
-        </select></td>
-        <td>
-          <button class="btn-secondary admin-btn" onclick="saveUserRoleAdmin('${d.uid}','${escHtml(d.email)}','${escHtml(d.displayName||'')}')">Save</button>
-          <button class="admin-remove-btn" onclick="removeUser('${d.uid}','${escHtml(d.email)}')" title="Remove user">✕</button>
-        </td>
+        <td>${roleCell}</td>
+        <td>${actionCell}</td>
       </tr>`;
     }).join('');
     container.innerHTML = `<div class="table-scroll"><table class="data-table admin-table">
