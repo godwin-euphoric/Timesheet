@@ -1133,8 +1133,9 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   border-color: rgba(74,222,128,0.4);
 }
 .diet-summary-card.diet-bg-over {
-  background: linear-gradient(135deg, #2D1515 0%, #151F32 60%);
-  border-color: rgba(248,113,113,0.5);
+  background: #3A0808;
+  border-color: #F87171;
+  box-shadow: 0 0 0 2px rgba(248,113,113,0.4), 0 4px 24px rgba(220,30,30,0.35);
 }
 
 /* Food log card box */
