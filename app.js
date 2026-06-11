@@ -3295,7 +3295,7 @@ function updatePlannerCell(pi, bi, ri, ci, value) {
 //  DIET TAB
 // ══════════════════════════════════════════════════════════════════════════
 
-const DIET_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest'];
+const DIET_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
 const DIET_CIRC  = 2 * Math.PI * 52; // ≈ 326.73
 
 // ── Firestore ──────────────────────────────────────────────────────────────
@@ -3379,12 +3379,9 @@ async function callGemini(promptText) {
       );
       if (!res.ok) {
         const errTxt = await res.text();
-        if (res.status >= 500) {
-          lastErr = new Error(`${model} ${res.status}: ${errTxt}`);
-          if (mi < DIET_MODELS.length - 1) await dietSleep(1000);
-          continue;
-        }
-        throw new Error(`Gemini ${model} error ${res.status}: ${errTxt}`);
+        lastErr = new Error(`Gemini ${model} error ${res.status}: ${errTxt}`);
+        if (mi < DIET_MODELS.length - 1) await dietSleep(800);
+        continue;
       }
       const json = await res.json();
       return json.candidates?.[0]?.content?.parts?.[0]?.text || '';
