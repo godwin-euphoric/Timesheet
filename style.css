@@ -1112,14 +1112,40 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   transition: color 0.15s; line-height: 0;
 }
 .diet-share-btn:hover { color: var(--lime); }
-.diet-sync-day-btn {
-  position: absolute; top: 14px; right: 44px;
-  background: none; border: none; cursor: pointer;
-  color: var(--muted); padding: 4px; border-radius: 6px;
-  transition: color 0.3s; line-height: 0;
+
+/* Success badge (top-right of summary card, next to share btn) */
+.diet-success-badge {
+  position: absolute; top: 12px; right: 44px;
+  background: rgba(200,255,0,0.15); border: 1px solid rgba(200,255,0,0.35);
+  color: var(--lime); font-size: 11px; font-weight: 700;
+  padding: 3px 7px; border-radius: 20px; letter-spacing: 0.02em;
+  white-space: nowrap; line-height: 1.4;
 }
-.diet-sync-day-btn:hover { color: var(--lime); }
-.diet-sync-day-btn.synced { color: #22c55e; }
+.diet-success-badge:empty { display: none; }
+
+/* Summary card bg tint based on calorie status */
+.diet-summary-card.diet-bg-success {
+  background: linear-gradient(135deg, #0D2E1A 0%, #151F32 60%);
+  border-color: rgba(74,222,128,0.4);
+}
+.diet-summary-card.diet-bg-over {
+  background: linear-gradient(135deg, #2D1515 0%, #151F32 60%);
+  border-color: rgba(248,113,113,0.5);
+}
+
+/* Food log card box */
+.diet-food-card-box {
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+  margin-top: 8px;
+}
+
+/* Save changes row inside food card */
+.diet-food-save-row {
+  padding: 10px 12px; border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end;
+}
+.diet-food-save-btn { font-size: 13px; padding: 6px 18px; }
 
 .diet-summary-top {
   display: flex; align-items: center; gap: 20px; margin-bottom: 16px;
@@ -1339,9 +1365,41 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 .diet-error-footer { display: flex; gap: 8px; justify-content: flex-end; }
 
+/* ══ Admin tab ════════════════════════════════════════════════════════════ */
+.admin-table th, .admin-table td { font-size: 13px; }
+.admin-table td:first-child { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-avatar { width: 22px; height: 22px; border-radius: 50%; vertical-align: middle; margin-right: 6px; object-fit: cover; }
+.admin-btn { font-size: 12px; padding: 4px 10px; margin: 0 2px; height: 28px; }
+.admin-remove-btn {
+  background: none; border: 1px solid rgba(248,113,113,0.4); color: #F87171;
+  border-radius: 6px; cursor: pointer; padding: 3px 8px; font-size: 13px;
+  transition: background 0.15s;
+}
+.admin-remove-btn:hover { background: rgba(248,113,113,0.15); }
+
+/* ══ Access Gate Overlay ════════════════════════════════════════════════ */
+.access-gate-overlay {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 900;
+}
+.access-gate-overlay.hidden { display: none; }
+.access-gate-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  padding: 40px 48px; max-width: 400px; width: 90%;
+  text-align: center; box-shadow: var(--shadow-lg);
+}
+.access-gate-icon { font-size: 48px; margin-bottom: 16px; }
+.access-gate-card h2 { font-size: 1.4rem; margin-bottom: 10px; color: var(--text); }
+.access-gate-card p { color: var(--muted); margin-bottom: 24px; line-height: 1.5; }
+
+/* Hidden tab btn */
+.tab-btn.hidden { display: none; }
+
 /* Mobile */
 @media (max-width: 640px) {
   .diet-summary-top { gap: 12px; }
   .diet-food-qty-row { flex-wrap: wrap; gap: 5px; }
   .settings-diet-form { flex-direction: column; }
+  .access-gate-card { padding: 32px 24px; }
 }

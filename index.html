@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Timesheet</title>
-  <link rel="stylesheet" href="style.css?v=51">
+  <link rel="stylesheet" href="style.css?v=52">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -55,6 +55,7 @@
       <button class="tab-btn" data-tab="log">Journal</button>
       <button class="tab-btn" data-tab="planner">Planner</button>
       <button class="tab-btn" data-tab="settings">Settings</button>
+      <button class="tab-btn hidden" id="tab-btn-admin" data-tab="admin">Admin</button>
     </nav>
     <div class="header-right">
       <button class="btn-header-action" onclick="downloadExcel()" title="Download Excel backup">⬇ Excel</button>
@@ -187,7 +188,7 @@
     <div id="diet-gate" class="diet-gate hidden">
       <div class="diet-gate-msg">
         <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <p>Enter your <strong>gender</strong> and <strong>Gemini API key</strong> in Settings to enable the Diet tab.</p>
+        <p>Enter your <strong>Gemini API key</strong> in Settings → Diet Settings to enable the Diet tab.</p>
         <button class="btn-primary" onclick="document.querySelector('[data-tab=settings]').click()">Go to Settings</button>
       </div>
     </div>
@@ -207,9 +208,7 @@
         <button class="diet-share-btn" onclick="shareDietSummary()" title="Share">
           <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
         </button>
-        <button class="diet-sync-day-btn" id="diet-sync-day-btn" onclick="syncDayToSheets()" title="Sync today to Sheet">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
-        </button>
+        <span id="diet-success-badge" class="diet-success-badge"></span>
         <div class="diet-summary-top">
           <div class="calorie-ring-wrap">
             <svg class="calorie-ring" viewBox="0 0 120 120">
@@ -251,8 +250,13 @@
         <div id="diet-ai-spinner" class="diet-ai-spinner hidden">
           <div class="diet-spinner"></div> Analyzing with AI...
         </div>
-        <div id="diet-food-list" class="diet-food-list">
-          <div class="diet-empty">Nothing logged yet — add your first meal</div>
+        <div class="diet-food-card-box">
+          <div id="diet-food-list" class="diet-food-list">
+            <div class="diet-empty">Nothing logged yet — add your first meal</div>
+          </div>
+          <div id="diet-food-save-row" class="diet-food-save-row hidden">
+            <button class="btn-primary diet-food-save-btn" onclick="saveFoodQtyChanges()">Save Changes</button>
+          </div>
         </div>
         <div class="diet-weight-row">
           <span class="diet-weight-label">Weight</span>
@@ -476,15 +480,6 @@
       <div class="card-title">🥗 Diet Settings</div>
       <p class="hint">Required to enable the Diet tab. The API key is stored in your account and never leaves your browser.</p>
       <div class="settings-diet-form">
-        <div class="field-group">
-          <label>Gender</label>
-          <select id="diet-gender">
-            <option value="">-- Select --</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
         <div class="field-group" style="flex:1;min-width:220px">
           <label>Gemini API Key</label>
           <div style="display:flex;gap:8px">
@@ -495,10 +490,6 @@
         <div class="field-group" style="width:170px">
           <label>Daily Calorie Target</label>
           <input type="number" id="diet-calorie-target" placeholder="e.g. 1800" min="500" max="6000" step="50">
-        </div>
-        <div class="field-group" style="flex:1;min-width:260px">
-          <label>Google Sheets Script URL <span style="font-weight:400;color:var(--muted)">(from Apps Script deploy)</span></label>
-          <input type="url" id="diet-sheets-url" placeholder="https://script.google.com/macros/s/...">
         </div>
       </div>
       <div style="margin-top:16px">
@@ -542,6 +533,35 @@
     </div>
 
   </div>
+
+  <!-- ══ ADMIN ═════════════════════════════════════════════════════════════ -->
+  <div id="tab-admin" class="tab-content">
+    <div class="card">
+      <div class="card-title">📬 Pending Access Requests</div>
+      <div id="admin-requests-list"><span class="empty-inline">Loading…</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">👥 Users</div>
+      <div id="admin-users-list"><span class="empty-inline">Loading…</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🏆 Diet Success Leaderboard</div>
+      <div id="admin-leaderboard"><span class="empty-inline">Loading…</span></div>
+    </div>
+  </div>
+
+  <!-- ══ ACCESS GATE ════════════════════════════════════════════════════════ -->
+  <div id="access-gate-overlay" class="access-gate-overlay hidden">
+    <div class="access-gate-card">
+      <div class="access-gate-icon">🔒</div>
+      <h2>Access Required</h2>
+      <p id="access-gate-msg">You need admin approval to use this app.</p>
+      <div id="access-gate-actions">
+        <button class="btn-primary" onclick="requestAccess()">Request Access</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div id="toast" class="toast"></div>
@@ -579,7 +599,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=55"></script>
+<script src="app.js?v=56"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

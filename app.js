@@ -48,8 +48,7 @@ const state = {
   dietDate:         todayStr(),
   dietMonthCache:   {},
   dietSettings:     null,
-  // Google Sheets sync
-  googleAccessToken: sessionStorage.getItem('g_sheets_token') || null,
+  userRole:         null,
 };
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -104,41 +103,6 @@ function signInWithGoogle() {
   auth.signInWithPopup(provider).catch(e => showToast('Sign-in failed: ' + e.message));
 }
 
-async function connectGoogleSheets() {
-  const btn = document.getElementById('diet-connect-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Connecting…'; }
-  try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-    // prompt:consent + select_account lets the user pick ANY Google account
-    // (independent of the Firebase login account)
-    provider.setCustomParameters({ prompt: 'consent select_account' });
-    // Always use signInWithPopup so any Google account can be chosen for Sheets access
-    const result = await auth.signInWithPopup(provider);
-    const token = result.credential?.accessToken;
-    if (!token) throw new Error('No access token returned — try again');
-    state.googleAccessToken = token;
-    sessionStorage.setItem('g_sheets_token', token);
-    renderSheetsStatus();
-    showToast('Google Sheets connected!');
-  } catch (e) {
-    showDietError(e, 'connectGoogleSheets');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Connect Google Sheets'; }
-  }
-}
-
-function renderSheetsStatus() {
-  const el = document.getElementById('diet-sheets-status');
-  if (!el) return;
-  if (state.googleAccessToken) {
-    el.textContent = '✓ Connected';
-    el.style.color = '#4ADE80';
-  } else {
-    el.textContent = 'Not connected';
-    el.style.color = '#7A90B0';
-  }
-}
 
 function doSignOut() {
   auth.signOut();
@@ -151,8 +115,7 @@ auth.onAuthStateChanged(user => {
   state.userDataCache  = null;
   state.dietMonthCache   = {};
   state.dietSettings     = null;
-  state.googleAccessToken = null;
-  sessionStorage.removeItem('g_sheets_token');
+  state.userRole         = null;
 
   if (user) {
     document.getElementById('auth-screen').classList.add('hidden');
@@ -251,6 +214,7 @@ function initApp() {
   document.getElementById('fm-date').value        = todayStr();
   initYearSelector();
   loadMainTab();
+  checkUserAccess();
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -259,7 +223,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, diet: loadDietTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, diet: loadDietTab, admin: loadAdminTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -3338,6 +3302,7 @@ async function getDietMonthData(month) {
 async function saveDietMonthData(month, data) {
   await dietMonthRef(month).set(data);
   state.dietMonthCache[month] = data;
+  updateDietStats();  // fire-and-forget
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────
@@ -3345,24 +3310,19 @@ async function saveDietMonthData(month, data) {
 async function loadDietSettings() {
   const ud = await getUserData();
   state.dietSettings = {
-    gender:        ud.dietGender        || '',
     geminiApiKey:  ud.dietGeminiKey     || '',
     calorieTarget: ud.dietCalorieTarget || 0,
-    sheetsUrl:     ud.dietSheetsUrl     || '',
   };
   return state.dietSettings;
 }
 
 async function saveDietSettings() {
-  const gender    = document.getElementById('diet-gender').value;
-  const key       = document.getElementById('diet-gemini-key').value.trim();
-  const calGoal   = parseInt(document.getElementById('diet-calorie-target').value, 10) || 0;
-  const sheetsUrl = document.getElementById('diet-sheets-url').value.trim();
-  if (!gender) { showToast('Select a gender'); return; }
-  if (!key)    { showToast('Enter a Gemini API key'); return; }
-  await saveUserData({ dietGender: gender, dietGeminiKey: key, dietCalorieTarget: calGoal, dietSheetsUrl: sheetsUrl });
+  const key     = document.getElementById('diet-gemini-key').value.trim();
+  const calGoal = parseInt(document.getElementById('diet-calorie-target').value, 10) || 0;
+  if (!key) { showToast('Enter a Gemini API key'); return; }
+  await saveUserData({ dietGeminiKey: key, dietCalorieTarget: calGoal });
   if (!state.dietSettings) state.dietSettings = {};
-  Object.assign(state.dietSettings, { gender, geminiApiKey: key, calorieTarget: calGoal, sheetsUrl });
+  Object.assign(state.dietSettings, { geminiApiKey: key, calorieTarget: calGoal });
   showToast('Diet settings saved');
 }
 
@@ -3374,15 +3334,11 @@ function toggleGeminiKeyVisibility() {
 }
 
 async function populateDietSettingsFields() {
-  const ud = await getUserData();
-  const genderEl = document.getElementById('diet-gender');
-  const keyEl    = document.getElementById('diet-gemini-key');
-  const tgtEl    = document.getElementById('diet-calorie-target');
-  const urlEl    = document.getElementById('diet-sheets-url');
-  if (genderEl) genderEl.value = ud.dietGender        || '';
-  if (keyEl)    keyEl.value    = ud.dietGeminiKey      || '';
-  if (tgtEl)    tgtEl.value   = ud.dietCalorieTarget  || '';
-  if (urlEl)    urlEl.value   = ud.dietSheetsUrl       || '';
+  const ud   = await getUserData();
+  const keyEl = document.getElementById('diet-gemini-key');
+  const tgtEl = document.getElementById('diet-calorie-target');
+  if (keyEl) keyEl.value = ud.dietGeminiKey     || '';
+  if (tgtEl) tgtEl.value = ud.dietCalorieTarget || '';
 }
 
 // ── Gemini AI ──────────────────────────────────────────────────────────────
@@ -3501,10 +3457,7 @@ async function copyDietError() {
 
 function getCalorieTarget() {
   const s = state.dietSettings;
-  if (s?.calorieTarget > 0) return s.calorieTarget;
-  if (s?.gender === 'male')   return 2000;
-  if (s?.gender === 'female') return 1600;
-  return 1800;
+  return (s?.calorieTarget > 0) ? s.calorieTarget : 2000;
 }
 
 // ── Diet tab load ──────────────────────────────────────────────────────────
@@ -3512,11 +3465,10 @@ function getCalorieTarget() {
 async function loadDietTab() {
   await loadDietSettings();
   await populateDietSettingsFields();
-  renderSheetsStatus();
-  const { geminiApiKey, gender } = state.dietSettings;
+  const { geminiApiKey } = state.dietSettings;
   const gate    = document.getElementById('diet-gate');
   const content = document.getElementById('diet-content');
-  if (!geminiApiKey || !gender) {
+  if (!geminiApiKey) {
     gate.classList.remove('hidden');
     content.classList.add('hidden');
     return;
@@ -3547,10 +3499,14 @@ async function renderDietDay(dateStr) {
   document.getElementById('diet-date-label').textContent = formatDietDateLabel(dateStr);
   renderDietSummary(foods, target);
   renderFoodCards(foods, dateStr);
+  document.getElementById('diet-food-save-row')?.classList.add('hidden');
   const wi = document.getElementById('diet-weight-input');
   if (wi) wi.value = (mData.days[dateStr]?.weight) || '';
-  const syncBtn = document.getElementById('diet-sync-day-btn');
-  if (syncBtn) syncBtn.classList.remove('synced');
+  // Update success badge async (non-blocking)
+  calcDietSuccessDays().then(count => {
+    const badge = document.getElementById('diet-success-badge');
+    if (badge) badge.textContent = count > 0 ? `${count} 🌟` : '';
+  });
 }
 
 async function saveDayWeight() {
@@ -3597,9 +3553,11 @@ function renderDietSummary(foods, target) {
   else if (pct >= 0.75) ringColor = '#F59E0B';
   ringEl.style.stroke = ringColor;
 
-  // Card border tint at 100%+
-  document.querySelector('.diet-summary-card').style.borderColor =
-    pct >= 1 ? 'rgba(248,113,113,0.5)' : '';
+  // Card background tint
+  const card = document.querySelector('.diet-summary-card');
+  card.classList.remove('diet-bg-success', 'diet-bg-over');
+  if (t.kcal > 0 && pct < 1) card.classList.add('diet-bg-success');
+  else if (t.kcal > 0 && pct >= 1) card.classList.add('diet-bg-over');
 
   // Center text
   document.getElementById('diet-consumed-num').textContent = t.kcal;
@@ -3649,7 +3607,7 @@ function renderFoodCards(foods, dateStr) {
   <td class="col-time">${escHtml(f.logged_at || '')}</td>
   <td class="col-qty">
     <input class="diet-qty-input" type="number" value="${q}" min="0.5" step="0.5"
-           onchange="updateDietQuantity('${ds}','${f.id}',parseFloat(this.value)||0.5)">
+           oninput="markDietFoodDirty()">
     <span class="diet-qty-unit">${escHtml(f.unit || '')}</span>
   </td>
   <td class="col-kcal">${kcal}</td>
@@ -3808,7 +3766,7 @@ async function shareDietSummary() {
   const card = document.querySelector('.diet-summary-card');
   if (!card || typeof html2canvas === 'undefined') { showToast('Share unavailable'); return; }
 
-  const hideEls = card.querySelectorAll('.diet-share-btn, .diet-sync-day-btn');
+  const hideEls = card.querySelectorAll('.diet-share-btn, .diet-success-badge');
   hideEls.forEach(el => el.style.visibility = 'hidden');
 
   showToast('Preparing image…');
@@ -4070,77 +4028,334 @@ function drawDietBarChart(canvas, labels, values, targetLine, highlightDay) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-//  GOOGLE SHEETS SYNC  (via Google Apps Script web app — no OAuth needed)
+//  DIET — FOOD QTY SAVE
 // ══════════════════════════════════════════════════════════════════════════
 
-async function syncDayToSheets() {
-  if (!state.dietSettings?.sheetsUrl) {
-    showToast('Set Google Sheets Script URL in Settings first');
-    return;
-  }
-  const btn = document.getElementById('diet-sync-day-btn');
-  if (btn) btn.style.opacity = '0.5';
-  const month = state.dietDate.slice(0, 7);
+function markDietFoodDirty() {
+  document.getElementById('diet-food-save-row')?.classList.remove('hidden');
+}
+
+async function saveFoodQtyChanges() {
+  const dateStr = state.dietDate;
+  const inputs  = document.querySelectorAll('#diet-food-list .diet-qty-input');
+  if (!inputs.length) return;
+  const month = dateStr.slice(0, 7);
   const mData = await getDietMonthData(month);
-  const kcal  = dietCalcTotals((mData.days[state.dietDate]?.foods || [])).kcal;
-  await syncDietToSheets(state.dietDate, kcal);
-  if (btn) { btn.style.opacity = '1'; btn.classList.add('synced'); }
-  showToast('Synced to Sheet');
-}
-
-function syncDietToSheets(dateStr, kcal) {
-  const url = state.dietSettings?.sheetsUrl;
-  if (!url) return Promise.resolve();
-
-  const params = new URLSearchParams({ date: dateStr, kcal: Math.round(kcal), colKey: 'godwin' });
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = img.onerror = () => resolve();
-    img.src = `${url}?${params}`;
-    setTimeout(resolve, 6000);
+  const foods = mData.days[dateStr]?.foods || [];
+  let changed = false;
+  inputs.forEach(inp => {
+    const row = inp.closest('tr');
+    const id  = row?.id?.replace('diet-card-', '');
+    if (!id) return;
+    const item = foods.find(f => f.id === id);
+    if (item) {
+      const newQty = parseFloat(inp.value) || 0.5;
+      if (Math.abs((item.quantity || 1) - newQty) > 0.001) { item.quantity = newQty; changed = true; }
+    }
   });
+  if (changed) {
+    await saveDietMonthData(month, mData);
+    await renderDietDay(dateStr);
+    showToast('Saved');
+  } else {
+    document.getElementById('diet-food-save-row')?.classList.add('hidden');
+  }
 }
 
-async function backfillDietToSheets() {
-  if (!state.dietSettings?.sheetsUrl) {
-    showToast('Paste your GAS script URL in Settings → Diet Settings first');
-    return;
+// ══════════════════════════════════════════════════════════════════════════
+//  DIET — SUCCESS COUNT
+// ══════════════════════════════════════════════════════════════════════════
+
+async function calcDietSuccessDays() {
+  const target = getCalorieTarget();
+  let y = 2026, m = 6;
+  const today = todayStr();
+  const [ey, em] = today.slice(0, 7).split('-').map(Number);
+  let count = 0;
+  while (y < ey || (y === ey && m <= em)) {
+    const month = `${y}-${String(m).padStart(2, '0')}`;
+    const mData = await getDietMonthData(month);
+    for (const [ds, day] of Object.entries(mData.days || {})) {
+      if (ds > today) continue;
+      const kcal = dietCalcTotals(day.foods || []).kcal;
+      if (kcal > 0 && kcal <= target) count++;
+    }
+    m++; if (m > 12) { y++; m = 1; }
   }
+  return count;
+}
 
-  const btn = document.getElementById('diet-sync-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
+// ══════════════════════════════════════════════════════════════════════════
+//  ACCESS CONTROL & ADMIN
+// ══════════════════════════════════════════════════════════════════════════
 
+const ADMIN_EMAIL = 'godwin.euphoric@gmail.com';
+
+function isAdmin() {
+  return state.user?.email === ADMIN_EMAIL;
+}
+
+async function checkUserAccess() {
+  if (isAdmin()) {
+    document.getElementById('tab-btn-admin')?.classList.remove('hidden');
+    hideAccessGate();
+    return 'admin';
+  }
   try {
-    const startDate = '2026-06-08';
-    const today     = todayStr();
-    let   synced    = 0;
+    const roleDoc = await db.collection('user_roles').doc(state.user.uid).get();
+    if (roleDoc.exists) {
+      const role = roleDoc.data().role;
+      state.userRole = role;
+      hideAccessGate();
+      applyRoleVisibility(role);
+      return role;
+    }
+    // No role — check if request exists
+    const reqDoc = await db.collection('access_requests').doc(state.user.uid).get();
+    showAccessGate(reqDoc.exists ? reqDoc.data().status : null);
+  } catch (e) {
+    // On permission error (rules not yet updated), allow access gracefully
+    hideAccessGate();
+    console.warn('checkUserAccess:', e.message);
+  }
+  return null;
+}
 
-    // Iterate month by month from 2026-06 to current month
-    let [y, m] = [2026, 6];
+function applyRoleVisibility(role) {
+  const showFor = {
+    timesheet: new Set(['main', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings']),
+    diet:      new Set(['diet', 'settings']),
+    both:      new Set(['main', 'diet', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings']),
+  };
+  const visible = showFor[role] || showFor.both;
+  document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+    const t = btn.dataset.tab;
+    if (t === 'admin') return;
+    btn.style.display = visible.has(t) ? '' : 'none';
+  });
+  // If currently active tab is hidden, switch to first visible tab
+  const activeBtn = document.querySelector('.tab-btn.active');
+  if (activeBtn && activeBtn.style.display === 'none') {
+    const first = document.querySelector('.tab-btn[data-tab]:not([style*="none"]):not(.hidden)');
+    if (first) first.click();
+  }
+}
+
+function showAccessGate(status) {
+  const overlay = document.getElementById('access-gate-overlay');
+  if (!overlay) return;
+  const msg     = document.getElementById('access-gate-msg');
+  const actions = document.getElementById('access-gate-actions');
+  overlay.classList.remove('hidden');
+  if (status === 'pending') {
+    if (msg)     msg.textContent = 'Your access request is pending approval.';
+    if (actions) actions.innerHTML = '<p style="color:#FCD34D;font-size:13px">⏳ Waiting for admin approval…</p>';
+  } else if (status === 'rejected') {
+    if (msg)     msg.textContent = 'Your access request was not approved.';
+    if (actions) actions.innerHTML = '<p style="color:#F87171;font-size:13px">Contact the app admin for access.</p>';
+  } else {
+    if (msg)     msg.textContent = 'You need admin approval to use this app.';
+    if (actions) actions.innerHTML = '<button class="btn-primary" onclick="requestAccess()">Request Access</button>';
+  }
+}
+
+function hideAccessGate() {
+  document.getElementById('access-gate-overlay')?.classList.add('hidden');
+}
+
+async function requestAccess() {
+  const btn = document.querySelector('#access-gate-actions button');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    await db.collection('access_requests').doc(state.user.uid).set({
+      uid:         state.user.uid,
+      email:       state.user.email,
+      displayName: state.user.displayName || '',
+      photoURL:    state.user.photoURL    || '',
+      requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      status:      'pending',
+    });
+    const msg     = document.getElementById('access-gate-msg');
+    const actions = document.getElementById('access-gate-actions');
+    if (msg)     msg.textContent = 'Request sent! Waiting for admin approval.';
+    if (actions) actions.innerHTML = '<p style="color:#FCD34D;font-size:13px">⏳ Pending approval…</p>';
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Request Access'; }
+    showToast('Failed: ' + e.message);
+  }
+}
+
+// ── Admin tab ──────────────────────────────────────────────────────────────
+
+async function loadAdminTab() {
+  if (!isAdmin()) return;
+  await Promise.all([loadPendingRequests(), loadAllUsers(), loadDietLeaderboard()]);
+}
+
+async function loadPendingRequests() {
+  const container = document.getElementById('admin-requests-list');
+  if (!container) return;
+  container.innerHTML = '<span class="empty-inline">Loading…</span>';
+  try {
+    const snap = await db.collection('access_requests').where('status', '==', 'pending').get();
+    if (snap.empty) { container.innerHTML = '<span class="empty-inline">No pending requests</span>'; return; }
+    const rows = snap.docs.map(doc => {
+      const d  = doc.data();
+      const ts = d.requestedAt?.toDate?.()?.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) || '—';
+      return `<tr>
+        <td><img src="${escHtml(d.photoURL||'')}" class="admin-avatar" onerror="this.style.display='none'">${escHtml(d.displayName||'(no name)')}</td>
+        <td>${escHtml(d.email)}</td>
+        <td>${ts}</td>
+        <td><select id="req-role-${d.uid}">
+          <option value="timesheet">Timesheet only</option>
+          <option value="diet">Diet only</option>
+          <option value="both" selected>Both</option>
+        </select></td>
+        <td>
+          <button class="btn-primary admin-btn" onclick="approveRequest('${d.uid}','${escHtml(d.email)}','${escHtml(d.displayName||'')}')">Approve</button>
+          <button class="btn-secondary admin-btn" onclick="rejectRequest('${d.uid}')">Reject</button>
+        </td>
+      </tr>`;
+    }).join('');
+    container.innerHTML = `<div class="table-scroll"><table class="data-table admin-table">
+      <thead><tr><th>Name</th><th>Email</th><th>Requested</th><th>Role</th><th>Action</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  } catch (e) {
+    container.innerHTML = `<span class="empty-inline" style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function approveRequest(uid, email, displayName) {
+  const roleEl = document.getElementById(`req-role-${uid}`);
+  const role   = roleEl?.value || 'both';
+  try {
+    const batch = db.batch();
+    batch.set(db.collection('user_roles').doc(uid), { uid, email, displayName, role });
+    batch.update(db.collection('access_requests').doc(uid), { status: 'approved' });
+    await batch.commit();
+    showToast(`✓ Approved ${email} (${role})`);
+    await loadPendingRequests();
+    await loadAllUsers();
+  } catch (e) { showToast('Error: ' + e.message); }
+}
+
+async function rejectRequest(uid) {
+  try {
+    await db.collection('access_requests').doc(uid).update({ status: 'rejected' });
+    showToast('Request rejected');
+    await loadPendingRequests();
+  } catch (e) { showToast('Error: ' + e.message); }
+}
+
+async function loadAllUsers() {
+  const container = document.getElementById('admin-users-list');
+  if (!container) return;
+  container.innerHTML = '<span class="empty-inline">Loading…</span>';
+  try {
+    const snap = await db.collection('user_roles').get();
+    if (snap.empty) { container.innerHTML = '<span class="empty-inline">No users yet</span>'; return; }
+    const rows = snap.docs.map(doc => {
+      const d = doc.data();
+      return `<tr id="user-row-${d.uid}">
+        <td>${escHtml(d.displayName || '—')}</td>
+        <td>${escHtml(d.email)}</td>
+        <td><select id="user-role-${d.uid}">
+          <option value="timesheet"${d.role==='timesheet'?' selected':''}>Timesheet only</option>
+          <option value="diet"${d.role==='diet'?' selected':''}>Diet only</option>
+          <option value="both"${d.role==='both'?' selected':''}>Both</option>
+        </select></td>
+        <td>
+          <button class="btn-secondary admin-btn" onclick="saveUserRoleAdmin('${d.uid}','${escHtml(d.email)}','${escHtml(d.displayName||'')}')">Save</button>
+          <button class="admin-remove-btn" onclick="removeUser('${d.uid}','${escHtml(d.email)}')" title="Remove user">✕</button>
+        </td>
+      </tr>`;
+    }).join('');
+    container.innerHTML = `<div class="table-scroll"><table class="data-table admin-table">
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  } catch (e) {
+    container.innerHTML = `<span class="empty-inline" style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function saveUserRoleAdmin(uid, email, displayName) {
+  const roleEl = document.getElementById(`user-role-${uid}`);
+  const role   = roleEl?.value || 'both';
+  try {
+    await db.collection('user_roles').doc(uid).set({ uid, email, displayName, role });
+    showToast('Role saved');
+  } catch (e) { showToast('Error: ' + e.message); }
+}
+
+async function removeUser(uid, email) {
+  if (!confirm(`Remove ${email}?\nThey will lose access and need to request again.`)) return;
+  try {
+    const batch = db.batch();
+    batch.delete(db.collection('user_roles').doc(uid));
+    // Reset request status so they can re-request
+    const reqRef = db.collection('access_requests').doc(uid);
+    const reqDoc = await reqRef.get();
+    if (reqDoc.exists) batch.delete(reqRef);
+    await batch.commit();
+    showToast(`Removed ${email}`);
+    document.getElementById(`user-row-${uid}`)?.remove();
+    const tbody = document.querySelector('#admin-users-list tbody');
+    if (tbody && !tbody.children.length) {
+      document.getElementById('admin-users-list').innerHTML = '<span class="empty-inline">No users yet</span>';
+    }
+  } catch (e) { showToast('Error: ' + e.message); }
+}
+
+async function loadDietLeaderboard() {
+  const container = document.getElementById('admin-leaderboard');
+  if (!container) return;
+  container.innerHTML = '<span class="empty-inline">Loading…</span>';
+  try {
+    const snap = await db.collection('diet_stats').get();
+    if (snap.empty) { container.innerHTML = '<span class="empty-inline">No diet stats yet</span>'; return; }
+    const stats = snap.docs.map(d => d.data()).sort((a, b) => (b.successDays || 0) - (a.successDays || 0));
+    const rows  = stats.map((d, i) => `<tr>
+      <td>${i + 1}</td>
+      <td>${escHtml(d.displayName || '—')}</td>
+      <td>${escHtml(d.email || '—')}</td>
+      <td><strong style="color:var(--lime)">${d.successDays || 0}</strong></td>
+      <td>${d.totalDays || 0}</td>
+    </tr>`).join('');
+    container.innerHTML = `<div class="table-scroll"><table class="data-table admin-table">
+      <thead><tr><th>#</th><th>Name</th><th>Email</th><th>🌟 Success Days</th><th>Total Days</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  } catch (e) {
+    container.innerHTML = `<span class="empty-inline" style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function updateDietStats() {
+  if (!state.user) return;
+  try {
+    const target = getCalorieTarget();
+    let y = 2026, m = 6;
+    const today = todayStr();
     const [ey, em] = today.slice(0, 7).split('-').map(Number);
-
+    let successDays = 0, totalDays = 0;
     while (y < ey || (y === ey && m <= em)) {
       const month = `${y}-${String(m).padStart(2, '0')}`;
       const mData = await getDietMonthData(month);
-      const dates = Object.keys(mData.days || {}).sort();
-
-      for (const dateStr of dates) {
-        if (dateStr < startDate || dateStr > today) continue;
-        const kcal = dietCalcTotals((mData.days[dateStr].foods || [])).kcal;
-        if (kcal > 0) {
-          await syncDietToSheets(dateStr, kcal);
-          synced++;
-          await dietSleep(300);
-        }
+      for (const [ds, day] of Object.entries(mData.days || {})) {
+        if (ds > today) continue;
+        const kcal = dietCalcTotals(day.foods || []).kcal;
+        if (kcal > 0) { totalDays++; if (kcal <= target) successDays++; }
       }
-
       m++; if (m > 12) { y++; m = 1; }
     }
-
-    showToast(`✓ Synced ${synced} day${synced !== 1 ? 's' : ''} to Google Sheets`);
-  } catch (e) {
-    showToast('Backfill failed: ' + e.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↑ Sync to Sheet'; }
-  }
+    await db.collection('diet_stats').doc(state.user.uid).set({
+      uid: state.user.uid, email: state.user.email,
+      displayName: state.user.displayName || '',
+      successDays, totalDays,
+      lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (e) { console.warn('updateDietStats:', e.message); }
 }
+
