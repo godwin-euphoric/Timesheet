@@ -1113,15 +1113,19 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 .diet-share-btn:hover { color: var(--lime); }
 
-/* Success badge (top-right of summary card, next to share btn) */
-.diet-success-badge {
-  position: absolute; top: 12px; right: 44px;
-  background: rgba(200,255,0,0.15); border: 1px solid rgba(200,255,0,0.35);
-  color: var(--lime); font-size: 11px; font-weight: 700;
-  padding: 3px 7px; border-radius: 20px; letter-spacing: 0.02em;
-  white-space: nowrap; line-height: 1.4;
+/* Day count circle (right of macros) */
+.diet-day-circle-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0;
 }
-.diet-success-badge:empty { display: none; }
+.diet-day-circle {
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 4px solid var(--lime);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(200,255,0,0.06);
+}
+.diet-day-circle span { font-size: 24px; font-weight: 700; color: var(--lime); line-height: 1; }
+.diet-day-circle small { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+.diet-day-circle-label { font-size: 11px; color: var(--muted); }
 
 /* Summary card bg tint based on calorie status */
 .diet-summary-card.diet-bg-success {

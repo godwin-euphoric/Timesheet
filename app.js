@@ -3502,10 +3502,10 @@ async function renderDietDay(dateStr) {
   document.getElementById('diet-food-save-row')?.classList.add('hidden');
   const wi = document.getElementById('diet-weight-input');
   if (wi) wi.value = (mData.days[dateStr]?.weight) || '';
-  // Update success badge async (non-blocking)
+  // Update success day count circle async (non-blocking)
   calcDietSuccessDays().then(count => {
-    const badge = document.getElementById('diet-success-badge');
-    if (badge) badge.textContent = count > 0 ? `${count} 🌟` : '';
+    const el = document.getElementById('diet-day-count-num');
+    if (el) el.textContent = count;
   });
 }
 
