@@ -1196,7 +1196,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .diet-stat-burnt > span:last-child { color: var(--lime); }
 
 .diet-macros-row {
-  display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; flex: 1;
+  display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; flex: 1; min-width: 0; max-width: 200px;
 }
 .macro-tile {
   background: var(--card2); border: 1px solid var(--border);
