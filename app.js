@@ -3144,8 +3144,9 @@ function renderPlannerTab() {
   if (!planners.length) { container.innerHTML = ''; return; }
 
   const planner = planners[ai];
-  container.innerHTML = planner.blocks.map((b, bi) => renderPlannerBlock(ai, bi, b)).join('') +
-    `<button class="btn-secondary planner-add-block-btn" onclick="addPlannerBlock()">+ Add Block</button>`;
+  container.innerHTML =
+    `<button class="btn-secondary planner-add-block-btn" onclick="addPlannerBlock()">+ Add Block</button>` +
+    planner.blocks.map((b, bi) => renderPlannerBlock(ai, bi, b)).join('');
 
   container.querySelectorAll('.planner-cell').forEach(ta => {
     autoResizeTa(ta);
@@ -3180,12 +3181,17 @@ function renderPlannerBlock(pi, bi, block) {
     </tr>`;
   }).join('');
 
+  const total = state.planners[pi]?.blocks?.length || 0;
   return `
     <div class="planner-block card">
       <div class="planner-block-titlebar">
         <input class="planner-block-title" value="${escHtml(block.header)}"
           onblur="updatePlannerBlockHeader(${pi},${bi},this.value)">
-        <button class="btn-planner-del-block" onclick="deletePlannerBlock(${pi},${bi})" title="Delete block">🗑</button>
+        <div class="planner-block-actions">
+          ${bi > 0 ? `<button class="btn-planner-move" onclick="movePlannerBlockUp(${pi},${bi})" title="Move up">↑</button>` : ''}
+          ${bi < total - 1 ? `<button class="btn-planner-move" onclick="movePlannerBlockDown(${pi},${bi})" title="Move down">↓</button>` : ''}
+          <button class="btn-planner-del-block" onclick="deletePlannerBlock(${pi},${bi})" title="Delete block">🗑</button>
+        </div>
       </div>
       <div class="table-scroll">
         <table class="planner-table">
@@ -3273,7 +3279,23 @@ async function deletePlanner(idx) {
 
 async function addPlannerBlock() {
   const pi = state.activePlannerIdx;
-  state.planners[pi].blocks.push({ id: pId(), header: 'New Block', cols: ['Column 1', 'Column 2'], rows: [{ c0: '', c1: '' }] });
+  state.planners[pi].blocks.unshift({ id: pId(), header: 'New Block', cols: ['Column 1', 'Column 2'], rows: [{ c0: '', c1: '' }] });
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function movePlannerBlockUp(pi, bi) {
+  if (bi === 0) return;
+  const blocks = state.planners[pi].blocks;
+  [blocks[bi - 1], blocks[bi]] = [blocks[bi], blocks[bi - 1]];
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function movePlannerBlockDown(pi, bi) {
+  const blocks = state.planners[pi].blocks;
+  if (bi >= blocks.length - 1) return;
+  [blocks[bi], blocks[bi + 1]] = [blocks[bi + 1], blocks[bi]];
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
