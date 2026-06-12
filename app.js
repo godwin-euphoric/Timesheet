@@ -3129,12 +3129,15 @@ async function loadPlannerTab() {
 function renderPlannerTab() {
   const planners = state.planners;
   const ai       = state.activePlannerIdx;
+  const n        = planners.length;
 
   // Sub-tabs
   document.getElementById('planner-sub-tabs').innerHTML = planners.map((p, i) => `
-    <button class="planner-sub-tab${i === ai ? ' active' : ''}" onclick="switchPlanner(${i})">
-      ${escHtml(p.name)}
-      <span class="planner-tab-del" onclick="event.stopPropagation();deletePlanner(${i})" title="Delete planner">✕</span>
+    <button class="planner-sub-tab${i === ai ? ' active' : ''}" data-idx="${i}" onclick="switchPlanner(${i})">
+      ${i > 0 ? `<span class="planner-tab-arrow" onclick="event.stopPropagation();movePlannerLeft(${i})" title="Move left">&#9664;</span>` : ''}
+      <span class="planner-tab-name" ondblclick="event.stopPropagation();startRenamePlanner(${i})" title="Double-click to rename">${escHtml(p.name)}</span>
+      ${i < n - 1 ? `<span class="planner-tab-arrow" onclick="event.stopPropagation();movePlannerRight(${i})" title="Move right">&#9654;</span>` : ''}
+      <span class="planner-tab-del" onclick="event.stopPropagation();deletePlanner(${i})" title="Delete">✕</span>
     </button>`).join('');
 
   const container = document.getElementById('planner-blocks-container');
@@ -3207,6 +3210,48 @@ function autoResizeTa(ta) {
 function switchPlanner(idx) {
   state.activePlannerIdx = idx;
   renderPlannerTab();
+}
+
+async function movePlannerLeft(idx) {
+  if (idx === 0) return;
+  [state.planners[idx - 1], state.planners[idx]] = [state.planners[idx], state.planners[idx - 1]];
+  state.activePlannerIdx = idx - 1;
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function movePlannerRight(idx) {
+  if (idx >= state.planners.length - 1) return;
+  [state.planners[idx], state.planners[idx + 1]] = [state.planners[idx + 1], state.planners[idx]];
+  state.activePlannerIdx = idx + 1;
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+function startRenamePlanner(idx) {
+  const nameEl = document.querySelector(`.planner-sub-tab[data-idx="${idx}"] .planner-tab-name`);
+  if (!nameEl) return;
+  const original = state.planners[idx].name;
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = original;
+  inp.className = 'planner-tab-rename-input';
+  inp.onclick = e => e.stopPropagation();
+  nameEl.replaceWith(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const commit = async () => {
+    if (done) return; done = true;
+    const name = inp.value.trim() || original;
+    state.planners[idx].name = name;
+    await saveUserData({ planners: state.planners });
+    renderPlannerTab();
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  inp.blur();
+    if (e.key === 'Escape') { inp.value = original; inp.blur(); }
+  });
 }
 
 async function addPlanner() {

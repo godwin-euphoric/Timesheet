@@ -953,6 +953,17 @@ textarea#fm-notes:focus {
   padding: 1px 2px; border-radius: 3px;
 }
 .planner-tab-del:hover { opacity: 1; color: var(--red); }
+.planner-tab-arrow {
+  font-size: 9px; opacity: 0.45; cursor: pointer; padding: 1px 3px;
+  border-radius: 3px; transition: opacity 0.15s, color 0.15s;
+}
+.planner-tab-arrow:hover { opacity: 1; color: var(--lime); }
+.planner-tab-name { cursor: default; }
+.planner-tab-rename-input {
+  background: transparent; border: none; border-bottom: 1px solid var(--lime);
+  color: inherit; font: inherit; font-size: 12px; width: 80px;
+  outline: none; padding: 0 2px;
+}
 .planner-new-btn { flex-shrink: 0; }
 
 .planner-block {
