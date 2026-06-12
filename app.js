@@ -3126,17 +3126,22 @@ async function loadPlannerTab() {
   renderPlannerTab();
 }
 
+let _plannerDragSrc = null;
+
 function renderPlannerTab() {
   const planners = state.planners;
   const ai       = state.activePlannerIdx;
-  const n        = planners.length;
 
-  // Sub-tabs
+  // Sub-tabs (draggable)
   document.getElementById('planner-sub-tabs').innerHTML = planners.map((p, i) => `
-    <button class="planner-sub-tab${i === ai ? ' active' : ''}" data-idx="${i}" onclick="switchPlanner(${i})">
-      ${i > 0 ? `<span class="planner-tab-arrow" onclick="event.stopPropagation();movePlannerLeft(${i})" title="Move left">&#9664;</span>` : ''}
+    <button class="planner-sub-tab${i === ai ? ' active' : ''}" data-idx="${i}"
+      draggable="true"
+      ondragstart="plannerTabDragStart(event,${i})"
+      ondragover="plannerTabDragOver(event,${i})"
+      ondrop="plannerTabDrop(event,${i})"
+      ondragend="plannerTabDragEnd(event)"
+      onclick="switchPlanner(${i})">
       <span class="planner-tab-name" ondblclick="event.stopPropagation();startRenamePlanner(${i})" title="Double-click to rename">${escHtml(p.name)}</span>
-      ${i < n - 1 ? `<span class="planner-tab-arrow" onclick="event.stopPropagation();movePlannerRight(${i})" title="Move right">&#9654;</span>` : ''}
       <span class="planner-tab-del" onclick="event.stopPropagation();deletePlanner(${i})" title="Delete">✕</span>
     </button>`).join('');
 
@@ -3218,18 +3223,31 @@ function switchPlanner(idx) {
   renderPlannerTab();
 }
 
-async function movePlannerLeft(idx) {
-  if (idx === 0) return;
-  [state.planners[idx - 1], state.planners[idx]] = [state.planners[idx], state.planners[idx - 1]];
-  state.activePlannerIdx = idx - 1;
-  await saveUserData({ planners: state.planners });
-  renderPlannerTab();
+function plannerTabDragStart(e, i) {
+  _plannerDragSrc = i;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => document.querySelectorAll('.planner-sub-tab')[i]?.classList.add('dragging'), 0);
 }
 
-async function movePlannerRight(idx) {
-  if (idx >= state.planners.length - 1) return;
-  [state.planners[idx], state.planners[idx + 1]] = [state.planners[idx + 1], state.planners[idx]];
-  state.activePlannerIdx = idx + 1;
+function plannerTabDragOver(e, i) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.planner-sub-tab').forEach((t, idx) => {
+    t.classList.toggle('drag-over', idx === i && idx !== _plannerDragSrc);
+  });
+}
+
+function plannerTabDragEnd() {
+  document.querySelectorAll('.planner-sub-tab').forEach(t => t.classList.remove('dragging', 'drag-over'));
+  _plannerDragSrc = null;
+}
+
+async function plannerTabDrop(e, i) {
+  e.preventDefault();
+  if (_plannerDragSrc === null || _plannerDragSrc === i) return;
+  const [moved] = state.planners.splice(_plannerDragSrc, 1);
+  state.planners.splice(i, 0, moved);
+  state.activePlannerIdx = i;
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }

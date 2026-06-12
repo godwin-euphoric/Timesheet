@@ -953,12 +953,10 @@ textarea#fm-notes:focus {
   padding: 1px 2px; border-radius: 3px;
 }
 .planner-tab-del:hover { opacity: 1; color: var(--red); }
-.planner-tab-arrow {
-  font-size: 9px; opacity: 0.45; cursor: pointer; padding: 1px 3px;
-  border-radius: 3px; transition: opacity 0.15s, color 0.15s;
-}
-.planner-tab-arrow:hover { opacity: 1; color: var(--lime); }
-.planner-tab-name { cursor: default; }
+.planner-sub-tab { cursor: grab; }
+.planner-sub-tab.dragging { opacity: 0.4; }
+.planner-sub-tab.drag-over { border-color: var(--lime); background: rgba(200,255,0,0.08); }
+.planner-tab-name { cursor: grab; }
 .planner-tab-rename-input {
   background: transparent; border: none; border-bottom: 1px solid var(--lime);
   color: inherit; font: inherit; font-size: 12px; width: 80px;
