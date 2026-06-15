@@ -3191,14 +3191,20 @@ function renderPlannerBlock(pi, bi, block) {
 
   const total = state.planners[pi]?.blocks?.length || 0;
   return `
-    <div class="planner-block card" oncontextmenu="showPlannerBlockMenu(event,${pi},${bi})">
+    <div class="planner-block card">
       <div class="planner-block-titlebar">
         <input class="planner-block-title" value="${escHtml(block.header)}"
           onblur="updatePlannerBlockHeader(${pi},${bi},this.value)">
         <div class="planner-block-actions">
           ${bi > 0 ? `<button class="btn-planner-move" onclick="movePlannerBlockUp(${pi},${bi})" title="Move up">↑</button>` : ''}
           ${bi < total - 1 ? `<button class="btn-planner-move" onclick="movePlannerBlockDown(${pi},${bi})" title="Move down">↓</button>` : ''}
-          <button class="btn-planner-del-block" onclick="deletePlannerBlock(${pi},${bi})" title="Delete block">🗑</button>
+          <div class="planner-block-menu-wrap">
+            <button class="btn-planner-more" onclick="togglePlannerBlockMenu(event,${pi},${bi})" title="More options">⋯</button>
+            <div class="planner-block-dropdown hidden" id="pbm-${pi}-${bi}">
+              <button onclick="ctxDuplicatePlannerBlock()">⧉ Duplicate</button>
+              <button onclick="ctxDeletePlannerBlock()">🗑 Delete</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="table-scroll">
@@ -3332,17 +3338,19 @@ async function deletePlannerBlock(pi, bi) {
 
 let _ctxPi = null, _ctxBi = null;
 
-function showPlannerBlockMenu(e, pi, bi) {
-  e.preventDefault();
+function togglePlannerBlockMenu(e, pi, bi) {
+  e.stopPropagation();
+  const menuId = `pbm-${pi}-${bi}`;
+  // Close any open dropdown
+  document.querySelectorAll('.planner-block-dropdown').forEach(d => {
+    if (d.id !== menuId) d.classList.add('hidden');
+  });
   _ctxPi = pi; _ctxBi = bi;
-  const menu = document.getElementById('planner-block-ctx-menu');
-  menu.classList.remove('hidden');
-  menu.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
-  menu.style.top  = Math.min(e.clientY, window.innerHeight - 100) + 'px';
+  document.getElementById(menuId)?.classList.toggle('hidden');
 }
 
 function hidePlannerBlockMenu() {
-  document.getElementById('planner-block-ctx-menu')?.classList.add('hidden');
+  document.querySelectorAll('.planner-block-dropdown').forEach(d => d.classList.add('hidden'));
 }
 
 document.addEventListener('click', hidePlannerBlockMenu);
