@@ -1041,7 +1041,9 @@ textarea#fm-notes:focus {
   transition: all 0.15s; width: 100%;
 }
 .btn-planner-add-row:hover { border-color: var(--primary); color: var(--primary-h); }
-.planner-add-block-btn { margin-top: 4px; width: 100%; }
+.planner-top-bar { display: flex; gap: 8px; margin-bottom: 4px; }
+.planner-add-block-btn { flex: 1; }
+.planner-export-btn { flex-shrink: 0; }
 
 /* ══ Mobile planner fix ══════════════════════════════════════════════════════ */
 @media (max-width: 768px) {

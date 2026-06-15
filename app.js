@@ -3150,7 +3150,10 @@ function renderPlannerTab() {
 
   const planner = planners[ai];
   container.innerHTML =
-    `<button class="btn-secondary planner-add-block-btn" onclick="addPlannerBlock()">+ Add Block</button>` +
+    `<div class="planner-top-bar">
+       <button class="btn-secondary planner-add-block-btn" onclick="addPlannerBlock()">+ Add Block</button>
+       <button class="btn-secondary planner-export-btn" onclick="exportPlannerToExcel()" title="Export to Excel">⬇ Excel</button>
+     </div>` +
     planner.blocks.map((b, bi) => renderPlannerBlock(ai, bi, b)).join('');
 
   container.querySelectorAll('.planner-cell').forEach(ta => {
@@ -3323,6 +3326,24 @@ async function deletePlannerBlock(pi, bi) {
   state.planners[pi].blocks.splice(bi, 1);
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
+}
+
+function exportPlannerToExcel() {
+  const planner = state.planners[state.activePlannerIdx];
+  if (!planner) return;
+  const wsData = [];
+  planner.blocks.forEach((block, bi) => {
+    if (bi > 0) wsData.push([]);
+    wsData.push([block.header || 'Block']);
+    wsData.push(block.cols || []);
+    (block.rows || []).forEach(row => {
+      wsData.push((block.cols || []).map((_, ci) => row['c' + ci] || ''));
+    });
+  });
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, planner.name.slice(0, 31));
+  XLSX.writeFile(wb, `${planner.name}.xlsx`);
 }
 
 async function addPlannerRow(pi, bi) {
