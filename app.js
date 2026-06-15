@@ -3191,7 +3191,7 @@ function renderPlannerBlock(pi, bi, block) {
 
   const total = state.planners[pi]?.blocks?.length || 0;
   return `
-    <div class="planner-block card">
+    <div class="planner-block card" oncontextmenu="showPlannerBlockMenu(event,${pi},${bi})">
       <div class="planner-block-titlebar">
         <input class="planner-block-title" value="${escHtml(block.header)}"
           onblur="updatePlannerBlockHeader(${pi},${bi},this.value)">
@@ -3324,6 +3324,47 @@ async function movePlannerBlockDown(pi, bi) {
 async function deletePlannerBlock(pi, bi) {
   if (!confirm('Delete this block?')) return;
   state.planners[pi].blocks.splice(bi, 1);
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+// ── Block context menu ─────────────────────────────────────────────────────
+
+let _ctxPi = null, _ctxBi = null;
+
+function showPlannerBlockMenu(e, pi, bi) {
+  e.preventDefault();
+  _ctxPi = pi; _ctxBi = bi;
+  const menu = document.getElementById('planner-block-ctx-menu');
+  menu.classList.remove('hidden');
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+  menu.style.top  = Math.min(e.clientY, window.innerHeight - 100) + 'px';
+}
+
+function hidePlannerBlockMenu() {
+  document.getElementById('planner-block-ctx-menu')?.classList.add('hidden');
+}
+
+document.addEventListener('click', hidePlannerBlockMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hidePlannerBlockMenu(); });
+
+async function ctxDuplicatePlannerBlock() {
+  hidePlannerBlockMenu();
+  if (_ctxPi === null || _ctxBi === null) return;
+  const src = state.planners[_ctxPi].blocks[_ctxBi];
+  const copy = JSON.parse(JSON.stringify(src));
+  copy.id = pId();
+  copy.header = src.header + ' (Copy)';
+  state.planners[_ctxPi].blocks.splice(_ctxBi + 1, 0, copy);
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function ctxDeletePlannerBlock() {
+  hidePlannerBlockMenu();
+  if (_ctxPi === null || _ctxBi === null) return;
+  if (!confirm('Delete this block?')) return;
+  state.planners[_ctxPi].blocks.splice(_ctxBi, 1);
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
