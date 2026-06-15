@@ -100,8 +100,18 @@ function showToast(msg, ms = 2500) {
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  auth.signInWithPopup(provider).catch(e => showToast('Sign-in failed: ' + e.message));
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (isPWA) {
+    auth.signInWithRedirect(provider);
+  } else {
+    auth.signInWithPopup(provider).catch(e => showToast('Sign-in failed: ' + e.message));
+  }
 }
+
+// Handle redirect result when returning from Google sign-in (PWA mode)
+auth.getRedirectResult().catch(e => {
+  if (e.code && e.code !== 'auth/no-auth-event') showToast('Sign-in failed: ' + e.message);
+});
 
 
 function doSignOut() {
