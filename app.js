@@ -3211,23 +3211,31 @@ function renderPlannerBlock(pi, bi, block) {
           <div class="planner-block-menu-wrap">
             <button class="btn-planner-more" onclick="togglePlannerBlockMenu(event,${pi},${bi})" title="More options">⋯</button>
             <div class="planner-block-dropdown hidden" id="pbm-${pi}-${bi}">
+              <button onclick="ctxTogglePlannerImage()">${block.imageData ? '🗑 Remove Image' : '🖼 Add Image'}</button>
               <button onclick="ctxDeletePlannerBlock()">🗑 Delete</button>
             </div>
           </div>
         </div>
       </div>
-      <div class="table-scroll">
-        <table class="planner-table">
-          <thead><tr>
-            ${colThs}
-            <th class="planner-addcol-th">
-              <button class="btn-planner-sm" onclick="addPlannerColumn(${pi},${bi})">+ Col</button>
-            </th>
-          </tr></thead>
-          <tbody>${bodyRows}</tbody>
-        </table>
-      </div>
-      <button class="btn-planner-add-row" onclick="addPlannerRow(${pi},${bi})">+ Row</button>
+      ${block.imageData
+        ? `<div class="planner-block-image-wrap">
+            <img src="${block.imageData}" class="planner-block-img" alt="block image">
+            <input type="file" accept="image/*" id="planner-img-input-${pi}-${bi}" style="display:none" onchange="onPlannerImageChange(event,${pi},${bi})">
+            <button class="btn-planner-sm planner-img-replace-btn" onclick="document.getElementById('planner-img-input-${pi}-${bi}').click()">Replace Image</button>
+           </div>`
+        : `<div class="table-scroll">
+            <table class="planner-table">
+              <thead><tr>
+                ${colThs}
+                <th class="planner-addcol-th">
+                  <button class="btn-planner-sm" onclick="addPlannerColumn(${pi},${bi})">+ Col</button>
+                </th>
+              </tr></thead>
+              <tbody>${bodyRows}</tbody>
+            </table>
+           </div>
+           <button class="btn-planner-add-row" onclick="addPlannerRow(${pi},${bi})">+ Row</button>`
+      }
     </div>`;
 }
 
@@ -3384,6 +3392,36 @@ async function ctxDeletePlannerBlock() {
   state.planners[_ctxPi].blocks.splice(_ctxBi, 1);
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
+}
+
+async function ctxTogglePlannerImage() {
+  hidePlannerBlockMenu();
+  if (_ctxPi === null || _ctxBi === null) return;
+  const block = state.planners[_ctxPi].blocks[_ctxBi];
+  if (block.imageData) {
+    if (!confirm('Remove image from this block?')) return;
+    delete block.imageData;
+    await saveUserData({ planners: state.planners });
+    renderPlannerTab();
+  } else {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = e => onPlannerImageChange(e, _ctxPi, _ctxBi);
+    input.click();
+  }
+}
+
+async function onPlannerImageChange(e, pi, bi) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    state.planners[pi].blocks[bi].imageData = ev.target.result;
+    await saveUserData({ planners: state.planners });
+    renderPlannerTab();
+  };
+  reader.readAsDataURL(file);
 }
 
 function exportPlannerToExcel() {

@@ -1066,6 +1066,11 @@ textarea#fm-notes:focus {
 }
 .planner-block-dropdown button:hover { background: rgba(255,255,255,0.06); }
 
+/* Planner block image mode */
+.planner-block-image-wrap { padding: 12px 0 8px; text-align: center; }
+.planner-block-img { max-width: 100%; max-height: 480px; border-radius: 8px; object-fit: contain; }
+.planner-img-replace-btn { display: block; margin: 10px auto 0; }
+
 /* ══ Mobile planner fix ══════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
   .planner-table { table-layout: fixed; width: 100%; }
