@@ -3311,8 +3311,11 @@ function renderPlannerBlock(pi, bi, block) {
             <img src="${block.imageData}" class="planner-block-img" alt="block image">
             <input type="file" accept="image/*" id="planner-img-input-${pi}-${bi}" style="display:none" onchange="onPlannerImageChange(event,${pi},${bi})">
             <button class="btn-planner-sm planner-img-replace-btn" onclick="document.getElementById('planner-img-input-${pi}-${bi}').click()">Replace Image</button>
-            <textarea class="planner-img-notes" rows="2" placeholder="Notes…"
-              onblur="savePlannerImgNotes(${pi},${bi},this.value)">${escHtml(block.imageNotes || '')}</textarea>
+            <div class="planner-img-notes-wrap">
+              <label class="planner-img-notes-label">Notes</label>
+              <textarea class="planner-img-notes" rows="3" placeholder="Add notes here…"
+                onblur="savePlannerImgNotes(${pi},${bi},this.value)">${escHtml(block.imageNotes || '')}</textarea>
+            </div>
            </div>`
         : `<div class="table-scroll">
             <table class="planner-table">
