@@ -3255,7 +3255,8 @@ function renderPlannerBlock(pi, bi, block) {
     const st = block.checklistState || {};
     const ths = gridCols.map((col, ci) => `
       <th class="pcl-grid-col-th">
-        ${escHtml(col)}
+        <input class="pcl-col-input" value="${escHtml(col)}"
+          onblur="updatePlannerGridColName(${pi},${bi},${ci},this.value)" onclick="this.select()">
         <button class="btn-planner-icon" title="Remove column" onclick="removePlannerGridCol(${pi},${bi},${ci})">✕</button>
       </th>`).join('');
     const trs = gridRows.map((row, ri) => {
@@ -3599,6 +3600,12 @@ async function removePlannerGridRow(pi, bi, ri) {
   block.checklistState = newState;
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
+}
+
+async function updatePlannerGridColName(pi, bi, ci, val) {
+  if (!val.trim()) return;
+  state.planners[pi].blocks[bi].checklistCols[ci] = val.trim();
+  await saveUserData({ planners: state.planners });
 }
 
 async function addPlannerGridCol(pi, bi) {
