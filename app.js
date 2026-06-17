@@ -3211,7 +3211,6 @@ function renderPlannerBlock(pi, bi, block) {
           <div class="planner-block-menu-wrap">
             <button class="btn-planner-more" onclick="togglePlannerBlockMenu(event,${pi},${bi})" title="More options">⋯</button>
             <div class="planner-block-dropdown hidden" id="pbm-${pi}-${bi}">
-              <button onclick="ctxDuplicatePlannerBlock()">⧉ Duplicate</button>
               <button onclick="ctxDeletePlannerBlock()">🗑 Delete</button>
             </div>
           </div>
