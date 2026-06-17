@@ -818,6 +818,15 @@ async function deleteSleepEntry(date) {
 //  MONTHLY TAB
 // ══════════════════════════════════════════════════════════════════════════
 
+const MONTHLY_CHECKLIST_ITEMS = [
+  'Family Movie',
+  'Besent Nagar',
+  'Ramani akka Home',
+  'Iyyapathangal',
+  'Other Relative Home (Goodwin, Nirmal, Palavakkam)',
+  'Friends Movie (Hari / Dhanasekar)',
+];
+
 async function loadMonthlyTab() {
   const data = await getMonthData(state.monthlyMonth);
   state.monthlyLeaves       = [...(data.leaves || [])];
@@ -825,6 +834,86 @@ async function loadMonthlyTab() {
   renderLeaveTags();
   loadLeaveDropdown(data);
   await renderMonthlyTable(data);
+  renderMonthlyChecklist(data);
+  renderWeeklyChecklist(data);
+}
+
+function renderMonthlyChecklist(data) {
+  const checked = data.monthlyChecklist || {};
+  const body = document.getElementById('monthly-checklist-body');
+  if (!body) return;
+  body.innerHTML = MONTHLY_CHECKLIST_ITEMS.map((item, i) => `
+    <label class="monthly-check-item ${checked[i] ? 'mc-done' : ''}">
+      <input type="checkbox" ${checked[i] ? 'checked' : ''} onchange="toggleMonthlyCheckItem(${i}, this.checked)">
+      <span>${escHtml(item)}</span>
+    </label>`).join('');
+}
+
+async function toggleMonthlyCheckItem(idx, val) {
+  const data = await getMonthData(state.monthlyMonth);
+  if (!data.monthlyChecklist) data.monthlyChecklist = {};
+  if (val) data.monthlyChecklist[idx] = true;
+  else delete data.monthlyChecklist[idx];
+  await saveMonthData(state.monthlyMonth, data);
+  renderMonthlyChecklist(data);
+}
+
+async function renderWeeklyChecklist(data) {
+  const ud = await getUserData();
+  const activities = ud.weeklyActivities && ud.weeklyActivities.length
+    ? ud.weeklyActivities
+    : ['Morning Movie'];
+  if (!ud.weeklyActivities) {
+    ud.weeklyActivities = ['Morning Movie'];
+    await saveUserData({ weeklyActivities: ud.weeklyActivities });
+  }
+  const wc = data.weeklyChecklist || {};
+  const tbody = document.getElementById('weekly-checklist-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = activities.map(act => {
+    const row = wc[act] || {};
+    const cells = [1,2,3,4].map(w => `
+      <td class="wc-cell">
+        <input type="checkbox" class="wc-check" ${row['w'+w] ? 'checked' : ''}
+          onchange="toggleWeeklyCheck(${JSON.stringify(act)}, 'w${w}', this.checked)">
+      </td>`).join('');
+    return `<tr>
+      <td class="wc-act-col"><span class="wc-act-name">${escHtml(act)}</span></td>
+      ${cells}
+      <td><button class="btn-planner-icon" title="Remove" onclick="removeWeeklyActivity(${JSON.stringify(act)})">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function toggleWeeklyCheck(activity, week, val) {
+  const data = await getMonthData(state.monthlyMonth);
+  if (!data.weeklyChecklist) data.weeklyChecklist = {};
+  if (!data.weeklyChecklist[activity]) data.weeklyChecklist[activity] = {};
+  if (val) data.weeklyChecklist[activity][week] = true;
+  else delete data.weeklyChecklist[activity][week];
+  await saveMonthData(state.monthlyMonth, data);
+}
+
+async function addWeeklyActivity() {
+  const name = prompt('Activity name:');
+  if (!name || !name.trim()) return;
+  const act = name.trim();
+  const ud = await getUserData();
+  const activities = ud.weeklyActivities || ['Morning Movie'];
+  if (activities.includes(act)) { showToast('Already exists'); return; }
+  activities.push(act);
+  await saveUserData({ weeklyActivities: activities });
+  const data = await getMonthData(state.monthlyMonth);
+  renderWeeklyChecklist(data);
+}
+
+async function removeWeeklyActivity(act) {
+  if (!confirm(`Remove "${act}" from weekly checklist?`)) return;
+  const ud = await getUserData();
+  ud.weeklyActivities = (ud.weeklyActivities || []).filter(a => a !== act);
+  await saveUserData({ weeklyActivities: ud.weeklyActivities });
+  const data = await getMonthData(state.monthlyMonth);
+  renderWeeklyChecklist(data);
 }
 
 function loadLeaveDropdown(data) {

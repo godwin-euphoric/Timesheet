@@ -328,6 +328,32 @@
       </div>
     </div>
 
+    <!-- Monthly Items Checklist -->
+    <div class="card" id="monthly-checklist-card">
+      <div class="card-title">✅ Monthly Items Checklist</div>
+      <div id="monthly-checklist-body" class="monthly-checklist-body"></div>
+    </div>
+
+    <!-- Weekly Checklist -->
+    <div class="card" id="weekly-checklist-card">
+      <div class="card-title-row">
+        <div class="card-title">📅 Weekly Checklist</div>
+        <button class="btn-secondary btn-sm" onclick="addWeeklyActivity()">+ Activity</button>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table weekly-checklist-table" id="weekly-checklist-table">
+          <thead>
+            <tr>
+              <th class="wc-act-col">Activity</th>
+              <th>Week 1</th><th>Week 2</th><th>Week 3</th><th>Week 4</th>
+              <th style="width:32px"></th>
+            </tr>
+          </thead>
+          <tbody id="weekly-checklist-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="card">
       <div class="summary-card-header" style="margin-bottom:12px">
         <div style="flex:1"></div>

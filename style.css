@@ -529,6 +529,29 @@ td.sleep-cell:hover { background: #16243f !important; }
 }
 .empty-inline { font-size: 13px; color: var(--muted); font-style: italic; }
 
+/* ══ Monthly Checklists ══════════════════════════════════════════════════════ */
+.card-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.card-title-row .card-title { margin-bottom: 0; }
+
+.monthly-checklist-body { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+.monthly-check-item {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  font-size: 14px; color: var(--text); padding: 8px 12px;
+  border-radius: 8px; border: 1px solid var(--border);
+  transition: background 0.15s, opacity 0.2s;
+}
+.monthly-check-item input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--lime); flex-shrink: 0; cursor: pointer; }
+.monthly-check-item:hover { background: rgba(255,255,255,0.04); }
+.monthly-check-item.mc-done { opacity: 0.55; }
+.monthly-check-item.mc-done span { text-decoration: line-through; color: var(--muted); }
+
+.weekly-checklist-table th, .weekly-checklist-table td { text-align: center; }
+.weekly-checklist-table th:first-child, .weekly-checklist-table td:first-child { text-align: left; }
+.wc-act-col { min-width: 160px; }
+.wc-act-name { font-size: 13px; }
+.wc-cell { width: 70px; }
+.wc-check { width: 17px; height: 17px; accent-color: var(--lime); cursor: pointer; }
+
 /* ══ Habit Tracker ═══════════════════════════════════════════════════════════ */
 .habits-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 
