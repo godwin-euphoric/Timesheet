@@ -1445,4 +1445,11 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   .diet-food-qty-row { flex-wrap: wrap; gap: 5px; }
   .settings-diet-form { flex-direction: column; }
   .access-gate-card { padding: 32px 24px; }
+  .health-bp-form { flex-direction: column; }
 }
+
+/* ══ Health Tab ══════════════════════════════════════════════════════════════ */
+.health-bp-form {
+  display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;
+}
+

@@ -233,7 +233,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, diet: loadDietTab, admin: loadAdminTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, diet: loadDietTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -4304,9 +4304,9 @@ async function checkUserAccess() {
 
 function applyRoleVisibility(role) {
   const showFor = {
-    timesheet: new Set(['main', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings']),
-    diet:      new Set(['diet', 'settings']),
-    both:      new Set(['main', 'diet', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings']),
+    timesheet: new Set(['main', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
+    diet:      new Set(['diet', 'settings', 'health']),
+    both:      new Set(['main', 'diet', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
   };
   const visible = showFor[role] || showFor.both;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
@@ -4544,5 +4544,51 @@ async function updateDietStats() {
       lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
     });
   } catch (e) { console.warn('updateDietStats:', e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  HEALTH TAB
+// ══════════════════════════════════════════════════════════════════════════
+
+async function loadHealthTab() {
+  document.getElementById('health-bp-date').value = todayStr();
+  const ud = await getUserData();
+  renderBpTable(ud.bpLog || []);
+}
+
+function renderBpTable(log) {
+  const tbody = document.getElementById('health-bp-tbody');
+  if (!log.length) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">No entries yet</td></tr>';
+    return;
+  }
+  const sorted = [...log].sort((a, b) => b.date.localeCompare(a.date));
+  tbody.innerHTML = sorted.map(e => `
+    <tr>
+      <td>${formatDate(e.date)}</td>
+      <td><strong>${escHtml(e.bp)}</strong></td>
+      <td><button class="btn-danger" onclick="deleteBpEntry('${e.id}')">✕</button></td>
+    </tr>`).join('');
+}
+
+async function addBpEntry() {
+  const date = document.getElementById('health-bp-date').value;
+  const bp   = document.getElementById('health-bp-value').value.trim();
+  if (!date) { showToast('Select a date'); return; }
+  if (!bp)   { showToast('Enter a BP reading'); return; }
+  const ud = await getUserData();
+  const bpLog = ud.bpLog || [];
+  bpLog.push({ id: pId(), date, bp });
+  await saveUserData({ bpLog });
+  document.getElementById('health-bp-value').value = '';
+  renderBpTable(bpLog);
+  showToast('BP entry saved');
+}
+
+async function deleteBpEntry(id) {
+  const ud    = await getUserData();
+  const bpLog = (ud.bpLog || []).filter(e => e.id !== id);
+  await saveUserData({ bpLog });
+  renderBpTable(bpLog);
 }
 

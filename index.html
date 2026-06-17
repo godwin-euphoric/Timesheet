@@ -55,6 +55,7 @@
       <button class="tab-btn" data-tab="log">Journal</button>
       <button class="tab-btn" data-tab="planner">Planner</button>
       <button class="tab-btn" data-tab="settings">Settings</button>
+      <button class="tab-btn" data-tab="health">Health</button>
       <button class="tab-btn hidden" id="tab-btn-admin" data-tab="admin">Admin</button>
     </nav>
     <div class="header-right">
@@ -554,6 +555,43 @@
       <div class="card-title">🏆 Diet Success Leaderboard</div>
       <div id="admin-leaderboard"><span class="empty-inline">Loading…</span></div>
     </div>
+  </div>
+
+  <!-- ══ HEALTH ════════════════════════════════════════════════════════════ -->
+  <div id="tab-health" class="tab-content">
+
+    <div class="card">
+      <div class="card-title">🩺 Blood Pressure</div>
+      <div class="health-bp-form">
+        <div class="field-group">
+          <label>Date</label>
+          <input type="date" id="health-bp-date">
+        </div>
+        <div class="field-group">
+          <label>BP Reading <span style="font-weight:400;color:var(--muted)">(e.g. 120/80)</span></label>
+          <input type="text" id="health-bp-value" placeholder="120/80" maxlength="10"
+            onkeydown="if(event.key==='Enter')addBpEntry()">
+        </div>
+        <div class="field-group" style="align-self:flex-end">
+          <button class="btn-primary" onclick="addBpEntry()">+ Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 BP Log</div>
+      <div class="table-scroll">
+        <table class="data-table" id="health-bp-table">
+          <thead>
+            <tr><th>Date</th><th>BP</th><th></th></tr>
+          </thead>
+          <tbody id="health-bp-tbody">
+            <tr><td colspan="3" class="empty">No entries yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <!-- ══ ACCESS GATE ════════════════════════════════════════════════════════ -->
