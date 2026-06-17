@@ -1093,6 +1093,12 @@ textarea#fm-notes:focus {
 .planner-block-image-wrap { padding: 12px 0 8px; text-align: center; }
 .planner-block-img { max-width: 100%; max-height: 480px; border-radius: 8px; object-fit: contain; }
 .planner-img-replace-btn { display: block; margin: 10px auto 0; }
+.planner-img-notes {
+  display: block; width: 100%; margin-top: 12px; box-sizing: border-box;
+  background: var(--input-bg, #0D1628); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; font-size: 13px; font-family: inherit;
+  resize: vertical; min-height: 60px;
+}
 
 /* ══ Mobile planner fix ══════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
