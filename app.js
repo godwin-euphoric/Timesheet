@@ -3282,6 +3282,37 @@ function defaultWeekdayPlanner() {
   };
 }
 
+function defaultWeekendPlanner() {
+  return {
+    name: 'Weekend Planner',
+    blocks: [
+      {
+        id: pId(), header: 'Monthly Checklist',
+        checklistType: 'simple',
+        checklistItems: [
+          'Family Movie',
+          'Besent Nagar',
+          'Ramani akka Home',
+          'Iyyapathangal',
+          'Other Relative Home (Goodwin, Nirmal, Palavakkam)',
+          'Friends Movie (Hari / Dhanasekar)',
+        ],
+        checklistState: {},
+      }
+    ]
+  };
+}
+
+function defaultWeeklyChecklistBlock() {
+  return {
+    id: pId(), header: 'Weekly Checklist',
+    checklistType: 'grid',
+    checklistRows: ['Morning Movie'],
+    checklistCols: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+    checklistState: {},
+  };
+}
+
 async function loadPlannerTab() {
   const ud = await getUserData();
   // Treat planners with old nested-array rows as missing (Firestore couldn't save them)
@@ -3290,10 +3321,23 @@ async function loadPlannerTab() {
     ud.planners[0].blocks[0].rows && ud.planners[0].blocks[0].rows.length > 0 &&
     !Array.isArray(ud.planners[0].blocks[0].rows[0]);
   if (!hasValidPlanners) {
-    state.planners = [defaultWeekdayPlanner()];
+    state.planners = [defaultWeekdayPlanner(), defaultWeekendPlanner()];
     await saveUserData({ planners: state.planners });
   } else {
     state.planners = ud.planners;
+    let changed = false;
+    // Inject Weekly Checklist block into Weekday Planner if missing
+    const weekday = state.planners.find(p => p.name === 'Weekday Planner');
+    if (weekday && !weekday.blocks.some(b => b.checklistType === 'grid')) {
+      weekday.blocks.push(defaultWeeklyChecklistBlock());
+      changed = true;
+    }
+    // Inject Weekend Planner if missing
+    if (!state.planners.find(p => p.name === 'Weekend Planner')) {
+      state.planners.push(defaultWeekendPlanner());
+      changed = true;
+    }
+    if (changed) await saveUserData({ planners: state.planners });
   }
   if (state.activePlannerIdx >= state.planners.length) state.activePlannerIdx = 0;
   renderPlannerTab();
@@ -3336,33 +3380,118 @@ function renderPlannerTab() {
 }
 
 function renderPlannerBlock(pi, bi, block) {
-  const cols = block.cols || ['Column 1', 'Column 2'];
-  const rows = block.rows || [];
-
-  const colThs = cols.map((col, ci) => `
-    <th class="planner-col-th">
-      <div class="planner-col-th-inner">
-        <input class="planner-col-name" value="${escHtml(col)}"
-          onblur="updatePlannerColName(${pi},${bi},${ci},this.value)" onclick="this.select()">
-        ${cols.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="removePlannerColumn(${pi},${bi},${ci})">✕</button>` : ''}
-      </div>
-    </th>`).join('');
-
-  const bodyRows = rows.map((row, ri) => {
-    const cells = cols.map((_, ci) => `
-      <td class="planner-cell-td">
-        <textarea class="planner-cell" rows="1"
-          onblur="updatePlannerCell(${pi},${bi},${ri},${ci},this.value)">${escHtml(row['c'+ci] || '')}</textarea>
-      </td>`).join('');
-    return `<tr>
-      ${cells}
-      <td class="planner-row-del-td">
-        <button class="btn-planner-icon" title="Remove row" onclick="removePlannerRow(${pi},${bi},${ri})">✕</button>
-      </td>
-    </tr>`;
-  }).join('');
-
   const total = state.planners[pi]?.blocks?.length || 0;
+
+  // ── ⋯ menu items based on current mode ──
+  let menuItems;
+  if (block.checklistType) {
+    menuItems = `
+      <button onclick="ctxResetPlannerChecklist()">🔄 Reset Checklist</button>
+      <button onclick="ctxRemovePlannerChecklist()">✕ Remove Checklist</button>`;
+  } else if (block.imageData) {
+    menuItems = `<button onclick="ctxTogglePlannerImage()">🗑 Remove Image</button>`;
+  } else {
+    menuItems = `
+      <button onclick="ctxTogglePlannerImage()">🖼 Add Image</button>
+      <button onclick="ctxSetPlannerChecklist('simple')">✅ Simple Checklist</button>
+      <button onclick="ctxSetPlannerChecklist('grid')">📅 Grid Checklist</button>`;
+  }
+
+  // ── body based on mode ──
+  let body;
+  if (block.checklistType === 'simple') {
+    const items = block.checklistItems || [];
+    const st = block.checklistState || {};
+    const rows = items.map(item => `
+      <div class="pcl-row ${st[item] ? 'pcl-done' : ''}">
+        <input type="checkbox" class="wc-check" ${st[item] ? 'checked' : ''}
+          onchange="togglePlannerCheckItem(${pi},${bi},${JSON.stringify(item)},this.checked)">
+        <span class="pcl-label">${escHtml(item)}</span>
+        <button class="btn-planner-icon" onclick="removePlannerCheckItem(${pi},${bi},${JSON.stringify(item)})">✕</button>
+      </div>`).join('');
+    body = `<div class="pcl-simple">${rows}</div>
+      <button class="btn-planner-add-row" onclick="addPlannerCheckItem(${pi},${bi})">+ Item</button>`;
+
+  } else if (block.checklistType === 'grid') {
+    const gridRows = block.checklistRows || [];
+    const gridCols = block.checklistCols || ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+    const st = block.checklistState || {};
+    const ths = gridCols.map((col, ci) => `
+      <th class="pcl-grid-col-th">
+        ${escHtml(col)}
+        <button class="btn-planner-icon" title="Remove column" onclick="removePlannerGridCol(${pi},${bi},${ci})">✕</button>
+      </th>`).join('');
+    const trs = gridRows.map((row, ri) => {
+      const cells = gridCols.map((col, ci) => {
+        const checked = !!(st[ri] && st[ri][ci]);
+        return `<td class="wc-cell"><input type="checkbox" class="wc-check" ${checked ? 'checked' : ''}
+          onchange="togglePlannerGridCell(${pi},${bi},${ri},${ci},this.checked)"></td>`;
+      }).join('');
+      return `<tr>
+        <td class="wc-act-col">
+          <span class="wc-act-name">${escHtml(row)}</span>
+          <button class="btn-planner-icon" onclick="removePlannerGridRow(${pi},${bi},${ri})">✕</button>
+        </td>${cells}</tr>`;
+    }).join('');
+    body = `<div class="table-scroll">
+      <table class="data-table weekly-checklist-table pcl-grid-table">
+        <thead><tr>
+          <th class="wc-act-col">Activity
+            <button class="btn-planner-sm pcl-addcol-btn" onclick="addPlannerGridCol(${pi},${bi})">+ Col</button>
+          </th>${ths}
+        </tr></thead>
+        <tbody>${trs}</tbody>
+      </table></div>
+      <button class="btn-planner-add-row" onclick="addPlannerGridRow(${pi},${bi})">+ Row</button>`;
+
+  } else if (block.imageData) {
+    body = `<div class="planner-block-image-wrap">
+        <img src="${block.imageData}" class="planner-block-img" alt="block image">
+        <input type="file" accept="image/*" id="planner-img-input-${pi}-${bi}" style="display:none" onchange="onPlannerImageChange(event,${pi},${bi})">
+        <button class="btn-planner-sm planner-img-replace-btn" onclick="document.getElementById('planner-img-input-${pi}-${bi}').click()">Replace Image</button>
+        <div class="planner-img-notes-wrap">
+          <label class="planner-img-notes-label">Notes</label>
+          <textarea class="planner-img-notes" rows="3" placeholder="Add notes here…"
+            onblur="savePlannerImgNotes(${pi},${bi},this.value)">${escHtml(block.imageNotes || '')}</textarea>
+        </div>
+       </div>`;
+
+  } else {
+    // Default: table mode
+    const cols = block.cols || ['Column 1', 'Column 2'];
+    const rows = block.rows || [];
+    const colThs = cols.map((col, ci) => `
+      <th class="planner-col-th">
+        <div class="planner-col-th-inner">
+          <input class="planner-col-name" value="${escHtml(col)}"
+            onblur="updatePlannerColName(${pi},${bi},${ci},this.value)" onclick="this.select()">
+          ${cols.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="removePlannerColumn(${pi},${bi},${ci})">✕</button>` : ''}
+        </div>
+      </th>`).join('');
+    const bodyRows = rows.map((row, ri) => {
+      const cells = cols.map((_, ci) => `
+        <td class="planner-cell-td">
+          <textarea class="planner-cell" rows="1"
+            onblur="updatePlannerCell(${pi},${bi},${ri},${ci},this.value)">${escHtml(row['c'+ci] || '')}</textarea>
+        </td>`).join('');
+      return `<tr>${cells}
+        <td class="planner-row-del-td">
+          <button class="btn-planner-icon" title="Remove row" onclick="removePlannerRow(${pi},${bi},${ri})">✕</button>
+        </td></tr>`;
+    }).join('');
+    body = `<div class="table-scroll">
+        <table class="planner-table">
+          <thead><tr>${colThs}
+            <th class="planner-addcol-th">
+              <button class="btn-planner-sm" onclick="addPlannerColumn(${pi},${bi})">+ Col</button>
+            </th>
+          </tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+       </div>
+       <button class="btn-planner-add-row" onclick="addPlannerRow(${pi},${bi})">+ Row</button>`;
+  }
+
   return `
     <div class="planner-block card">
       <div class="planner-block-titlebar">
@@ -3374,36 +3503,13 @@ function renderPlannerBlock(pi, bi, block) {
           <div class="planner-block-menu-wrap">
             <button class="btn-planner-more" onclick="togglePlannerBlockMenu(event,${pi},${bi})" title="More options">⋯</button>
             <div class="planner-block-dropdown hidden" id="pbm-${pi}-${bi}">
-              <button onclick="ctxTogglePlannerImage()">${block.imageData ? '🗑 Remove Image' : '🖼 Add Image'}</button>
+              ${menuItems}
               <button onclick="ctxDeletePlannerBlock()">🗑 Delete</button>
             </div>
           </div>
         </div>
       </div>
-      ${block.imageData
-        ? `<div class="planner-block-image-wrap">
-            <img src="${block.imageData}" class="planner-block-img" alt="block image">
-            <input type="file" accept="image/*" id="planner-img-input-${pi}-${bi}" style="display:none" onchange="onPlannerImageChange(event,${pi},${bi})">
-            <button class="btn-planner-sm planner-img-replace-btn" onclick="document.getElementById('planner-img-input-${pi}-${bi}').click()">Replace Image</button>
-            <div class="planner-img-notes-wrap">
-              <label class="planner-img-notes-label">Notes</label>
-              <textarea class="planner-img-notes" rows="3" placeholder="Add notes here…"
-                onblur="savePlannerImgNotes(${pi},${bi},this.value)">${escHtml(block.imageNotes || '')}</textarea>
-            </div>
-           </div>`
-        : `<div class="table-scroll">
-            <table class="planner-table">
-              <thead><tr>
-                ${colThs}
-                <th class="planner-addcol-th">
-                  <button class="btn-planner-sm" onclick="addPlannerColumn(${pi},${bi})">+ Col</button>
-                </th>
-              </tr></thead>
-              <tbody>${bodyRows}</tbody>
-            </table>
-           </div>
-           <button class="btn-planner-add-row" onclick="addPlannerRow(${pi},${bi})">+ Row</button>`
-      }
+      ${body}
     </div>`;
 }
 
@@ -3560,6 +3666,141 @@ async function ctxDeletePlannerBlock() {
   state.planners[_ctxPi].blocks.splice(_ctxBi, 1);
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
+}
+
+// ── Checklist block ─────────────────────────────────────────────────────────
+async function ctxSetPlannerChecklist(type) {
+  hidePlannerBlockMenu();
+  if (_ctxPi === null || _ctxBi === null) return;
+  const block = state.planners[_ctxPi].blocks[_ctxBi];
+  block.checklistType = type;
+  if (type === 'simple') {
+    if (!block.checklistItems) block.checklistItems = [];
+    if (!block.checklistState) block.checklistState = {};
+  } else {
+    if (!block.checklistRows) block.checklistRows = [];
+    if (!block.checklistCols) block.checklistCols = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+    if (!block.checklistState) block.checklistState = {};
+  }
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function ctxRemovePlannerChecklist() {
+  hidePlannerBlockMenu();
+  if (_ctxPi === null || _ctxBi === null) return;
+  if (!confirm('Remove checklist and restore table mode?')) return;
+  const block = state.planners[_ctxPi].blocks[_ctxBi];
+  delete block.checklistType;
+  delete block.checklistItems;
+  delete block.checklistRows;
+  delete block.checklistCols;
+  delete block.checklistState;
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function ctxResetPlannerChecklist() {
+  hidePlannerBlockMenu();
+  if (_ctxPi === null || _ctxBi === null) return;
+  if (!confirm('Uncheck all items in this checklist?')) return;
+  state.planners[_ctxPi].blocks[_ctxBi].checklistState = {};
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+// Simple checklist
+async function addPlannerCheckItem(pi, bi) {
+  const name = prompt('Item name:');
+  if (!name?.trim()) return;
+  const block = state.planners[pi].blocks[bi];
+  if (!block.checklistItems) block.checklistItems = [];
+  if (block.checklistItems.includes(name.trim())) { showToast('Already exists'); return; }
+  block.checklistItems.push(name.trim());
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function removePlannerCheckItem(pi, bi, item) {
+  const block = state.planners[pi].blocks[bi];
+  block.checklistItems = (block.checklistItems || []).filter(i => i !== item);
+  if (block.checklistState) delete block.checklistState[item];
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function togglePlannerCheckItem(pi, bi, item, val) {
+  const block = state.planners[pi].blocks[bi];
+  if (!block.checklistState) block.checklistState = {};
+  if (val) block.checklistState[item] = true;
+  else delete block.checklistState[item];
+  await saveUserData({ planners: state.planners });
+}
+
+// Grid checklist
+async function addPlannerGridRow(pi, bi) {
+  const name = prompt('Row / Activity name:');
+  if (!name?.trim()) return;
+  const block = state.planners[pi].blocks[bi];
+  if (!block.checklistRows) block.checklistRows = [];
+  block.checklistRows.push(name.trim());
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function removePlannerGridRow(pi, bi, ri) {
+  const block = state.planners[pi].blocks[bi];
+  if (block.checklistState) delete block.checklistState[ri];
+  // Re-index state after removal
+  const newState = {};
+  Object.entries(block.checklistState || {}).forEach(([k, v]) => {
+    const idx = parseInt(k);
+    if (idx < ri) newState[k] = v;
+    else if (idx > ri) newState[idx - 1] = v;
+  });
+  block.checklistRows.splice(ri, 1);
+  block.checklistState = newState;
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function addPlannerGridCol(pi, bi) {
+  const name = prompt('Column name:');
+  if (!name?.trim()) return;
+  const block = state.planners[pi].blocks[bi];
+  if (!block.checklistCols) block.checklistCols = [];
+  block.checklistCols.push(name.trim());
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function removePlannerGridCol(pi, bi, ci) {
+  const block = state.planners[pi].blocks[bi];
+  block.checklistCols.splice(ci, 1);
+  // Re-index col state in each row
+  const st = block.checklistState || {};
+  Object.keys(st).forEach(ri => {
+    const row = st[ri] || {};
+    const newRow = {};
+    Object.entries(row).forEach(([k, v]) => {
+      const idx = parseInt(k);
+      if (idx < ci) newRow[k] = v;
+      else if (idx > ci) newRow[idx - 1] = v;
+    });
+    st[ri] = newRow;
+  });
+  block.checklistState = st;
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function togglePlannerGridCell(pi, bi, ri, ci, val) {
+  const block = state.planners[pi].blocks[bi];
+  if (!block.checklistState) block.checklistState = {};
+  if (!block.checklistState[ri]) block.checklistState[ri] = {};
+  if (val) block.checklistState[ri][ci] = true;
+  else delete block.checklistState[ri][ci];
+  await saveUserData({ planners: state.planners });
 }
 
 async function ctxTogglePlannerImage() {

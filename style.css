@@ -1095,6 +1095,25 @@ textarea#fm-notes:focus {
 }
 .planner-block-dropdown button:hover { background: rgba(255,255,255,0.06); }
 
+/* Planner block checklist modes */
+.pcl-simple { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+.pcl-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border-radius: 8px; border: 1px solid var(--border);
+  transition: opacity 0.2s;
+}
+.pcl-row:hover { background: rgba(255,255,255,0.04); }
+.pcl-row.pcl-done { opacity: 0.5; }
+.pcl-row.pcl-done .pcl-label { text-decoration: line-through; color: var(--muted); }
+.pcl-row input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--lime); flex-shrink: 0; cursor: pointer; }
+.pcl-label { flex: 1; font-size: 14px; }
+.pcl-grid-col-th { position: relative; font-size: 12px; white-space: nowrap; }
+.pcl-grid-col-th .btn-planner-icon { margin-left: 4px; font-size: 11px; opacity: 0.5; vertical-align: middle; }
+.pcl-grid-col-th .btn-planner-icon:hover { opacity: 1; }
+.pcl-addcol-btn { margin-left: 6px; font-size: 11px; padding: 2px 6px; }
+.wc-act-col .btn-planner-icon { margin-left: 6px; font-size: 11px; opacity: 0.4; vertical-align: middle; }
+.wc-act-col .btn-planner-icon:hover { opacity: 1; }
+
 /* Planner block image mode */
 .planner-block-image-wrap { padding: 12px 0 8px; text-align: center; }
 .planner-block-img { max-width: 100%; max-height: 480px; border-radius: 8px; object-fit: contain; }
