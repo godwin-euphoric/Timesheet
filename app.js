@@ -834,28 +834,57 @@ async function loadMonthlyTab() {
   renderLeaveTags();
   loadLeaveDropdown(data);
   await renderMonthlyTable(data);
-  renderMonthlyChecklist(data);
+  await renderMonthlyChecklist(data);
   renderWeeklyChecklist(data);
 }
 
-function renderMonthlyChecklist(data) {
+async function renderMonthlyChecklist(data) {
+  const ud = await getUserData();
+  const customItems = ud.monthlyChecklistItems || [];
+  const allItems = [...MONTHLY_CHECKLIST_ITEMS, ...customItems];
   const checked = data.monthlyChecklist || {};
   const body = document.getElementById('monthly-checklist-body');
   if (!body) return;
-  body.innerHTML = MONTHLY_CHECKLIST_ITEMS.map((item, i) => `
-    <label class="monthly-check-item ${checked[i] ? 'mc-done' : ''}">
-      <input type="checkbox" ${checked[i] ? 'checked' : ''} onchange="toggleMonthlyCheckItem(${i}, this.checked)">
+  body.innerHTML = allItems.map((item, i) => {
+    const isCustom = i >= MONTHLY_CHECKLIST_ITEMS.length;
+    return `
+    <label class="monthly-check-item ${checked[item] ? 'mc-done' : ''}">
+      <input type="checkbox" ${checked[item] ? 'checked' : ''} onchange="toggleMonthlyCheckItem(${JSON.stringify(item)}, this.checked)">
       <span>${escHtml(item)}</span>
-    </label>`).join('');
+      ${isCustom ? `<button class="monthly-check-remove" onclick="event.preventDefault();removeMonthlyChecklistActivity(${JSON.stringify(item)})">✕</button>` : ''}
+    </label>`;
+  }).join('');
 }
 
-async function toggleMonthlyCheckItem(idx, val) {
+async function toggleMonthlyCheckItem(item, val) {
   const data = await getMonthData(state.monthlyMonth);
   if (!data.monthlyChecklist) data.monthlyChecklist = {};
-  if (val) data.monthlyChecklist[idx] = true;
-  else delete data.monthlyChecklist[idx];
+  if (val) data.monthlyChecklist[item] = true;
+  else delete data.monthlyChecklist[item];
   await saveMonthData(state.monthlyMonth, data);
-  renderMonthlyChecklist(data);
+  await renderMonthlyChecklist(data);
+}
+
+async function addMonthlyChecklistActivity() {
+  const name = prompt('Activity name:');
+  if (!name || !name.trim()) return;
+  const act = name.trim();
+  const ud = await getUserData();
+  const items = ud.monthlyChecklistItems || [];
+  if (MONTHLY_CHECKLIST_ITEMS.includes(act) || items.includes(act)) { showToast('Already exists'); return; }
+  items.push(act);
+  await saveUserData({ monthlyChecklistItems: items });
+  const data = await getMonthData(state.monthlyMonth);
+  await renderMonthlyChecklist(data);
+}
+
+async function removeMonthlyChecklistActivity(act) {
+  if (!confirm(`Remove "${act}" from checklist?`)) return;
+  const ud = await getUserData();
+  ud.monthlyChecklistItems = (ud.monthlyChecklistItems || []).filter(a => a !== act);
+  await saveUserData({ monthlyChecklistItems: ud.monthlyChecklistItems });
+  const data = await getMonthData(state.monthlyMonth);
+  await renderMonthlyChecklist(data);
 }
 
 async function renderWeeklyChecklist(data) {
@@ -1696,6 +1725,8 @@ async function loadYearlyTab() {
 
   // FM count section
   await renderYearlyFmCount(year, today);
+  // Checklist summary
+  await renderYearlyChecklistSummary(year, today);
 }
 
 async function renderYearlyFmCount(year, today) {
@@ -1767,6 +1798,49 @@ async function renderYearlyFmCount(year, today) {
     <td>${grandTotal}</td>
   `;
   tbody.appendChild(totalTr);
+}
+
+async function renderYearlyChecklistSummary(year, today) {
+  const allData = await getAllMonths();
+  const ud = await getUserData();
+  const customItems = ud.monthlyChecklistItems || [];
+  const allItems = [...MONTHLY_CHECKLIST_ITEMS, ...customItems];
+  const thead = document.getElementById('yearly-checklist-thead');
+  const tbody = document.getElementById('yearly-checklist-tbody');
+  if (!thead || !tbody) return;
+
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const months = [];
+  for (let m = 1; m <= 12; m++) {
+    const key = `${year}-${String(m).padStart(2,'0')}`;
+    if (key <= today.slice(0,7)) months.push(key);
+  }
+
+  if (!months.length) {
+    thead.innerHTML = '';
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">No data for this year</td></tr>';
+    return;
+  }
+
+  thead.innerHTML = `<tr>
+    <th style="text-align:left">Activity</th>
+    ${months.map(m => `<th>${monthNames[parseInt(m.split('-')[1])-1]}</th>`).join('')}
+    <th>Done</th>
+  </tr>`;
+
+  tbody.innerHTML = allItems.map(item => {
+    let total = 0;
+    const cells = months.map(m => {
+      const done = !!(allData[m]?.monthlyChecklist?.[item]);
+      if (done) total++;
+      return `<td style="text-align:center">${done ? '<span style="color:var(--lime);font-weight:700">✓</span>' : '<span style="color:var(--muted)">—</span>'}</td>`;
+    }).join('');
+    return `<tr>
+      <td>${escHtml(item)}</td>
+      ${cells}
+      <td style="text-align:center;font-weight:700;color:${total===months.length?'var(--lime)':total>0?'#facc15':'var(--muted)'}">${total}/${months.length}</td>
+    </tr>`;
+  }).join('');
 }
 
 document.getElementById('yearly-year').addEventListener('change', async function () {

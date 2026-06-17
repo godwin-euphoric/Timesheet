@@ -541,9 +541,15 @@ td.sleep-cell:hover { background: #16243f !important; }
   transition: background 0.15s, opacity 0.2s;
 }
 .monthly-check-item input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--lime); flex-shrink: 0; cursor: pointer; }
+.monthly-check-item span { flex: 1; }
 .monthly-check-item:hover { background: rgba(255,255,255,0.04); }
 .monthly-check-item.mc-done { opacity: 0.55; }
 .monthly-check-item.mc-done span { text-decoration: line-through; color: var(--muted); }
+.monthly-check-remove {
+  background: none; border: none; cursor: pointer; color: var(--red);
+  font-size: 13px; font-weight: 700; padding: 0 2px; opacity: 0.6; flex-shrink: 0;
+}
+.monthly-check-remove:hover { opacity: 1; }
 
 .weekly-checklist-table th, .weekly-checklist-table td { text-align: center; }
 .weekly-checklist-table th:first-child, .weekly-checklist-table td:first-child { text-align: left; }
