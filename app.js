@@ -4481,6 +4481,7 @@ async function removeUser(uid, email) {
   try {
     const batch = db.batch();
     batch.delete(db.collection('user_roles').doc(uid));
+    batch.delete(db.collection('diet_stats').doc(uid));
     // Reset request status so they can re-request
     const reqRef = db.collection('access_requests').doc(uid);
     const reqDoc = await reqRef.get();
@@ -4492,6 +4493,7 @@ async function removeUser(uid, email) {
     if (tbody && !tbody.children.length) {
       document.getElementById('admin-users-list').innerHTML = '<span class="empty-inline">No users yet</span>';
     }
+    await loadDietLeaderboard();
   } catch (e) { showToast('Error: ' + e.message); }
 }
 
