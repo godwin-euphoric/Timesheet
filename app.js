@@ -250,6 +250,11 @@ async function loadMainTab() {
   renderWastedMonthSummary(data);  // also sets wasted chip
   await renderDayEntries();
   renderMainNotes(data);
+  const ud = await getUserData();
+  populateMainFmDropdown(ud.fmCategories || []);
+  renderFmTablesMain(ud.fmCategories || [], ud.fmLog || []);
+  const fmDateEl = document.getElementById('main-fm-date');
+  if (fmDateEl && !fmDateEl.value) fmDateEl.value = todayStr();
 }
 
 let mainNotesTimer = null;
@@ -1987,6 +1992,74 @@ async function deleteFmEntry(id) {
   await saveUserData({ fmLog });
   showToast('Entry deleted');
   renderFmTables(userData.fmCategories || [], fmLog);
+  renderFmTablesMain(userData.fmCategories || [], fmLog);
+}
+
+function populateMainFmDropdown(cats) {
+  const sel = document.getElementById('main-fm-type');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">-- Select --</option>' +
+    cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  if (prev) sel.value = prev;
+}
+
+function renderFmTablesMain(cats, fmLog) {
+  const container = document.getElementById('main-fm-tables-container');
+  if (!container) return;
+  if (!cats.length) { container.innerHTML = ''; return; }
+  container.innerHTML = '';
+  cats.forEach(cat => {
+    const entries = fmLog
+      .filter(e => e.type === cat)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const rows = entries.length
+      ? entries.map(e => `
+          <tr>
+            <td>
+              <div style="font-weight:500">${escHtml(e.name)}</div>
+              ${e.notes ? `<div style="font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5">${escHtml(e.notes)}</div>` : ''}
+            </td>
+            <td style="color:var(--muted);font-size:12px;white-space:nowrap">${formatDate(e.date)}</td>
+            <td><button class="btn-danger" onclick="deleteFmEntry('${e.id}')">✕</button></td>
+          </tr>`).join('')
+      : `<tr><td colspan="3" class="empty">No ${escHtml(cat)} entries yet</td></tr>`;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>${escHtml(cat)}</span>
+        <span class="fm-count-badge">${entries.length}</span>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Title / Name</th><th>Date</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+async function addFmEntryFromMain() {
+  const type  = document.getElementById('main-fm-type').value.trim();
+  const name  = document.getElementById('main-fm-name').value.trim();
+  const date  = document.getElementById('main-fm-date').value;
+  const notes = document.getElementById('main-fm-notes').value.trim();
+  if (!type) { showToast('Select a category'); return; }
+  if (!name) { showToast('Enter a title');     return; }
+  if (!date) { showToast('Select a date');     return; }
+  const userData = await getUserData();
+  const entry = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, name, date };
+  if (notes) entry.notes = notes;
+  const fmLog = [...(userData.fmLog || []), entry];
+  await saveUserData({ fmLog });
+  document.getElementById('main-fm-name').value  = '';
+  document.getElementById('main-fm-notes').value = '';
+  showToast('Entry added');
+  renderFmTablesMain(userData.fmCategories || [], fmLog);
+  renderFmTables(userData.fmCategories || [], fmLog);
+  await loadMonthlySummary(await getMonthData(state.mainMonth));
 }
 
 // ══════════════════════════════════════════════════════════════════════════

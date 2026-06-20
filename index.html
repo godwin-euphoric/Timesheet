@@ -170,6 +170,36 @@
 
     </div><!-- end log-row -->
 
+    <!-- Movie Journal logging on main tab -->
+    <div class="card" id="main-fm-card">
+      <div class="card-title">📚 Movie Journal</div>
+      <div class="log-form">
+        <div class="form-fields-row">
+          <div class="field-group" style="width:160px">
+            <label>Category</label>
+            <select id="main-fm-type"><option value="">-- Select --</option></select>
+          </div>
+          <div class="field-group" style="flex:1">
+            <label>Title / Name</label>
+            <input type="text" id="main-fm-name" placeholder="e.g. Inception">
+          </div>
+          <div class="field-group" style="width:160px">
+            <label>Date</label>
+            <input type="date" id="main-fm-date">
+          </div>
+        </div>
+        <div class="field-group">
+          <label>Notes (optional)</label>
+          <input type="text" id="main-fm-notes" placeholder="Optional notes...">
+        </div>
+        <div class="field-group form-action">
+          <button class="btn-primary" onclick="addFmEntryFromMain()">+ Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="main-fm-tables-container"></div>
+
     <div class="card" id="main-dayentries-card">
       <div class="entries-label" id="day-entries-label">Today's Entries</div>
       <div id="day-entries-list"><span class="empty-inline">No entries for this date</span></div>
