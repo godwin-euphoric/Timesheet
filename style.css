@@ -1112,10 +1112,11 @@ textarea#fm-notes:focus {
 
 /* ══ Mobile planner fix ══════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .planner-table { table-layout: fixed; width: 100%; }
-  .planner-col-th { min-width: 0 !important; width: auto; }
-  .planner-addcol-th { width: 32px; }
-  .planner-cell { width: 100%; font-size: 12px; }
+  /* Let planner tables scroll horizontally — don't compress columns */
+  .planner-table { table-layout: auto; width: max-content; min-width: 100%; }
+  .planner-col-th { min-width: 140px; }
+  .planner-addcol-th { width: 40px; }
+  .planner-cell { font-size: 13px; }
 }
 
 /* ══ Mobile transposed Monthly table ════════════════════════════════════════ */
