@@ -170,9 +170,9 @@
 
     </div><!-- end log-row -->
 
-    <!-- Movie Journal logging on main tab -->
+    <!-- Journal logging on main tab -->
     <div class="card" id="main-fm-card">
-      <div class="card-title">📚 Movie Journal</div>
+      <div class="card-title">📚 Journal</div>
       <div class="log-form">
         <div class="form-fields-row">
           <div class="field-group" style="width:160px">
@@ -183,17 +183,9 @@
             <label>Title / Name</label>
             <input type="text" id="main-fm-name" placeholder="e.g. Inception">
           </div>
-          <div class="field-group" style="width:160px">
-            <label>Date</label>
-            <input type="date" id="main-fm-date">
+          <div class="field-group form-action">
+            <button class="btn-primary" onclick="addFmEntryFromMain()">+ Add</button>
           </div>
-        </div>
-        <div class="field-group">
-          <label>Notes (optional)</label>
-          <input type="text" id="main-fm-notes" placeholder="Optional notes...">
-        </div>
-        <div class="field-group form-action">
-          <button class="btn-primary" onclick="addFmEntryFromMain()">+ Add</button>
         </div>
       </div>
     </div>

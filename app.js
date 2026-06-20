@@ -253,8 +253,6 @@ async function loadMainTab() {
   const ud = await getUserData();
   populateMainFmDropdown(ud.fmCategories || []);
   renderFmTablesMain(ud.fmCategories || [], ud.fmLog || []);
-  const fmDateEl = document.getElementById('main-fm-date');
-  if (fmDateEl && !fmDateEl.value) fmDateEl.value = todayStr();
 }
 
 let mainNotesTimer = null;
@@ -2042,20 +2040,17 @@ function renderFmTablesMain(cats, fmLog) {
 }
 
 async function addFmEntryFromMain() {
-  const type  = document.getElementById('main-fm-type').value.trim();
-  const name  = document.getElementById('main-fm-name').value.trim();
-  const date  = document.getElementById('main-fm-date').value;
-  const notes = document.getElementById('main-fm-notes').value.trim();
+  const type = document.getElementById('main-fm-type').value.trim();
+  const name = document.getElementById('main-fm-name').value.trim();
+  const date = state.mainDate;
   if (!type) { showToast('Select a category'); return; }
   if (!name) { showToast('Enter a title');     return; }
-  if (!date) { showToast('Select a date');     return; }
+  if (!date) { showToast('Select a date from the date picker above'); return; }
   const userData = await getUserData();
   const entry = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, name, date };
-  if (notes) entry.notes = notes;
   const fmLog = [...(userData.fmLog || []), entry];
   await saveUserData({ fmLog });
-  document.getElementById('main-fm-name').value  = '';
-  document.getElementById('main-fm-notes').value = '';
+  document.getElementById('main-fm-name').value = '';
   showToast('Entry added');
   renderFmTablesMain(userData.fmCategories || [], fmLog);
   renderFmTables(userData.fmCategories || [], fmLog);
