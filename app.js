@@ -373,22 +373,17 @@ async function renderSleepAverages(mainData) {
   if (mEl) mEl.textContent = mDays > 0 ? `${mAvg} hrs` : '—';
   paintChip('sleep-avg-month-chip', mAvg, mDays > 0);
 
-  // Sleep miss streak: count consecutive days backwards from today with no entry
-  const allMonthData = await getAllMonths();
-  const getSleep = dateStr => {
-    const m = dateStr.slice(0, 7);
-    return (allMonthData[m]?.sleep || {})[dateStr] || 0;
-  };
+  // Sleep miss count: all days this month up to today with no sleep entry
   let missCount = 0;
-  for (let i = 0; i < 3; i++) {
-    const d = new Date(todayD); d.setDate(d.getDate() - i);
-    if (getSleep(ymd(d)) > 0) break;
-    missCount++;
+  for (let d = 1; d <= monthEnd; d++) {
+    const ds = `${month}-${String(d).padStart(2,'0')}`;
+    if (ds > tStr) break;
+    if (!(monthSleep[ds] > 0)) missCount++;
   }
   const badge = document.getElementById('sleep-miss-badge');
   if (badge) {
     if (missCount > 0) {
-      badge.textContent = 'X'.repeat(missCount);
+      badge.textContent = missCount;
       badge.classList.remove('hidden');
     } else {
       badge.classList.add('hidden');

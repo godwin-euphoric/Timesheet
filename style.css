@@ -121,7 +121,7 @@ header {
   height: 64px; margin-bottom: 28px; gap: 16px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.5);
   border-bottom: 1px solid var(--border);
-  position: relative;
+  position: sticky; top: 0; z-index: 200;
 }
 header::after {
   content: '';
@@ -695,6 +695,23 @@ textarea#fm-notes:focus {
   box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important;
 }
 .inline-input.sm { width: 100px; }
+
+/* ══ Monthly tab sticky controls + thead (desktop) ══════════════════════════ */
+#tab-monthly .top-controls {
+  position: sticky; top: 64px; z-index: 110;
+  background: var(--bg); margin-bottom: 0;
+  padding-bottom: 20px; padding-top: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+/* Two-row thead: first row at top: 64 + ~112 = 176, second row 38px lower */
+#monthly-thead tr:first-child th {
+  position: sticky; top: 176px; z-index: 100;
+  background: #0D1628;
+}
+#monthly-thead tr:last-child th {
+  position: sticky; top: 214px; z-index: 100;
+  background: #0D1628;
+}
 
 /* ══ Summary card header ═════════════════════════════════════════════════════ */
 .summary-card-header {
