@@ -373,6 +373,28 @@ async function renderSleepAverages(mainData) {
   if (mEl) mEl.textContent = mDays > 0 ? `${mAvg} hrs` : '—';
   paintChip('sleep-avg-month-chip', mAvg, mDays > 0);
 
+  // Sleep miss streak: count consecutive days backwards from today with no entry
+  const allMonthData = await getAllMonths();
+  const getSleep = dateStr => {
+    const m = dateStr.slice(0, 7);
+    return (allMonthData[m]?.sleep || {})[dateStr] || 0;
+  };
+  let missCount = 0;
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(todayD); d.setDate(d.getDate() - i);
+    if (getSleep(ymd(d)) > 0) break;
+    missCount++;
+  }
+  const badge = document.getElementById('sleep-miss-badge');
+  if (badge) {
+    if (missCount > 0) {
+      badge.textContent = 'X'.repeat(missCount);
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
   // ── Yearly average (Jun 1 → today across all months, inclusive) ──
   const allData = await getAllMonths();
   let ySum = 0;

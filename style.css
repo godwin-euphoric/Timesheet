@@ -291,6 +291,12 @@ input:focus, select:focus {
   box-shadow: 0 2px 8px rgba(217,119,6,0.1);
 }
 .stat-chip strong { color: var(--amber); font-size: 17px; font-weight: 800; }
+.sleep-miss-badge {
+  display: inline-block; margin-left: 6px;
+  background: #7f1d1d; color: #fca5a5;
+  font-size: 11px; font-weight: 800; letter-spacing: 1px;
+  padding: 1px 5px; border-radius: 4px; vertical-align: middle;
+}
 
 /* ══ Stat chip variants ══════════════════════════════════════════════════════ */
 .stat-chip-green {
@@ -826,12 +832,14 @@ textarea#fm-notes:focus {
 
   /* ── Main tab: summary first, then both logging sections below it ────────── */
   #tab-main.active { display: flex; flex-direction: column; }
-  #tab-main > .top-controls         { order: 1; }
-  #tab-main > #main-summary-card    { order: 2; }
-  #tab-main > #main-monthdate-row   { order: 3; }
-  #tab-main > .log-row              { order: 4; }
-  #tab-main > #main-dayentries-card { order: 5; }
-  #tab-main > #main-notes-card      { order: 6; }
+  #tab-main > .top-controls                  { order: 1; }
+  #tab-main > #main-summary-card             { order: 2; }
+  #tab-main > #main-monthdate-row            { order: 3; }
+  #tab-main > .log-row                       { order: 4; }
+  #tab-main > #main-fm-card                  { order: 5; }
+  #tab-main > #main-fm-tables-container      { order: 6; }
+  #tab-main > #main-dayentries-card          { order: 7; }
+  #tab-main > #main-notes-card               { order: 8; }
 
   /* ── Summary card header (month picker + title row) ──────────────────────── */
   .summary-card-header { flex-wrap: wrap; gap: 8px; }
