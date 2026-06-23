@@ -541,6 +541,7 @@ td.sleep-cell:hover { background: #16243f !important; }
 .wc-check { width: 17px; height: 17px; accent-color: var(--lime); cursor: pointer; }
 
 /* ══ Habit Tracker ═══════════════════════════════════════════════════════════ */
+#tab-habits { overflow-x: clip; }
 .habits-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .habits-table th {
