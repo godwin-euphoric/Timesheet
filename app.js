@@ -100,15 +100,21 @@ function showToast(msg, ms = 2500) {
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-  if (isPWA) {
-    auth.signInWithRedirect(provider);
-  } else {
-    auth.signInWithPopup(provider).catch(e => showToast('Sign-in failed: ' + e.message));
-  }
+  // Always use popup — signInWithRedirect in standalone PWA navigates the PWA away
+  // and the redirect back opens in the external browser, so auth never reaches the PWA.
+  // Chrome Android PWA supports popups; iOS standalone blocks them (handled below).
+  auth.signInWithPopup(provider).catch(e => {
+    if (e.code === 'auth/popup-blocked') {
+      // iOS Safari standalone blocks popups — show instructions
+      const iosMsg = document.getElementById('pwa-ios-msg');
+      if (iosMsg) iosMsg.classList.remove('hidden');
+    } else if (e.code !== 'auth/popup-closed-by-user') {
+      showToast('Sign-in failed: ' + e.message);
+    }
+  });
 }
 
-// Handle redirect result when returning from Google sign-in (PWA mode)
+// Handle any leftover redirect result (edge cases)
 auth.getRedirectResult().catch(e => {
   if (e.code && e.code !== 'auth/no-auth-event') showToast('Sign-in failed: ' + e.message);
 });
