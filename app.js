@@ -100,12 +100,12 @@ function showToast(msg, ms = 2500) {
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  const isIOSStandalone = window.navigator.standalone === true; // iOS Safari home screen
-  if (isIOSStandalone) {
-    // iOS standalone: popups blocked, redirect hash stripped on return.
-    // Show the guide — user must sign in via Safari, then reload.
-    document.getElementById('pwa-ios-guide').classList.remove('hidden');
+  if (window.navigator.standalone === true) {
+    // iOS home screen: open Safari, user signs in there, auto-reload on return
+    localStorage.setItem('pwa_ios_signin_pending', '1');
     document.getElementById('btn-google').classList.add('hidden');
+    document.getElementById('pwa-ios-guide').classList.remove('hidden');
+    openInSafari();
   } else {
     auth.signInWithPopup(provider).catch(e => {
       if (e.code !== 'auth/popup-closed-by-user') showToast('Sign-in failed: ' + e.message);
@@ -113,8 +113,17 @@ function signInWithGoogle() {
   }
 }
 
+// iOS only: when user returns from Safari after signing in, reload to pick up auth
+if (window.navigator.standalone === true) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && localStorage.getItem('pwa_ios_signin_pending')) {
+      localStorage.removeItem('pwa_ios_signin_pending');
+      window.location.reload();
+    }
+  });
+}
+
 function openInSafari() {
-  // On iOS standalone, <a target="_blank"> opens in Safari (not the standalone PWA)
   const a = document.createElement('a');
   a.href = window.location.href.split('?')[0].split('#')[0];
   a.target = '_blank'; a.rel = 'noopener';
@@ -122,7 +131,6 @@ function openInSafari() {
 }
 
 function reloadAfterSafariSignIn() {
-  // After signing in via Safari, reload — Firebase reads shared localStorage and signs in
   window.location.reload();
 }
 
