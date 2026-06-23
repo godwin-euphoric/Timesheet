@@ -100,18 +100,25 @@ function showToast(msg, ms = 2500) {
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  // Always use popup — signInWithRedirect in standalone PWA navigates the PWA away
-  // and the redirect back opens in the external browser, so auth never reaches the PWA.
-  // Chrome Android PWA supports popups; iOS standalone blocks them (handled below).
-  auth.signInWithPopup(provider).catch(e => {
-    if (e.code === 'auth/popup-blocked') {
-      // iOS Safari standalone blocks popups — show instructions
-      const iosMsg = document.getElementById('pwa-ios-msg');
-      if (iosMsg) iosMsg.classList.remove('hidden');
-    } else if (e.code !== 'auth/popup-closed-by-user') {
-      showToast('Sign-in failed: ' + e.message);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (isStandalone) {
+    // In standalone PWA, popup's window.opener is null so Firebase can't post auth back.
+    // Fix: open the app in a regular browser tab where sign-in works normally.
+    // Firebase syncs auth state across same-origin tabs via localStorage, so the PWA
+    // will receive onAuthStateChanged automatically after sign-in in the browser tab.
+    const tab = window.open(window.location.href, '_blank');
+    if (tab) {
+      document.getElementById('pwa-waiting-msg').classList.remove('hidden');
+      document.getElementById('pwa-ios-msg').classList.add('hidden');
+    } else {
+      // window.open blocked (older iOS) — show manual instructions
+      document.getElementById('pwa-ios-msg').classList.remove('hidden');
     }
-  });
+  } else {
+    auth.signInWithPopup(provider).catch(e => {
+      if (e.code !== 'auth/popup-closed-by-user') showToast('Sign-in failed: ' + e.message);
+    });
+  }
 }
 
 // Handle any leftover redirect result (edge cases)
