@@ -1069,11 +1069,12 @@ textarea#fm-notes:focus {
   border-radius: 6px; cursor: pointer; transition: all 0.12s; white-space: nowrap;
 }
 .btn-planner-sm:hover { border-color: var(--primary); color: var(--primary-h); }
+.planner-add-btns { display: flex; gap: 8px; margin-top: 8px; }
 .btn-planner-add-row {
-  margin-top: 8px; padding: 5px 14px; background: none;
+  padding: 5px 14px; background: none; flex: 1;
   border: 1px dashed var(--border); border-radius: 8px;
   color: var(--muted); font-size: 12px; cursor: pointer;
-  transition: all 0.15s; width: 100%;
+  transition: all 0.15s;
 }
 .btn-planner-add-row:hover { border-color: var(--primary); color: var(--primary-h); }
 .planner-top-bar { display: flex; gap: 8px; margin-bottom: 4px; }

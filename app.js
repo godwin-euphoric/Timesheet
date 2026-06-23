@@ -3405,14 +3405,15 @@ function renderPlannerBlock(pi, bi, block) {
     body = `<div class="table-scroll">
         <table class="planner-table">
           <thead><tr>${colThs}
-            <th class="planner-addcol-th">
-              <button class="btn-planner-sm" onclick="addPlannerColumn(${pi},${bi})">+ Col</button>
-            </th>
+            <th class="planner-row-del-td"></th>
           </tr></thead>
           <tbody>${bodyRows}</tbody>
         </table>
        </div>
-       <button class="btn-planner-add-row" onclick="addPlannerRow(${pi},${bi})">+ Row</button>`;
+       <div class="planner-add-btns">
+         <button class="btn-planner-add-row" onclick="addPlannerRow(${pi},${bi})">+ Row</button>
+         <button class="btn-planner-add-row" onclick="addPlannerColumn(${pi},${bi})">+ Col</button>
+       </div>`;
   }
 
   return `
