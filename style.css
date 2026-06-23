@@ -541,7 +541,7 @@ td.sleep-cell:hover { background: #16243f !important; }
 .wc-check { width: 17px; height: 17px; accent-color: var(--lime); cursor: pointer; }
 
 /* ══ Habit Tracker ═══════════════════════════════════════════════════════════ */
-.habits-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.habits-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .habits-table th {
   padding: 10px 16px; font-size: 11px; font-weight: 700;
@@ -549,7 +549,10 @@ td.sleep-cell:hover { background: #16243f !important; }
   background: #0D1628; border-bottom: 2px solid var(--border);
   text-align: center;
 }
-.habit-name-col  { text-align: left !important; min-width: 180px; position: sticky; left: 0; z-index: 2; background: #0D1628; }
+.habit-name-col {
+  text-align: left !important; min-width: 180px;
+  position: sticky; left: 0; z-index: 20; background: #0D1628;
+}
 .habit-day-col   { min-width: 60px; }
 .habits-table th.col-today   { color: var(--amber); border-bottom-color: var(--amber); }
 .habits-table th.col-weekend { color: var(--muted); opacity: 0.6; }
@@ -561,7 +564,7 @@ td.habit-check-cell.cell-weekend { background: rgba(255,255,255,0.02); }
 .habit-name-cell {
   padding: 12px 16px;
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  position: sticky; left: 0; z-index: 1; background: var(--card);
+  position: sticky; left: 0; z-index: 10; background: var(--card);
 }
 .habit-row:hover .habit-name-cell { background: var(--card2); }
 .habit-name-text { font-weight: 600; color: var(--text); }
@@ -910,11 +913,12 @@ textarea#fm-notes:focus {
   td.yearly-comment-cell { min-width: 100px; max-width: 150px; font-size: 11px; }
 
   /* ── Habits table: compact day cells ─────────────────────────────────────── */
-  .habit-name-col { min-width: 130px; max-width: 130px; }
-  .habit-day-col  { min-width: 40px; }
+  .habits-table { width: max-content; min-width: 100%; }
+  .habit-name-col { min-width: 120px; max-width: 120px; }
+  .habit-day-col  { min-width: 38px; }
   .habit-check-cell { padding: 8px 2px; }
   .habits-table th { padding: 7px 4px; font-size: 10px; }
-  .habit-name-cell { padding: 10px 10px; }
+  .habit-name-cell { padding: 10px 8px; }
   .habit-name-text { font-size: 12px; }
   .btn-habit-del { width: 22px; height: 22px; font-size: 11px; }
 
