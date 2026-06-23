@@ -4426,16 +4426,59 @@ async function renderWeightChart() {
   }
   entries.sort((a, b) => a.ds.localeCompare(b.ds));
 
-  if (!entries.length) { if (card) card.style.display = 'none'; return; }
+  if (!entries.length) { if (card) card.style.display = 'none'; renderWeightEntries([]); return; }
   if (card) card.style.display = '';
 
   const labels  = entries.map(e => e.ds.slice(5));
   const weights = entries.map(e => e.w);
   document.getElementById('diet-weight-chart-label').textContent = entries[0].ds.slice(0, 7) + ' – ' + entries[entries.length - 1].ds.slice(0, 7);
-  drawDietLineChart(canvas, labels, weights, 'kg');
+  drawDietLineChart(canvas, labels, weights, 'kg', true);
+  renderWeightEntries(entries);
 }
 
-function drawDietLineChart(canvas, labels, values, unit) {
+function renderWeightEntries(entries) {
+  const el = document.getElementById('diet-weight-entries-list');
+  if (!el) return;
+  if (!entries.length) { el.innerHTML = ''; return; }
+  const reversed = [...entries].reverse();
+  el.innerHTML = `<div class="weight-entries-list">${reversed.map(e => `
+    <div class="weight-entry-row">
+      <span class="weight-entry-date">${e.ds.slice(5)}</span>
+      <input class="weight-entry-input" type="number" step="0.1" value="${e.w}"
+        onblur="saveWeightEntryEdit('${e.ds}',this.value)"
+        onkeydown="if(event.key==='Enter')this.blur()">
+      <span class="weight-entry-unit">kg</span>
+      <button class="weight-entry-del" onclick="deleteWeightEntry('${e.ds}')">✕</button>
+    </div>`).join('')}</div>`;
+}
+
+async function saveWeightEntryEdit(ds, val) {
+  const kg = parseFloat(val);
+  if (!kg || kg <= 0) return;
+  const month = ds.slice(0, 7);
+  const mData = await getDietMonthData(month);
+  if (!mData.days) mData.days = {};
+  if (!mData.days[ds]) mData.days[ds] = {};
+  mData.days[ds].weight = kg;
+  await saveDietMonthData(month, mData);
+  await renderWeightChart();
+  showToast('Weight updated');
+}
+
+async function deleteWeightEntry(ds) {
+  const month = ds.slice(0, 7);
+  const mData = await getDietMonthData(month);
+  if (mData.days?.[ds]) {
+    delete mData.days[ds].weight;
+    await saveDietMonthData(month, mData);
+    const wi = document.getElementById('diet-weight-input');
+    if (wi && state.dietDate === ds) wi.value = '';
+    await renderWeightChart();
+    showToast('Entry removed');
+  }
+}
+
+function drawDietLineChart(canvas, labels, values, unit, showDotLabels = false) {
   const dpr = window.devicePixelRatio || 1;
   const W   = canvas.parentElement?.clientWidth || 600;
   const H   = 180;
@@ -4448,7 +4491,7 @@ function drawDietLineChart(canvas, labels, values, unit) {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, H);
 
-  const PL = 46, PR = 14, PT = 16, PB = 28;
+  const PL = 46, PR = 14, PT = showDotLabels ? 26 : 16, PB = 28;
   const cW = W - PL - PR, cH = H - PT - PB;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -4489,17 +4532,27 @@ function drawDietLineChart(canvas, labels, values, unit) {
   ctx.fillStyle = 'rgba(200,255,0,0.07)';
   ctx.fill();
 
-  // Dots + x-labels
+  // Dots + labels
+  const labelEvery = showDotLabels ? Math.ceil(n / 14) : Math.ceil(n / 12);
   values.forEach((v, i) => {
+    const x = px(i), y = py(v);
     ctx.beginPath();
-    ctx.arc(px(i), py(v), 3, 0, Math.PI * 2);
+    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
     ctx.fillStyle = '#C8FF00';
     ctx.fill();
+    // Value label above dot
+    if (showDotLabels && (n <= 14 || i % labelEvery === 0)) {
+      ctx.fillStyle = '#C8FF00';
+      ctx.font = `bold 9px -apple-system,sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(v % 1 === 0 ? v : parseFloat(v).toFixed(1), x, y - 7);
+    }
+    // x-axis date label
     if (n <= 12 || i % Math.ceil(n / 12) === 0) {
       ctx.fillStyle = 'rgba(122,144,176,0.7)';
       ctx.font = '9px -apple-system,sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(labels[i], px(i), H - PB + 14);
+      ctx.fillText(labels[i], x, H - PB + 14);
     }
   });
 }
