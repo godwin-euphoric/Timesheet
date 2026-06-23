@@ -109,12 +109,21 @@ body {
   box-shadow: 0 6px 24px rgba(99,102,241,0.25);
   transform: translateY(-2px);
 }
-.pwa-waiting-msg {
-  margin-top: 16px; padding: 12px 16px;
-  background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.3);
-  border-radius: 10px; font-size: 13px; color: #86efac;
-  line-height: 1.6; text-align: center;
+.pwa-signin-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
 }
+.pwa-signin-overlay-inner { text-align: center; color: var(--muted); font-size: 14px; }
+.pwa-spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: var(--lime);
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.pwa-waiting-msg { display: none; }
 .pwa-ios-msg {
   margin-top: 16px; padding: 12px 16px;
   background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3);

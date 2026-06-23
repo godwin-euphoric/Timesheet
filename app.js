@@ -97,23 +97,17 @@ function showToast(msg, ms = 2500) {
 //  AUTH
 // ══════════════════════════════════════════════════════════════════════════
 
+const PWA_PENDING_KEY = 'pwa_signin_pending';
+
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
   if (isStandalone) {
-    // In standalone PWA, popup's window.opener is null so Firebase can't post auth back.
-    // Fix: open the app in a regular browser tab where sign-in works normally.
-    // Firebase syncs auth state across same-origin tabs via localStorage, so the PWA
-    // will receive onAuthStateChanged automatically after sign-in in the browser tab.
-    const tab = window.open(window.location.href, '_blank');
-    if (tab) {
-      document.getElementById('pwa-waiting-msg').classList.remove('hidden');
-      document.getElementById('pwa-ios-msg').classList.add('hidden');
-    } else {
-      // window.open blocked (older iOS) — show manual instructions
-      document.getElementById('pwa-ios-msg').classList.remove('hidden');
-    }
+    // PWA: use redirect. Mark pending so we show a loading overlay on return
+    // instead of the auth screen (prevents the sign-in loop confusion).
+    localStorage.setItem(PWA_PENDING_KEY, '1');
+    auth.signInWithRedirect(provider);
   } else {
     auth.signInWithPopup(provider).catch(e => {
       if (e.code !== 'auth/popup-closed-by-user') showToast('Sign-in failed: ' + e.message);
@@ -121,10 +115,31 @@ function signInWithGoogle() {
   }
 }
 
-// Handle any leftover redirect result (edge cases)
-auth.getRedirectResult().catch(e => {
-  if (e.code && e.code !== 'auth/no-auth-event') showToast('Sign-in failed: ' + e.message);
-});
+// On every page load: if a redirect was in progress, show a loading overlay
+// and wait for getRedirectResult() before revealing auth screen.
+(function handlePwaRedirectReturn() {
+  if (!localStorage.getItem(PWA_PENDING_KEY)) return;
+  // Show loading overlay, hide auth screen until redirect settles
+  const overlay = document.getElementById('pwa-signin-overlay');
+  const authScreen = document.getElementById('auth-screen');
+  if (overlay) overlay.classList.remove('hidden');
+  if (authScreen) authScreen.classList.add('hidden');
+
+  auth.getRedirectResult().then(result => {
+    localStorage.removeItem(PWA_PENDING_KEY);
+    if (overlay) overlay.classList.add('hidden');
+    if (!result || !result.user) {
+      // Redirect came back but no user — show auth screen normally
+      if (authScreen) authScreen.classList.remove('hidden');
+    }
+    // If result.user exists, onAuthStateChanged will handle showing the app
+  }).catch(e => {
+    localStorage.removeItem(PWA_PENDING_KEY);
+    if (overlay) overlay.classList.add('hidden');
+    if (authScreen) authScreen.classList.remove('hidden');
+    if (e.code && e.code !== 'auth/no-auth-event') showToast('Sign-in failed: ' + e.message);
+  });
+})();
 
 
 function doSignOut() {
@@ -140,7 +155,11 @@ auth.onAuthStateChanged(user => {
   state.dietSettings     = null;
   state.userRole         = null;
 
+  // Don't touch the auth/app visibility while a redirect is being processed
+  if (!user && localStorage.getItem(PWA_PENDING_KEY)) return;
+
   if (user) {
+    document.getElementById('pwa-signin-overlay')?.classList.add('hidden');
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     const avatar = document.getElementById('user-avatar');
