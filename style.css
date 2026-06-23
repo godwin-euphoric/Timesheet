@@ -966,6 +966,7 @@ textarea#fm-notes:focus {
 }
 
 /* ══ Planner Tab ═════════════════════════════════════════════════════════════ */
+#tab-planner { overflow-x: clip; }
 .planner-nav {
   display: flex; align-items: center; gap: 12px;
   margin-bottom: 20px; flex-wrap: wrap;
