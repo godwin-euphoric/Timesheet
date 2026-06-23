@@ -4937,21 +4937,31 @@ async function loadDietLeaderboard() {
   try {
     const snap = await db.collection('diet_stats').get();
     if (snap.empty) { container.innerHTML = '<span class="empty-inline">No diet stats yet</span>'; return; }
-    const stats = snap.docs.map(d => d.data()).sort((a, b) => (b.successDays || 0) - (a.successDays || 0));
+    const admin = isAdmin();
+    const stats = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.successDays || 0) - (a.successDays || 0));
     const rows  = stats.map((d, i) => `<tr>
       <td>${i + 1}</td>
       <td>${escHtml(d.displayName || '—')}</td>
       <td>${escHtml(d.email || '—')}</td>
       <td><strong style="color:var(--lime)">${d.successDays || 0}</strong></td>
       <td>${d.totalDays || 0}</td>
+      ${admin ? `<td><button class="lb-remove-btn" onclick="removeDietLeaderboardEntry('${d.id}')">✕ Remove</button></td>` : ''}
     </tr>`).join('');
     container.innerHTML = `<div class="table-scroll"><table class="data-table admin-table">
-      <thead><tr><th>#</th><th>Name</th><th>Email</th><th>🌟 Success Days</th><th>Total Days</th></tr></thead>
+      <thead><tr><th>#</th><th>Name</th><th>Email</th><th>🌟 Success Days</th><th>Total Days</th>${admin ? '<th></th>' : ''}</tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   } catch (e) {
     container.innerHTML = `<span class="empty-inline" style="color:var(--red)">Error: ${e.message}</span>`;
   }
+}
+
+async function removeDietLeaderboardEntry(uid) {
+  if (!isAdmin()) return;
+  if (!confirm('Remove this entry from the leaderboard?')) return;
+  await db.collection('diet_stats').doc(uid).delete();
+  showToast('Entry removed');
+  await loadDietLeaderboard();
 }
 
 async function updateDietStats() {
