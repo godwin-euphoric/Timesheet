@@ -3410,10 +3410,7 @@ function renderPlannerBlock(pi, bi, block) {
           <tbody>${bodyRows}</tbody>
         </table>
        </div>
-       <div class="planner-add-btns">
-         <button class="btn-planner-add-row" onclick="addPlannerRow(${pi},${bi})">+ Row</button>
-         <button class="btn-planner-add-row" onclick="addPlannerColumn(${pi},${bi})">+ Col</button>
-       </div>`;
+       <button class="btn-planner-add-row" onclick="addPlannerRow(${pi},${bi})">+ Row</button>`;
   }
 
   return `
@@ -3422,6 +3419,7 @@ function renderPlannerBlock(pi, bi, block) {
         <input class="planner-block-title" value="${escHtml(block.header)}"
           onblur="updatePlannerBlockHeader(${pi},${bi},this.value)">
         <div class="planner-block-actions">
+          ${!block.checklistType && !block.imageData ? `<button class="btn-planner-addcol-title" onclick="addPlannerColumn(${pi},${bi})" title="Add column">+ Col</button>` : ''}
           ${bi > 0 ? `<button class="btn-planner-move" onclick="movePlannerBlockUp(${pi},${bi})" title="Move up">↑</button>` : ''}
           ${bi < total - 1 ? `<button class="btn-planner-move" onclick="movePlannerBlockDown(${pi},${bi})" title="Move down">↓</button>` : ''}
           <div class="planner-block-menu-wrap">
