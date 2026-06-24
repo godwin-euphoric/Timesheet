@@ -1771,13 +1771,17 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   text-transform: uppercase; white-space: nowrap;
 }
 .fm-period-sep { font-size: 14px; color: var(--muted); }
-.fm-tracker-period-block input[type="datetime-local"] {
+.fm-tracker-period-block input[type="date"],
+.fm-tracker-period-block input[type="time"] {
   background: var(--card2); border: 1px solid var(--border);
   border-radius: 6px; padding: 5px 8px; font-size: 12px;
   color: var(--text); outline: none; color-scheme: dark;
-  flex: 1 1 140px; min-width: 0;
+  min-width: 0;
 }
-.fm-tracker-period-block input[type="datetime-local"]:focus { border-color: var(--primary); }
+.fm-tracker-period-block input[type="date"] { flex: 1 1 110px; }
+.fm-tracker-period-block input[type="time"] { flex: 0 0 auto; width: 78px; }
+.fm-tracker-period-block input[type="date"]:focus,
+.fm-tracker-period-block input[type="time"]:focus { border-color: var(--primary); }
 .fm-now-btn {
   padding: 5px 10px; font-size: 11px; font-weight: 600;
   background: var(--card2); border: 1px solid var(--border);
@@ -1807,7 +1811,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 @media (max-width: 640px) {
   .fm-tracker-tiles { grid-template-columns: repeat(2, 1fr); }
   .fm-period-sep { display: none; }
-  .fm-tracker-period-block input[type="datetime-local"] { flex-basis: 100%; }
+  .fm-tracker-period-block input[type="date"] { flex-basis: auto; }
 }
 
 /* ══ Weekly Reference — white background ════════════════════════════════════ */

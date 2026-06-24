@@ -5065,21 +5065,33 @@ async function dpFlushRefSave() {
 
 const FM_TRACKER_DEFAULT_START = '2026-06-23T10:00';
 
+function _fmSetDT(prefix, dtStr) {
+  const [d, t] = (dtStr || '').split('T');
+  document.getElementById(`fm-tracker-${prefix}-date`).value = d || '';
+  document.getElementById(`fm-tracker-${prefix}-time`).value = t || '';
+}
+
+function _fmGetDT(prefix) {
+  const d = document.getElementById(`fm-tracker-${prefix}-date`)?.value || '';
+  const t = document.getElementById(`fm-tracker-${prefix}-time`)?.value || '00:00';
+  return d ? `${d}T${t}` : '';
+}
+
 async function loadFMTracker() {
   try {
     const doc = await db.collection('users').doc(state.user.uid)
                         .collection('trackers').doc('period').get();
     if (doc.exists) {
       const d = doc.data();
-      document.getElementById('fm-tracker-start').value = d.start || FM_TRACKER_DEFAULT_START;
-      document.getElementById('fm-tracker-end').value   = d.end   || _fmNowStr();
+      _fmSetDT('start', d.start || FM_TRACKER_DEFAULT_START);
+      _fmSetDT('end',   d.end   || _fmNowStr());
     } else {
-      document.getElementById('fm-tracker-start').value = FM_TRACKER_DEFAULT_START;
-      document.getElementById('fm-tracker-end').value   = _fmNowStr();
+      _fmSetDT('start', FM_TRACKER_DEFAULT_START);
+      _fmSetDT('end',   _fmNowStr());
     }
   } catch(e) {
-    document.getElementById('fm-tracker-start').value = FM_TRACKER_DEFAULT_START;
-    document.getElementById('fm-tracker-end').value   = _fmNowStr();
+    _fmSetDT('start', FM_TRACKER_DEFAULT_START);
+    _fmSetDT('end',   _fmNowStr());
   }
   await refreshFMTrackerStats();
 }
@@ -5090,13 +5102,13 @@ function _fmNowStr() {
 }
 
 function fmSetNow() {
-  document.getElementById('fm-tracker-end').value = _fmNowStr();
+  _fmSetDT('end', _fmNowStr());
   saveFMTrackerPeriod();
 }
 
 async function saveFMTrackerPeriod() {
-  const start = document.getElementById('fm-tracker-start').value;
-  const end   = document.getElementById('fm-tracker-end').value;
+  const start = _fmGetDT('start');
+  const end   = _fmGetDT('end');
   try {
     await db.collection('users').doc(state.user.uid)
             .collection('trackers').doc('period').set({ start, end });
@@ -5105,8 +5117,8 @@ async function saveFMTrackerPeriod() {
 }
 
 async function refreshFMTrackerStats() {
-  const start = document.getElementById('fm-tracker-start')?.value || FM_TRACKER_DEFAULT_START;
-  const end   = document.getElementById('fm-tracker-end')?.value   || _fmNowStr();
+  const start = _fmGetDT('start') || FM_TRACKER_DEFAULT_START;
+  const end   = _fmGetDT('end')   || _fmNowStr();
   const startDate = start.slice(0, 10);
   const endDate   = end.slice(0, 10);
 
