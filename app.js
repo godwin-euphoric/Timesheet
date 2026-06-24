@@ -4913,8 +4913,9 @@ function dpScrollToThisWeek() {
   const row = document.getElementById(`dp-row-${mondayStr}`);
   const wrap = document.getElementById('dp-table-wrap');
   if (row && wrap) {
-    // Offset so Monday sits near the top with a little breathing room
-    wrap.scrollTop = row.offsetTop - 4;
+    const thead = wrap.querySelector('thead');
+    const theadH = thead ? thead.getBoundingClientRect().height : 0;
+    wrap.scrollTop = row.offsetTop - theadH;
   }
 }
 
