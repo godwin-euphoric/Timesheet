@@ -97,6 +97,10 @@ function showToast(msg, ms = 2500) {
 //  AUTH
 // ══════════════════════════════════════════════════════════════════════════
 
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
@@ -106,6 +110,8 @@ function signInWithGoogle() {
     document.getElementById('btn-google').classList.add('hidden');
     document.getElementById('pwa-ios-guide').classList.remove('hidden');
     openInSafari();
+    // After 8s show manual fallback in case visibilitychange doesn't fire
+    setTimeout(() => document.getElementById('btn-ios-back').classList.remove('hidden'), 8000);
   } else {
     auth.signInWithPopup(provider).catch(e => {
       if (e.code !== 'auth/popup-closed-by-user') showToast('Sign-in failed: ' + e.message);
@@ -164,10 +170,21 @@ auth.onAuthStateChanged(user => {
     if (avatarM) { if (user.photoURL) { avatarM.src = user.photoURL; avatarM.style.display = 'block'; } }
     const nameM = document.getElementById('mobile-user-name');
     if (nameM) nameM.textContent = user.displayName || user.email || '';
+    // iOS Safari (non-standalone): prompt to add to home screen after first sign-in
+    if (isIOS() && !window.navigator.standalone && !sessionStorage.getItem('ios_ath_dismissed')) {
+      document.getElementById('ios-ath-banner').classList.remove('hidden');
+    }
     initApp();
   } else {
     document.getElementById('auth-screen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
+    // iOS standalone: if sign-in was pending but PWA was killed and restarted,
+    // auth may not have propagated — show guide with manual fallback immediately
+    if (window.navigator.standalone === true && localStorage.getItem('pwa_ios_signin_pending')) {
+      document.getElementById('btn-google').classList.add('hidden');
+      document.getElementById('pwa-ios-guide').classList.remove('hidden');
+      document.getElementById('btn-ios-back').classList.remove('hidden');
+    }
   }
 });
 
@@ -260,7 +277,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, diet: loadDietTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, diet: loadDietTab, admin: loadAdminTab, health: loadHealthTab, dailyplan: loadDailyPlanTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -4761,11 +4778,216 @@ async function checkUserAccess() {
   return null;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  DAILY PLAN TAB
+// ══════════════════════════════════════════════════════════════════════════
+
+const DP_COLS = ['c630', 'c730', 'c830', 'morning', 'evening'];
+const DP_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DP_DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let dpData = {};           // dateStr → { c630, c730, c830, morning, evening }
+let dpSaveTimer = null;
+let dpDirty = new Set();   // dateStrs with unsaved changes
+let dpTableBuilt = false;
+
+function dpGetMonday(d) {
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  const m = new Date(d);
+  m.setDate(d.getDate() + diff);
+  m.setHours(0, 0, 0, 0);
+  return m;
+}
+
+function dpDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function dpAllDates() {
+  const today = new Date();
+  const start = dpGetMonday(today);
+  start.setDate(start.getDate() - 7); // one week back (last Monday)
+
+  const end = new Date(today.getFullYear(), 11, 31); // Dec 31 this year
+
+  const dates = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    dates.push(new Date(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+async function loadDailyPlanTab() {
+  // Show image from localStorage
+  dpRestoreImage();
+
+  // Load data from Firestore
+  const year = String(new Date().getFullYear());
+  try {
+    const doc = await db.collection('users').doc(state.user.uid)
+                        .collection('dailyplan').doc(year).get();
+    dpData = doc.exists ? (doc.data().rows || {}) : {};
+  } catch(e) {
+    dpData = {};
+  }
+
+  if (!dpTableBuilt) {
+    dpBuildTable();
+    dpTableBuilt = true;
+  } else {
+    dpRefreshInputs();
+  }
+
+  dpScrollToThisWeek();
+}
+
+function dpBuildTable() {
+  const tbody = document.getElementById('dp-tbody');
+  tbody.innerHTML = '';
+  const dates = dpAllDates();
+  const todayStr_ = todayStr();
+
+  dates.forEach((d, i) => {
+    const ds = dpDateStr(d);
+    const dow = d.getDay(); // 0=Sun
+    const row = dpData[ds] || {};
+
+    const tr = document.createElement('tr');
+    tr.id = `dp-row-${ds}`;
+    if (dow === 1 && i > 0) tr.classList.add('dp-week-start'); // Monday = new week
+    if (ds === todayStr_)   tr.classList.add('dp-today');
+    if (dow === 0)          tr.classList.add('dp-sunday');
+
+    // Date cell
+    const tdDate = document.createElement('td');
+    tdDate.className = 'dp-date-cell';
+    tdDate.textContent = `${String(d.getDate()).padStart(2,'0')} ${DP_MONTHS[d.getMonth()]}`;
+    tr.appendChild(tdDate);
+
+    // Day cell
+    const tdDay = document.createElement('td');
+    tdDay.className = 'dp-day-cell' + (dow === 6 ? ' dp-sat' : dow === 0 ? ' dp-sun' : '');
+    tdDay.textContent = DP_DAYS[dow];
+    tr.appendChild(tdDay);
+
+    // Editable cells
+    DP_COLS.forEach(col => {
+      const td = document.createElement('td');
+      td.className = 'dp-input-cell';
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'dp-input';
+      inp.id = `dp-inp-${ds}-${col}`;
+      inp.value = row[col] || '';
+      inp.addEventListener('input', () => {
+        if (!dpData[ds]) dpData[ds] = {};
+        dpData[ds][col] = inp.value;
+        dpDirty.add(ds);
+        dpScheduleSave();
+      });
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+}
+
+function dpRefreshInputs() {
+  const dates = dpAllDates();
+  dates.forEach(d => {
+    const ds = dpDateStr(d);
+    const row = dpData[ds] || {};
+    DP_COLS.forEach(col => {
+      const inp = document.getElementById(`dp-inp-${ds}-${col}`);
+      if (inp && !dpDirty.has(ds)) inp.value = row[col] || '';
+    });
+  });
+}
+
+function dpScrollToThisWeek() {
+  const monday = dpGetMonday(new Date());
+  const mondayStr = dpDateStr(monday);
+  const row = document.getElementById(`dp-row-${mondayStr}`);
+  const wrap = document.getElementById('dp-table-wrap');
+  if (row && wrap) {
+    // Offset so Monday sits near the top with a little breathing room
+    wrap.scrollTop = row.offsetTop - 4;
+  }
+}
+
+function dpScheduleSave() {
+  const status = document.getElementById('dp-save-status');
+  status.textContent = 'Saving…';
+  status.className = 'dp-save-status saving';
+  clearTimeout(dpSaveTimer);
+  dpSaveTimer = setTimeout(dpFlushSave, 900);
+}
+
+async function dpFlushSave() {
+  if (!dpDirty.size) return;
+  const year = String(new Date().getFullYear());
+  const updates = {};
+  dpDirty.forEach(ds => { updates[ds] = dpData[ds] || {}; });
+  dpDirty.clear();
+  try {
+    await db.collection('users').doc(state.user.uid)
+            .collection('dailyplan').doc(year)
+            .set({ rows: updates }, { merge: true });
+    const status = document.getElementById('dp-save-status');
+    status.textContent = 'Saved';
+    status.className = 'dp-save-status saved';
+    setTimeout(() => { status.textContent = ''; status.className = 'dp-save-status'; }, 1800);
+  } catch(e) {
+    showToast('Save failed: ' + e.message);
+  }
+}
+
+// ── Image upload ──────────────────────────────────────────────────────────
+
+function dpHandleImageUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    try { localStorage.setItem('dp_weekly_image', dataUrl); } catch(_) {}
+    dpShowImage(dataUrl);
+  };
+  reader.readAsDataURL(file);
+  input.value = ''; // allow re-upload of same file
+}
+
+function dpShowImage(dataUrl) {
+  document.getElementById('dp-img-placeholder').classList.add('hidden');
+  const img = document.getElementById('dp-img-display');
+  img.src = dataUrl;
+  img.classList.remove('hidden');
+  document.getElementById('dp-remove-btn').classList.remove('hidden');
+}
+
+function dpRemoveImage() {
+  localStorage.removeItem('dp_weekly_image');
+  document.getElementById('dp-img-display').classList.add('hidden');
+  document.getElementById('dp-img-display').src = '';
+  document.getElementById('dp-remove-btn').classList.add('hidden');
+  document.getElementById('dp-img-placeholder').classList.remove('hidden');
+}
+
+function dpRestoreImage() {
+  try {
+    const saved = localStorage.getItem('dp_weekly_image');
+    if (saved) dpShowImage(saved);
+  } catch(_) {}
+}
+
 function applyRoleVisibility(role) {
   const showFor = {
-    timesheet: new Set(['main', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
+    timesheet: new Set(['main', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health', 'dailyplan']),
     diet:      new Set(['diet', 'settings', 'health']),
-    both:      new Set(['main', 'diet', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
+    both:      new Set(['main', 'diet', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health', 'dailyplan']),
   };
   const visible = showFor[role] || showFor.both;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
