@@ -297,6 +297,7 @@ async function loadMainTab() {
   const ud = await getUserData();
   populateMainFmDropdown(ud.fmCategories || []);
   renderFmTablesMain(ud.fmCategories || [], ud.fmLog || []);
+  loadFMTracker();
 }
 
 let mainNotesTimer = null;
@@ -5056,6 +5057,107 @@ async function dpFlushRefSave() {
     if (s) { s.textContent = 'Saved'; s.className = 'dp-ref-status saved'; }
     setTimeout(() => { const s2 = document.getElementById('dp-ref-status'); if (s2) { s2.textContent = ''; s2.className = 'dp-ref-status'; } }, 1800);
   } catch(e) { showToast('Save failed: ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  FM TRACKER SUMMARY
+// ══════════════════════════════════════════════════════════════════════════
+
+const FM_TRACKER_DEFAULT_START = '2026-06-23T10:00';
+
+async function loadFMTracker() {
+  try {
+    const doc = await db.collection('users').doc(state.user.uid)
+                        .collection('trackers').doc('period').get();
+    if (doc.exists) {
+      const d = doc.data();
+      document.getElementById('fm-tracker-start').value = d.start || FM_TRACKER_DEFAULT_START;
+      document.getElementById('fm-tracker-end').value   = d.end   || _fmNowStr();
+    } else {
+      document.getElementById('fm-tracker-start').value = FM_TRACKER_DEFAULT_START;
+      document.getElementById('fm-tracker-end').value   = _fmNowStr();
+    }
+  } catch(e) {
+    document.getElementById('fm-tracker-start').value = FM_TRACKER_DEFAULT_START;
+    document.getElementById('fm-tracker-end').value   = _fmNowStr();
+  }
+  await refreshFMTrackerStats();
+}
+
+function _fmNowStr() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+}
+
+function fmSetNow() {
+  document.getElementById('fm-tracker-end').value = _fmNowStr();
+  saveFMTrackerPeriod();
+}
+
+async function saveFMTrackerPeriod() {
+  const start = document.getElementById('fm-tracker-start').value;
+  const end   = document.getElementById('fm-tracker-end').value;
+  try {
+    await db.collection('users').doc(state.user.uid)
+            .collection('trackers').doc('period').set({ start, end });
+  } catch(e) {}
+  await refreshFMTrackerStats();
+}
+
+async function refreshFMTrackerStats() {
+  const start = document.getElementById('fm-tracker-start')?.value || FM_TRACKER_DEFAULT_START;
+  const end   = document.getElementById('fm-tracker-end')?.value   || _fmNowStr();
+  const startDate = start.slice(0, 10);
+  const endDate   = end.slice(0, 10);
+
+  const [allMonths, ud] = await Promise.all([getAllMonths(), getUserData()]);
+
+  let fmSS = 0, fmOther = 0;
+  Object.values(allMonths).forEach(data => {
+    let ssName = null, otName = null;
+    (data.categories || []).forEach(c => {
+      if (/fm\s*-?\s*ss/i.test(c.category))    ssName = c.category;
+      if (/fm\s*-?\s*other/i.test(c.category))  otName = c.category;
+    });
+    Object.entries(data.entries || {}).forEach(([ds, dayE]) => {
+      if (ds < startDate || ds > endDate) return;
+      if (ssName) fmSS   += (dayE[ssName] || 0);
+      if (otName) fmOther += (dayE[otName] || 0);
+    });
+  });
+
+  let movies = 0, stories = 0;
+  (ud.fmLog || []).forEach(e => {
+    if (!e.date || e.date < startDate || e.date > endDate) return;
+    if (/movie/i.test(e.type || ''))  movies++;
+    if (/story/i.test(e.type || ''))  stories++;
+  });
+
+  document.getElementById('fm-tracker-fmss').textContent    = Math.round(fmSS * 100) / 100 + ' hrs';
+  document.getElementById('fm-tracker-fmother').textContent = Math.round(fmOther * 100) / 100 + ' hrs';
+  document.getElementById('fm-tracker-movies').textContent  = movies;
+  document.getElementById('fm-tracker-stories').textContent = stories;
+}
+
+async function shareFMTracker() {
+  const card = document.getElementById('fm-tracker-card');
+  if (!card || typeof html2canvas === 'undefined') { showToast('Share unavailable'); return; }
+  const btn = card.querySelector('.fm-tracker-share-btn');
+  if (btn) btn.style.visibility = 'hidden';
+  showToast('Preparing image…');
+  try {
+    const cvs = await html2canvas(card, { backgroundColor: '#151F32', scale: 2, logging: false, useCORS: true });
+    if (btn) btn.style.visibility = '';
+    cvs.toBlob(async blob => {
+      const file = new File([blob], `fm-tracker-${todayStr()}.png`, { type: 'image/png' });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: 'FM Progress' }); return; } catch(e) { if (e.name === 'AbortError') return; }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = file.name; a.click();
+      URL.revokeObjectURL(url);
+    });
+  } catch(e) { if (btn) btn.style.visibility = ''; showToast('Share failed'); }
 }
 
 function applyRoleVisibility(role) {
