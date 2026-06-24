@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Timesheet</title>
-  <link rel="stylesheet" href="style.css?v=53">
+  <link rel="stylesheet" href="style.css?v=54">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -393,24 +393,7 @@
   <!-- ══ DAILY PLAN ══════════════════════════════════════════════════════ -->
   <div id="tab-dailyplan" class="tab-content">
 
-    <!-- Image reference section -->
-    <div class="card dp-image-card">
-      <div class="dp-image-header">
-        <span class="card-title">Weekly Schedule Reference</span>
-        <div class="dp-image-actions">
-          <label class="btn-secondary dp-upload-label" for="dp-img-input">Upload Image</label>
-          <input type="file" id="dp-img-input" accept="image/*" style="display:none" onchange="dpHandleImageUpload(this)">
-          <button class="btn-secondary dp-remove-btn hidden" id="dp-remove-btn" onclick="dpRemoveImage()">Remove</button>
-        </div>
-      </div>
-      <div id="dp-img-placeholder" class="dp-img-placeholder">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-        <p>Upload your weekly schedule image to display it here</p>
-      </div>
-      <img id="dp-img-display" class="dp-img-display hidden" alt="Weekly Plan">
-    </div>
-
-    <!-- Daily plan table -->
+    <!-- Daily plan table (top) -->
     <div class="card dp-plan-card">
       <div class="dp-plan-header">
         <span class="card-title">Daily Plan</span>
@@ -430,6 +413,29 @@
             </tr>
           </thead>
           <tbody id="dp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Weekly reference table (below) -->
+    <div class="card dp-ref-card">
+      <div class="dp-ref-header">
+        <span class="card-title">Weekly Reference</span>
+        <span class="dp-ref-status" id="dp-ref-status"></span>
+      </div>
+      <div class="dp-ref-wrap">
+        <table class="dp-ref-table">
+          <thead>
+            <tr>
+              <th class="dp-ref-th dp-ref-th-day">Day</th>
+              <th class="dp-ref-th dp-ref-th-slot">6:30</th>
+              <th class="dp-ref-th dp-ref-th-730">7:30</th>
+              <th class="dp-ref-th dp-ref-th-slot">8:30</th>
+              <th class="dp-ref-th dp-ref-th-morning">Morning Locations</th>
+              <th class="dp-ref-th dp-ref-th-evening">Evening</th>
+            </tr>
+          </thead>
+          <tbody id="dp-ref-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -733,7 +739,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=57"></script>
+<script src="app.js?v=58"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

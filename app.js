@@ -4820,10 +4820,7 @@ function dpAllDates() {
 }
 
 async function loadDailyPlanTab() {
-  // Show image from localStorage
-  dpRestoreImage();
-
-  // Load data from Firestore
+  // Load daily plan data
   const year = String(new Date().getFullYear());
   try {
     const doc = await db.collection('users').doc(state.user.uid)
@@ -4840,7 +4837,14 @@ async function loadDailyPlanTab() {
     dpRefreshInputs();
   }
 
-  dpScrollToThisWeek();
+  // Double RAF: ensures browser has finished layout before measuring
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    dpSetTableHeight();
+    dpScrollToThisWeek();
+  }));
+
+  // Load weekly reference in parallel
+  dpLoadWeeklyRef();
 }
 
 function dpBuildTable() {
@@ -4907,16 +4911,28 @@ function dpRefreshInputs() {
   });
 }
 
+function dpSetTableHeight() {
+  const wrap = document.getElementById('dp-table-wrap');
+  const tbody = document.getElementById('dp-tbody');
+  if (!wrap || !tbody) return;
+  const allRows = Array.from(tbody.querySelectorAll('tr'));
+  if (!allRows.length) return;
+  const thead = wrap.querySelector('thead');
+  const theadH = thead ? thead.offsetHeight : 38;
+  // Measure exactly 7 rows (one week) for the visible height
+  const rowsH = allRows.slice(0, 7).reduce((s, r) => s + r.offsetHeight, 0);
+  wrap.style.height = (theadH + rowsH + 1) + 'px';
+}
+
 function dpScrollToThisWeek() {
   const monday = dpGetMonday(new Date());
   const mondayStr = dpDateStr(monday);
   const row = document.getElementById(`dp-row-${mondayStr}`);
   const wrap = document.getElementById('dp-table-wrap');
-  if (row && wrap) {
-    const thead = wrap.querySelector('thead');
-    const theadH = thead ? thead.getBoundingClientRect().height : 0;
-    wrap.scrollTop = row.offsetTop - theadH;
-  }
+  if (!row || !wrap) return;
+  const thead = wrap.querySelector('thead');
+  const theadH = thead ? thead.offsetHeight : 0;
+  wrap.scrollTop = row.offsetTop - theadH;
 }
 
 function dpScheduleSave() {
@@ -4946,42 +4962,100 @@ async function dpFlushSave() {
   }
 }
 
-// ── Image upload ──────────────────────────────────────────────────────────
+// ── Weekly Reference ─────────────────────────────────────────────────────
 
-function dpHandleImageUpload(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const dataUrl = e.target.result;
-    try { localStorage.setItem('dp_weekly_image', dataUrl); } catch(_) {}
-    dpShowImage(dataUrl);
-  };
-  reader.readAsDataURL(file);
-  input.value = ''; // allow re-upload of same file
-}
+const DP_REF_DAYS     = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DP_REF_DAY_FULL = { Mon:'Monday', Tue:'Tuesday', Wed:'Wednesday', Thu:'Thursday', Fri:'Friday', Sat:'Saturday', Sun:'Sunday' };
+const DP_REF_DEFAULTS = {
+  Mon: { c630: '',            c730: 'MMA + GYM',                                       c830: '', morning: 'Library 1, Library 2, Phoenix Mall, Home Work + Outworks + Home, Others', evening: 'S&B' },
+  Tue: { c630: 'Meditation',  c730: 'MMA / GYM',                                       c830: '', morning: 'Library 1, Library 2, Phoenix Mall, Home Work + Outworks + Home, Others', evening: 'S&B' },
+  Wed: { c630: 'Meditation',  c730: 'Rest',                                             c830: '', morning: 'Movie',                                                                    evening: 'Home, MMA + GYM (Optional)' },
+  Thu: { c630: '',            c730: 'MMA + GYM',                                       c830: '', morning: 'Library 1, Library 2, Phoenix Mall, Home Work + Outworks + Home, Others', evening: 'S&B' },
+  Fri: { c630: '',            c730: 'MMA + GYM',                                       c830: '', morning: 'Other Working Space, Phoenix Mall, Home Work + Outworks + Home, Others',  evening: 'S&B, Other Working Space' },
+  Sat: { c630: '',            c730: 'MMA Sparring / Cricket / Group Workout / Cycling', c830: '', morning: '',                                                                        evening: '' },
+  Sun: { c630: '',            c730: 'Rest',                                             c830: 'Meditation', morning: '',                                                              evening: '' },
+};
 
-function dpShowImage(dataUrl) {
-  document.getElementById('dp-img-placeholder').classList.add('hidden');
-  const img = document.getElementById('dp-img-display');
-  img.src = dataUrl;
-  img.classList.remove('hidden');
-  document.getElementById('dp-remove-btn').classList.remove('hidden');
-}
+let dpRefData     = {};
+let dpRefSaveTimer = null;
+let dpRefBuilt    = false;
 
-function dpRemoveImage() {
-  localStorage.removeItem('dp_weekly_image');
-  document.getElementById('dp-img-display').classList.add('hidden');
-  document.getElementById('dp-img-display').src = '';
-  document.getElementById('dp-remove-btn').classList.add('hidden');
-  document.getElementById('dp-img-placeholder').classList.remove('hidden');
-}
-
-function dpRestoreImage() {
+async function dpLoadWeeklyRef() {
   try {
-    const saved = localStorage.getItem('dp_weekly_image');
-    if (saved) dpShowImage(saved);
-  } catch(_) {}
+    const doc = await db.collection('users').doc(state.user.uid)
+                        .collection('weeklyref').doc('template').get();
+    dpRefData = doc.exists ? (doc.data().rows || {}) : {};
+  } catch(e) {
+    dpRefData = {};
+  }
+  if (!dpRefBuilt) { dpBuildWeeklyRef(); dpRefBuilt = true; }
+  else dpRefreshWeeklyRef();
+}
+
+function dpBuildWeeklyRef() {
+  const tbody = document.getElementById('dp-ref-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  DP_REF_DAYS.forEach(day => {
+    const saved = dpRefData[day] || {};
+    const def   = DP_REF_DEFAULTS[day] || {};
+    const dow   = DP_REF_DAYS.indexOf(day); // 0=Mon
+    const tr = document.createElement('tr');
+    tr.className = 'dp-ref-row dp-ref-row-' + day.toLowerCase();
+
+    const tdDay = document.createElement('td');
+    tdDay.className = 'dp-ref-day-cell' + (dow === 5 ? ' dp-ref-sat' : dow === 6 ? ' dp-ref-sun' : '');
+    tdDay.textContent = DP_REF_DAY_FULL[day];
+    tr.appendChild(tdDay);
+
+    ['c630','c730','c830','morning','evening'].forEach(col => {
+      const td = document.createElement('td');
+      td.className = 'dp-ref-cell dp-ref-col-' + col;
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'dp-ref-input';
+      inp.id = `dp-ref-${day}-${col}`;
+      inp.value = saved[col] !== undefined ? saved[col] : (def[col] || '');
+      inp.placeholder = col === 'morning' ? 'Locations…' : col === 'evening' ? 'Evening…' : 'Activity…';
+      inp.addEventListener('input', () => {
+        if (!dpRefData[day]) dpRefData[day] = {};
+        dpRefData[day][col] = inp.value;
+        dpScheduleRefSave();
+      });
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function dpRefreshWeeklyRef() {
+  DP_REF_DAYS.forEach(day => {
+    const saved = dpRefData[day] || {};
+    const def   = DP_REF_DEFAULTS[day] || {};
+    ['c630','c730','c830','morning','evening'].forEach(col => {
+      const inp = document.getElementById(`dp-ref-${day}-${col}`);
+      if (inp) inp.value = saved[col] !== undefined ? saved[col] : (def[col] || '');
+    });
+  });
+}
+
+function dpScheduleRefSave() {
+  const s = document.getElementById('dp-ref-status');
+  if (s) { s.textContent = 'Saving…'; s.className = 'dp-ref-status saving'; }
+  clearTimeout(dpRefSaveTimer);
+  dpRefSaveTimer = setTimeout(dpFlushRefSave, 900);
+}
+
+async function dpFlushRefSave() {
+  try {
+    await db.collection('users').doc(state.user.uid)
+            .collection('weeklyref').doc('template')
+            .set({ rows: dpRefData }, { merge: true });
+    const s = document.getElementById('dp-ref-status');
+    if (s) { s.textContent = 'Saved'; s.className = 'dp-ref-status saved'; }
+    setTimeout(() => { const s2 = document.getElementById('dp-ref-status'); if (s2) { s2.textContent = ''; s2.className = 'dp-ref-status'; } }, 1800);
+  } catch(e) { showToast('Save failed: ' + e.message); }
 }
 
 function applyRoleVisibility(role) {
