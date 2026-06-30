@@ -3469,7 +3469,11 @@ function renderPlannerBlock(pi, bi, block) {
         <input class="planner-block-title" value="${escHtml(block.header)}"
           onblur="updatePlannerBlockHeader(${pi},${bi},this.value)">
         <div class="planner-block-actions">
-          ${!block.checklistType && !block.imageData ? `<button class="btn-planner-addcol-title" onclick="addPlannerColumn(${pi},${bi})" title="Add column">+ Col</button>` : ''}
+          ${!block.checklistType && !block.imageData ? `
+            <button class="btn-planner-addcol-title" onclick="addPlannerColumn(${pi},${bi})" title="Add column">+ Col</button>
+            <button class="btn-planner-addcol-title btn-planner-import" onclick="document.getElementById('planner-xl-${pi}-${bi}').click()" title="Import from Excel / CSV">⬆ Import</button>
+            <input type="file" id="planner-xl-${pi}-${bi}" accept=".xlsx,.xls,.csv" style="display:none" onchange="importPlannerBlockExcel(${pi},${bi},this)">
+          ` : ''}
           ${bi > 0 ? `<button class="btn-planner-move" onclick="movePlannerBlockUp(${pi},${bi})" title="Move up">↑</button>` : ''}
           ${bi < total - 1 ? `<button class="btn-planner-move" onclick="movePlannerBlockDown(${pi},${bi})" title="Move down">↓</button>` : ''}
           <div class="planner-block-menu-wrap">
@@ -3483,6 +3487,37 @@ function renderPlannerBlock(pi, bi, block) {
       </div>
       ${body}
     </div>`;
+}
+
+async function importPlannerBlockExcel(pi, bi, input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (!data.length) { showToast('Empty sheet'); return; }
+      const block = state.planners[pi].blocks[bi];
+      // Row 0 = column headers; rows 1+ = data
+      const headers = data[0].map(h => String(h || '').trim()).filter(Boolean);
+      if (!headers.length) { showToast('No headers found in row 1'); return; }
+      block.cols = headers;
+      block.rows = data.slice(1)
+        .filter(row => row.some(c => String(c || '').trim()))
+        .map(row => {
+          const r = {};
+          headers.forEach((_, ci) => { r['c' + ci] = String(row[ci] ?? '').trim(); });
+          return r;
+        });
+      await saveUserData({ planners: state.planners });
+      showToast(`Imported ${block.rows.length} rows`);
+      renderPlannerTab();
+    } catch(err) { showToast('Import failed: ' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function autoResizeTa(ta) {
