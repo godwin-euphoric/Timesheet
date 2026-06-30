@@ -1789,23 +1789,41 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 .fm-now-btn:hover { border-color: var(--lime); }
 
+/* Shareable stats sub-section */
+.fm-stats-section {
+  position: relative;
+  margin-top: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 14px;
+  padding: 40px 12px 14px;
+}
+.fm-stats-share-btn {
+  position: absolute; top: 10px; right: 10px;
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 13px; font-size: 12px; font-weight: 600;
+  background: var(--primary); border: none; border-radius: 20px;
+  color: #fff; cursor: pointer; transition: opacity 0.15s;
+}
+.fm-stats-share-btn:hover { opacity: 0.85; }
+
 .fm-tracker-tiles {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
 }
 .fm-tile {
-  border-radius: 12px; padding: 14px 8px; text-align: center;
+  border-radius: 12px; padding: 16px 10px 14px; text-align: center;
 }
 .fm-tile-blue   { background: rgba(80,150,255,0.13); }
 .fm-tile-teal   { background: rgba(50,200,140,0.13); }
 .fm-tile-orange { background: rgba(255,160,60,0.13); }
 .fm-tile-purple { background: rgba(160,100,255,0.13); }
 .fm-tile strong {
-  display: block; font-size: 18px; font-weight: 800;
-  margin-bottom: 5px; color: var(--text); line-height: 1.1;
+  display: block; font-size: 22px; font-weight: 800;
+  margin-bottom: 8px; color: var(--text); line-height: 1.1;
 }
 .fm-tile small {
-  font-size: 10px; color: var(--muted); font-weight: 600;
-  letter-spacing: 0.3px; line-height: 1.3; display: block;
+  font-size: 12px; color: var(--muted); font-weight: 500;
+  line-height: 1.4; display: block;
 }
 
 @media (max-width: 640px) {

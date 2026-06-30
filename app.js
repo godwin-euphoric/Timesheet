@@ -5157,13 +5157,13 @@ async function refreshFMTrackerStats() {
 }
 
 async function shareFMTracker() {
-  const card = document.getElementById('fm-tracker-card');
-  if (!card || typeof html2canvas === 'undefined') { showToast('Share unavailable'); return; }
-  const btn = card.querySelector('.fm-tracker-share-btn');
+  const section = document.getElementById('fm-stats-share');
+  if (!section || typeof html2canvas === 'undefined') { showToast('Share unavailable'); return; }
+  const btn = section.querySelector('.fm-stats-share-btn');
   if (btn) btn.style.visibility = 'hidden';
   showToast('Preparing image…');
   try {
-    const cvs = await html2canvas(card, { backgroundColor: '#151F32', scale: 2, logging: false, useCORS: true });
+    const cvs = await html2canvas(section, { backgroundColor: '#151F32', scale: 2, logging: false, useCORS: true });
     if (btn) btn.style.visibility = '';
     cvs.toBlob(async blob => {
       const file = new File([blob], `fm-tracker-${todayStr()}.png`, { type: 'image/png' });
