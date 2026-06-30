@@ -3356,7 +3356,11 @@ function renderPlannerBlock(pi, bi, block) {
 
   // ── ⋯ menu items based on current mode ──
   let menuItems;
-  if (block.checklistType) {
+  if (block.taskTable) {
+    menuItems = `
+      <button onclick="ctxResetPlannerTasks()">🔄 Uncheck All</button>
+      <button onclick="ctxRemovePlannerTaskTable()">✕ Remove Task Table</button>`;
+  } else if (block.checklistType) {
     menuItems = `
       <button onclick="ctxResetPlannerChecklist()">🔄 Reset Checklist</button>
       <button onclick="ctxRemovePlannerChecklist()">✕ Remove Checklist</button>`;
@@ -3366,12 +3370,45 @@ function renderPlannerBlock(pi, bi, block) {
     menuItems = `
       <button onclick="ctxTogglePlannerImage()">🖼 Add Image</button>
       <button onclick="ctxSetPlannerChecklist('simple')">✅ Simple Checklist</button>
-      <button onclick="ctxSetPlannerChecklist('grid')">📅 Grid Checklist</button>`;
+      <button onclick="ctxSetPlannerChecklist('grid')">📅 Grid Checklist</button>
+      <button onclick="ctxSetPlannerTaskTable()">📋 Task Table</button>`;
   }
 
   // ── body based on mode ──
   let body;
-  if (block.checklistType === 'simple') {
+  if (block.taskTable) {
+    const trows = (block.taskRows || []).map((row, ri) => `
+      <tr class="${row.done ? 'ptask-done' : ''}">
+        <td class="ptask-sno">${ri + 1}</td>
+        <td class="ptask-task">
+          <textarea class="planner-cell" rows="1"
+            onblur="updatePlannerTaskField(${pi},${bi},${ri},'task',this.value)">${escHtml(row.task || '')}</textarea>
+        </td>
+        <td class="ptask-check">
+          <input type="checkbox" class="ptask-chk" ${row.done ? 'checked' : ''}
+            onchange="togglePlannerTask(${pi},${bi},${ri},this.checked)">
+        </td>
+        <td class="ptask-notes">
+          <textarea class="planner-cell" rows="1"
+            onblur="updatePlannerTaskField(${pi},${bi},${ri},'notes',this.value)">${escHtml(row.notes || '')}</textarea>
+        </td>
+        <td class="ptask-del">
+          <button class="btn-planner-icon" onclick="removePlannerTaskRow(${pi},${bi},${ri})">✕</button>
+        </td>
+      </tr>`).join('');
+    body = `<div class="table-scroll">
+      <table class="planner-task-table">
+        <thead><tr>
+          <th class="ptask-sno">#</th>
+          <th class="ptask-task">Task</th>
+          <th class="ptask-check">✓</th>
+          <th class="ptask-notes">Notes</th>
+          <th class="ptask-del"></th>
+        </tr></thead>
+        <tbody>${trows}</tbody>
+      </table></div>
+      <button class="btn-planner-add-row" onclick="addPlannerTaskRow(${pi},${bi})">+ Task</button>`;
+  } else if (block.checklistType === 'simple') {
     const items = block.checklistItems || [];
     const st = block.checklistState || {};
     const rows = items.map(item => `
@@ -3469,7 +3506,7 @@ function renderPlannerBlock(pi, bi, block) {
         <input class="planner-block-title" value="${escHtml(block.header)}"
           onblur="updatePlannerBlockHeader(${pi},${bi},this.value)">
         <div class="planner-block-actions">
-          ${!block.checklistType && !block.imageData ? `
+          ${!block.checklistType && !block.imageData && !block.taskTable ? `
             <button class="btn-planner-addcol-title" onclick="addPlannerColumn(${pi},${bi})" title="Add column">+ Col</button>
             <button class="btn-planner-addcol-title btn-planner-import" onclick="document.getElementById('planner-xl-${pi}-${bi}').click()" title="Import from Excel / CSV">⬆ Import</button>
             <input type="file" id="planner-xl-${pi}-${bi}" accept=".xlsx,.xls,.csv" style="display:none" onchange="importPlannerBlockExcel(${pi},${bi},this)">
@@ -3714,6 +3751,72 @@ async function ctxResetPlannerChecklist() {
   state.planners[_ctxPi].blocks[_ctxBi].checklistState = {};
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
+}
+
+// ── Task Table block ─────────────────────────────────────────────────────────
+
+async function ctxSetPlannerTaskTable() {
+  hidePlannerBlockMenu();
+  if (_ctxPi === null || _ctxBi === null) return;
+  const block = state.planners[_ctxPi].blocks[_ctxBi];
+  delete block.checklistType; delete block.checklistItems;
+  delete block.checklistState; delete block.checklistRows;
+  delete block.checklistCols; delete block.imageData;
+  block.taskTable = true;
+  block.taskRows  = block.taskRows || [];
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function ctxRemovePlannerTaskTable() {
+  hidePlannerBlockMenu();
+  if (_ctxPi === null || _ctxBi === null) return;
+  if (!confirm('Remove task table and restore regular table?')) return;
+  const block = state.planners[_ctxPi].blocks[_ctxBi];
+  delete block.taskTable; delete block.taskRows;
+  block.rows = block.rows || [mkRow('', '')];
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function ctxResetPlannerTasks() {
+  hidePlannerBlockMenu();
+  if (_ctxPi === null || _ctxBi === null) return;
+  if (!confirm('Uncheck all tasks?')) return;
+  const rows = state.planners[_ctxPi].blocks[_ctxBi].taskRows || [];
+  rows.forEach(r => r.done = false);
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function addPlannerTaskRow(pi, bi) {
+  const block = state.planners[pi].blocks[bi];
+  if (!block.taskRows) block.taskRows = [];
+  block.taskRows.push({ task: '', done: false, notes: '' });
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function removePlannerTaskRow(pi, bi, ri) {
+  state.planners[pi].blocks[bi].taskRows.splice(ri, 1);
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function togglePlannerTask(pi, bi, ri, checked) {
+  state.planners[pi].blocks[bi].taskRows[ri].done = checked;
+  await saveUserData({ planners: state.planners });
+  // just update the row class without full re-render
+  const trs = document.querySelectorAll(`#pbm-${pi}-${bi}`).length
+    ? [] : document.querySelectorAll('.planner-task-table tbody tr');
+  trs[ri]?.classList.toggle('ptask-done', checked);
+}
+
+async function updatePlannerTaskField(pi, bi, ri, field, value) {
+  const row = state.planners[pi].blocks[bi].taskRows[ri];
+  if (!row || row[field] === value) return;
+  row[field] = value;
+  await saveUserData({ planners: state.planners });
 }
 
 // Simple checklist

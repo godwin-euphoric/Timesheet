@@ -1183,6 +1183,25 @@ textarea#fm-notes:focus {
 .wc-act-col .btn-planner-icon { margin-left: 6px; font-size: 11px; opacity: 0.4; vertical-align: middle; }
 .wc-act-col .btn-planner-icon:hover { opacity: 1; }
 
+/* Planner Task Table block */
+.planner-task-table { width: 100%; border-collapse: collapse; }
+.planner-task-table thead th {
+  background: var(--card2); font-size: 11px; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--border);
+}
+.planner-task-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); }
+.planner-task-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+.planner-task-table td { padding: 3px 6px; vertical-align: middle; }
+.ptask-sno { width: 36px; text-align: center; color: var(--muted); font-size: 12px; font-weight: 600; }
+.ptask-check { width: 42px; text-align: center; }
+.ptask-del  { width: 28px; text-align: center; }
+.ptask-task { min-width: 160px; }
+.ptask-notes { min-width: 120px; }
+.ptask-chk { width: 16px; height: 16px; accent-color: var(--lime); cursor: pointer; }
+.ptask-done { opacity: 0.45; }
+.ptask-done .ptask-task .planner-cell { text-decoration: line-through; color: var(--muted); }
+
 /* Planner block image mode */
 .planner-block-image-wrap { padding: 12px 0 8px; text-align: center; }
 .planner-block-img { max-width: 100%; max-height: 480px; border-radius: 8px; object-fit: contain; }
