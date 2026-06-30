@@ -5017,7 +5017,7 @@ function dpBuildWeeklyRef() {
       inp.className = 'dp-ref-input';
       inp.id = `dp-ref-${day}-${col}`;
       inp.value = saved[col] !== undefined ? saved[col] : (def[col] || '');
-      inp.placeholder = col === 'morning' ? 'Locations…' : col === 'evening' ? 'Evening…' : 'Activity…';
+      inp.placeholder = '';
       inp.addEventListener('input', () => {
         if (!dpRefData[day]) dpRefData[day] = {};
         dpRefData[day][col] = inp.value;

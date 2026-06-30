@@ -1824,21 +1824,25 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .dp-ref-status.saving { color: #996600; }
 .dp-ref-status.saved  { color: #007740; }
 .dp-ref-wrap { border-color: #CBD8E6; }
-.dp-ref-day-cell { background: #F4F8FC; color: #1A2840; border-right: 1px solid #E0EAF4; }
-.dp-ref-row { border-bottom-color: #E4EEF8; }
-.dp-ref-col-c630    { background: rgba(40,180,120,0.06); }
-.dp-ref-col-c730    { background: rgba(210,70,50,0.05); }
-.dp-ref-col-c830    { background: rgba(40,180,120,0.06); }
-.dp-ref-col-morning { background: rgba(60,130,240,0.04); }
-.dp-ref-col-evening { background: rgba(120,80,240,0.04); }
-/* Force white inputs regardless of browser dark-mode defaults */
+.dp-ref-day-cell { background: #F0F4FA; color: #1A2840; border-right: 1px solid #E0EAF4; font-weight: 600; }
+.dp-ref-row { border-bottom-color: #E8EEF6; }
+.dp-ref-col-c630    { background: rgba(40,180,120,0.05); }
+.dp-ref-col-c730    { background: rgba(210,70,50,0.04); }
+.dp-ref-col-c830    { background: rgba(40,180,120,0.05); }
+.dp-ref-col-morning { background: rgba(60,130,240,0.03); }
+.dp-ref-col-evening { background: rgba(120,80,240,0.03); }
+/* Inputs look like plain editable text — no borders */
 .dp-ref-input {
-  color: #1A2840; background: #FFFFFF !important;
+  color: #2C3E5A !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  border-radius: 4px;
   color-scheme: light;
+  box-shadow: none !important;
 }
-.dp-ref-input::placeholder { color: transparent; }
-.dp-ref-input:focus::placeholder { color: #B0BEC5; }
-.dp-ref-input:not(:placeholder-shown):not(:focus) { background: #FFFFFF !important; border-color: transparent; }
+.dp-ref-input:hover  { background: rgba(80,130,240,0.07) !important; }
+.dp-ref-input:focus  { background: rgba(80,130,240,0.10) !important; }
 .dp-ref-sat { color: #1055B8 !important; }
 .dp-ref-sun { color: #C02020 !important; }
 
