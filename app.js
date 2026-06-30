@@ -728,6 +728,7 @@ async function logEntry() {
   showToast('Entry saved');
   await loadMonthlySummary(data);
   await renderDayEntries();
+  refreshFMTrackerStats();
 }
 
 async function deleteEntryFromLog(date, category) {
@@ -743,6 +744,7 @@ async function deleteEntryFromLog(date, category) {
   showToast('Entry deleted');
   await loadMonthlySummary(data);
   await renderDayEntries();
+  refreshFMTrackerStats();
 }
 
 // ── Wasted Time ───────────────────────────────────────────────────────────
@@ -2044,6 +2046,7 @@ async function addFmEntry() {
   document.getElementById('fm-notes').value = '';
   showToast(`${type} added`);
   renderFmTables(userData.fmCategories || [], fmLog);
+  refreshFMTrackerStats();
 }
 
 async function deleteFmEntry(id) {
@@ -2053,6 +2056,7 @@ async function deleteFmEntry(id) {
   showToast('Entry deleted');
   renderFmTables(userData.fmCategories || [], fmLog);
   renderFmTablesMain(userData.fmCategories || [], fmLog);
+  refreshFMTrackerStats();
 }
 
 function populateMainFmDropdown(cats) {
@@ -2117,6 +2121,7 @@ async function addFmEntryFromMain() {
   renderFmTablesMain(userData.fmCategories || [], fmLog);
   renderFmTables(userData.fmCategories || [], fmLog);
   await loadMonthlySummary(await getMonthData(state.mainMonth));
+  refreshFMTrackerStats();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
