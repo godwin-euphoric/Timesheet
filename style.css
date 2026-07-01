@@ -1039,12 +1039,33 @@ textarea#fm-notes:focus {
 .planner-sub-tab.dragging { opacity: 0.4; }
 .planner-sub-tab.drag-over { border-color: var(--lime); background: rgba(200,255,0,0.08); }
 .planner-tab-name { cursor: grab; }
+.planner-tab-rename-btn {
+  font-size: 13px; opacity: 0.45; cursor: pointer; line-height: 1;
+  padding: 1px 2px; border-radius: 3px; transition: opacity 0.15s, color 0.15s;
+}
+.planner-tab-rename-btn:hover { opacity: 1; color: var(--lime); }
 .planner-tab-rename-input {
   background: transparent; border: none; border-bottom: 1px solid var(--lime);
   color: inherit; font: inherit; font-size: 12px; width: 80px;
   outline: none; padding: 0 2px;
 }
 .planner-new-btn { flex-shrink: 0; }
+
+/* Block headings nav */
+.planner-block-nav {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 8px 0 6px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  min-height: 0;
+}
+.planner-block-nav:empty { display: none; }
+.planner-block-nav-btn {
+  padding: 4px 14px; font-size: 12px; font-weight: 600;
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 20px; color: var(--muted); cursor: pointer;
+  white-space: nowrap; transition: all 0.15s;
+}
+.planner-block-nav-btn:hover { border-color: var(--primary); color: var(--text); }
 
 .planner-block {
   margin-bottom: 20px;

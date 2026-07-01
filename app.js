@@ -3330,14 +3330,29 @@ function renderPlannerTab() {
       ondrop="plannerTabDrop(event,${i})"
       ondragend="plannerTabDragEnd(event)"
       onclick="switchPlanner(${i})">
-      <span class="planner-tab-name" ondblclick="event.stopPropagation();startRenamePlanner(${i})" title="Double-click to rename">${escHtml(p.name)}</span>
+      <span class="planner-tab-name" ondblclick="event.stopPropagation();startRenamePlanner(${i})">${escHtml(p.name)}</span>
+      ${i === ai ? `<span class="planner-tab-rename-btn" onclick="event.stopPropagation();startRenamePlanner(${i})" title="Rename">✎</span>` : ''}
       <span class="planner-tab-del" onclick="event.stopPropagation();deletePlanner(${i})" title="Delete">✕</span>
     </button>`).join('');
 
   const container = document.getElementById('planner-blocks-container');
-  if (!planners.length) { container.innerHTML = ''; return; }
+  const blockNav  = document.getElementById('planner-block-nav');
+
+  if (!planners.length) {
+    container.innerHTML = '';
+    if (blockNav) blockNav.innerHTML = '';
+    return;
+  }
 
   const planner = planners[ai];
+
+  // Block headings nav
+  if (blockNav) {
+    blockNav.innerHTML = planner.blocks.map((b, bi) =>
+      `<button class="planner-block-nav-btn" onclick="scrollToPlannerBlock(${bi})">${escHtml(b.header)}</button>`
+    ).join('');
+  }
+
   container.innerHTML =
     `<div class="planner-top-bar">
        <button class="btn-secondary planner-add-block-btn" onclick="addPlannerBlock()">+ Add Block</button>
@@ -3501,7 +3516,7 @@ function renderPlannerBlock(pi, bi, block) {
   }
 
   return `
-    <div class="planner-block card">
+    <div class="planner-block card" id="planner-block-${bi}">
       <div class="planner-block-titlebar">
         <input class="planner-block-title" value="${escHtml(block.header)}"
           onblur="updatePlannerBlockHeader(${pi},${bi},this.value)">
@@ -3560,6 +3575,11 @@ async function importPlannerBlockExcel(pi, bi, input) {
 function autoResizeTa(ta) {
   ta.style.height = 'auto';
   ta.style.height = ta.scrollHeight + 'px';
+}
+
+function scrollToPlannerBlock(bi) {
+  const el = document.getElementById(`planner-block-${bi}`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function switchPlanner(idx) {
