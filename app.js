@@ -269,6 +269,9 @@ function initApp() {
   initYearSelector();
   loadMainTab();
   checkUserAccess();
+  window.addEventListener('scroll', () => {
+    document.getElementById('back-to-top-btn')?.classList.toggle('visible', window.scrollY > 250);
+  });
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -3332,6 +3335,7 @@ function renderPlannerTab() {
       onclick="switchPlanner(${i})">
       <span class="planner-tab-name" ondblclick="event.stopPropagation();startRenamePlanner(${i})">${escHtml(p.name)}</span>
       ${i === ai ? `<span class="planner-tab-rename-btn" onclick="event.stopPropagation();startRenamePlanner(${i})" title="Rename">✎</span>` : ''}
+      ${i === ai ? `<span class="planner-tab-blocks-btn" onclick="event.stopPropagation();togglePlannerBlocksDropdown(${i},this)" title="Jump to block">▾</span>` : ''}
       <span class="planner-tab-del" onclick="event.stopPropagation();deletePlanner(${i})" title="Delete">✕</span>
     </button>`).join('');
 
@@ -3346,12 +3350,8 @@ function renderPlannerTab() {
 
   const planner = planners[ai];
 
-  // Block headings nav
-  if (blockNav) {
-    blockNav.innerHTML = planner.blocks.map((b, bi) =>
-      `<button class="planner-block-nav-btn" onclick="scrollToPlannerBlock(${bi})">${escHtml(b.header)}</button>`
-    ).join('');
-  }
+  // Block headings nav — hidden; dropdown on tab handles navigation
+  if (blockNav) blockNav.innerHTML = '';
 
   container.innerHTML =
     `<div class="planner-top-bar">
@@ -3581,9 +3581,38 @@ function scrollToPlannerBlock(bi) {
   const el = document.getElementById(`planner-block-${bi}`);
   if (!el) return;
   const headerH = document.querySelector('header')?.offsetHeight || 64;
-  const navH    = document.getElementById('planner-block-nav')?.offsetHeight || 0;
-  const top = el.getBoundingClientRect().top + window.pageYOffset - headerH - navH - 8;
+  const top = el.getBoundingClientRect().top + window.pageYOffset - headerH - 8;
   window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
+
+function togglePlannerBlocksDropdown(pi, btn) {
+  const existing = document.getElementById('planner-blocks-dropdown');
+  if (existing) { existing.remove(); return; }
+
+  const planner = state.planners[pi];
+  if (!planner || !planner.blocks.length) return;
+
+  const rect = btn.getBoundingClientRect();
+  const dd = document.createElement('div');
+  dd.id = 'planner-blocks-dropdown';
+  dd.className = 'planner-blocks-dropdown';
+  dd.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
+  dd.style.left = rect.left + 'px';
+
+  dd.innerHTML = planner.blocks.map((b, bi) =>
+    `<button class="planner-blocks-dd-item" onclick="scrollToPlannerBlock(${bi});document.getElementById('planner-blocks-dropdown')?.remove()">${escHtml(b.header)}</button>`
+  ).join('');
+
+  document.body.appendChild(dd);
+  setTimeout(() => document.addEventListener('click', _closePlannerDD, { once: true }), 0);
+}
+
+function _closePlannerDD() {
+  document.getElementById('planner-blocks-dropdown')?.remove();
+}
+
+function scrollToPageTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function switchPlanner(idx) {
