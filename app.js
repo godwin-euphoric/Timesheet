@@ -5670,3 +5670,62 @@ async function deleteBpEntry(id) {
   renderBpTable(bpLog);
 }
 
+// ONE-TIME SEED: call seedSivanthiyappanStatus() from browser console once
+async function seedSivanthiyappanStatus() {
+  const ROWS = [
+    ['1',  'One Line Generation', 'Done'],
+    ['2',  'Thinking Around the One Line', 'Done'],
+    ['3',  'Getting a Rough Plot - Permutations, Combinations, Thinking and Bringing a Rough Plot', 'Done'],
+    ['4',  'Tell Others and Get Feedback', 'Done'],
+    ['5',  'Write the Rough Plot Version - Rough Version - All Notes in General', 'Done'],
+    ['6',  'Prepare Excel with Scene List - Columns Needed: Scene No, Location, Day/Night, Scene Description, Rough Version Points to improve, All Other Notes (Fill Till This Column), Draft1 status, Draft 1 points to improve, Draft 2 Status, Draft 2 points to improve, Draft 3 status, Draft 3 points to improve, Final Draft without any Correction status, Future check and Additions, Actors, Properties, Costumes, Background Stuffs BP, BPR, BA, BS', 'Done'],
+    ['7',  'Fill the rough Notes / Corrections Across all Scenes', 'Done'],
+    ['8',  'Character Sketch - Do Character Study and Do research and Build Character arc and all. We should know how the character behaves, his speaking style', 'Done'],
+    ['9',  'Write Draft 1: Go through Each Scene and Make Corrections and Check previous improvement Area and Note future improvements as Draft 1 Improvements list. Once All Improvement Areas are Completed, Check Rough Version Improvement Area. Once Each Version is Completed, Take Print out of the Version. Count the Completion % with number of Pages in Rough Document', 'Done'],
+    ['10', 'Work on Draft 1.5', 'Done'],
+    ['11', 'Discuss 1.5 with People and Note Improvements Needed', 'Done'],
+    ['12', 'Draft 2: Complete Draft 2 - Complete Scene by Scene and Note Improvements / Note: When ever Free, you can do it', ''],
+    ['13', 'Draft 2.5: Fix improvements Noted in Draft 2', ''],
+    ['11', 'Draft 2 - get review from People Needed and Correct it and Lock it', ''],
+    ['12', 'Draft 3 - Put the whole script in Proper own english and dialogues in tanglish. Proper Numbering of Each Scenes, Sub Scenes, Montages. Update the Excel for Scene, Sub Scene List. Proper Neat Script', ''],
+    ['13', 'Draft 4: Background Sounds - Fill the Column - Visualize the scene and check if it is Needed, Ambience, songs audio in background like radio etc. Note - background items for SS refer scam 1992, Even in the scene with advocate they had crow sounds. In room planning scene near kitchen we can use near by dog sound, click sound in any one room, Based on this sound the Scene might be Improvised too', ''],
+    ['14', 'Draft 5: Scene Improvisation - Go through Each Scene and See any Improvisations Can be done. If so please do it', ''],
+    ['16', 'Dialogue Preresearch: 1. Create a List for finding the slang and choice of words and ideology of the characters, Research on how they talk, check with Relevant people for this - Get the Overall Locked Script. 2. Go through Vetrimaran movie / Ranjith / Other directors - Maniratnam, Mahendran and understand the dialogues pattern whichever Relevant to the Scenes', ''],
+    ['17', 'Draft 7: Write Dialogues or Coordinate with Someone and Write dialogues', ''],
+    ['18', 'Draft 8 - Do a study on the music and note where u need music and what type of music, this might tune the tune too, based on the music you can do changes/Correction to the scene too. This should be the last draft. If any improvement areas are there, note it and proceed with the next steps. (Learn Music - Nuances from Internet. For music Reference check, For background music refer Girl with Dragon Tattoo): Do After dialogues', ''],
+    ['20', 'Draft 9: Final Proof Reading and Lock the Script', ''],
+    ['21', 'Location Hunt and Finalise', ''],
+    ['22', 'Draft 10: Based on Location, Do final Changes', ''],
+    ['23', 'Prepare Excel Sheets for Actors and Associated Scenes List Along with their Costumes and Update the Costumes (Watch Wolf of Wall Street to understand the dressing behaviour, drinking behaviour, stylish drinking shots of rich people.)', ''],
+    ['24', 'Prepare Excel Sheets for Scene List with Properties Needed', ''],
+    ['25', 'Camera PreResearch: Godwin Shots (Unique Specific to Theme), Myskin Workshop shots, Internet Reference Shots, Favourite Dir Shots, ChatGPT Shots Finalize, Slowmotion Areas Note and why. (Have it only if it is necessary): Note: For shot Reference u can check few directors ideology. List the Directors and analyse it. (Slow Motion Wherever Necessary)', ''],
+    ['26', 'Camera PreResearch: Godwin Lighting Pattern (Unique Specific to Theme), Lighting Workshop Related shots, Internet Reference Shots, Favourite Dir Shots, ChatGPT Shots Finalize', ''],
+    ['27', 'Camera PreResearch: Godwin DI Pattern, Internet Reference Shots, ChatGPT Shots Finalize', ''],
+    ['26', 'Camera Draft 1: Discuss Shots, Lighting pattern, DI Pattern with Dhana and finalise and Note the Shot Divisions', ''],
+    ['27', 'Fix Body Language, Voice Tone (It can be a Rough One - don\'t Spend Much Time, Later we can finalize after sitting with the Actors)', ''],
+    ['28', 'Actors Hunt and Finalise - Actor Look Test and Confirm and Fix Them', ''],
+    ['29', 'Acting Rehearsal - Before this we need to speak with Actors and finalise the body language, speaking style, modulation and then Script Reading (Get Ebinesar Help on this)', ''],
+    ['30', 'Production Planning and Finalise - Location, costume, Actors etc', ''],
+    ['31', 'Others', ''],
+    ['32', 'Shoot', ''],
+    ['33', 'Post Production (Tamil)', ''],
+    ['34', 'Sales, Promotions, Release (Meanwhile Work on Dubbing: Options: Hindi, Malayalam Based on Market)', ''],
+  ];
+
+  const pi = state.planners.findIndex(p => /film/i.test(p.name));
+  if (pi === -1) { showToast('Filmmaking planner not found'); return; }
+  const bi = state.planners[pi].blocks.findIndex(b => /sivanthiyappan.*status/i.test(b.header));
+  if (bi === -1) { showToast('Sivanthiyappan Status block not found'); return; }
+
+  const block = state.planners[pi].blocks[bi];
+  delete block.taskTable;
+  delete block.taskRows;
+  delete block.checklistType;
+  block.cols = ['S.', 'Task', 'Status'];
+  block.rows = ROWS.map(([s, task, status]) => ({ c0: s, c1: task, c2: status }));
+
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+  showToast('Sivanthiyappan Status seeded!');
+}
+
