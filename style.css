@@ -1051,19 +1051,22 @@ textarea#fm-notes:focus {
 }
 .planner-new-btn { flex-shrink: 0; }
 
-/* Block headings nav */
+/* Block headings nav — sticky below header */
 .planner-block-nav {
-  display: flex; gap: 6px; flex-wrap: wrap;
-  padding: 8px 0 6px; margin-bottom: 4px;
+  display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto;
+  padding: 8px 0 8px; margin-bottom: 8px;
   border-bottom: 1px solid var(--border);
-  min-height: 0;
+  position: sticky; top: 64px; z-index: 95;
+  background: var(--bg);
+  scrollbar-width: none;
 }
+.planner-block-nav::-webkit-scrollbar { display: none; }
 .planner-block-nav:empty { display: none; }
 .planner-block-nav-btn {
-  padding: 4px 14px; font-size: 12px; font-weight: 600;
+  padding: 5px 14px; font-size: 12px; font-weight: 600;
   background: var(--card2); border: 1px solid var(--border);
   border-radius: 20px; color: var(--muted); cursor: pointer;
-  white-space: nowrap; transition: all 0.15s;
+  white-space: nowrap; flex-shrink: 0; transition: all 0.15s;
 }
 .planner-block-nav-btn:hover { border-color: var(--primary); color: var(--text); }
 

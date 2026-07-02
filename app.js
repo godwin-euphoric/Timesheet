@@ -3579,7 +3579,11 @@ function autoResizeTa(ta) {
 
 function scrollToPlannerBlock(bi) {
   const el = document.getElementById(`planner-block-${bi}`);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (!el) return;
+  const headerH = document.querySelector('header')?.offsetHeight || 64;
+  const navH    = document.getElementById('planner-block-nav')?.offsetHeight || 0;
+  const top = el.getBoundingClientRect().top + window.pageYOffset - headerH - navH - 8;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
 }
 
 function switchPlanner(idx) {
