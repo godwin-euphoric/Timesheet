@@ -3525,7 +3525,7 @@ function renderPlannerBlock(pi, bi, block) {
             <button class="btn-planner-addcol-title" onclick="addPlannerColumn(${pi},${bi})" title="Add column">+ Col</button>
             <button class="btn-planner-addcol-title btn-planner-import" onclick="document.getElementById('planner-xl-${pi}-${bi}').click()" title="Import from Excel / CSV">⬆ Import</button>
             <input type="file" id="planner-xl-${pi}-${bi}" accept=".xlsx,.xls,.csv" style="display:none" onchange="importPlannerBlockExcel(${pi},${bi},this)">
-            ${/sivanthiyappan.*status/i.test(block.header) && !(block.rows||[]).some(r=>r.c1) ? `<button class="btn-planner-addcol-title btn-seed-data" onclick="seedSivanthiyappanStatus()">📥 Load Data</button>` : ''}
+            ${/sivanthiyappan.*status/i.test(block.header) && !(block.rows||[]).some(r=>r.c1) ? `<button class="btn-planner-addcol-title btn-seed-data" onclick="seedSivanthiyappanStatus(${pi},${bi})">📥 Load Data</button>` : ''}
           ` : ''}
           ${bi > 0 ? `<button class="btn-planner-move" onclick="movePlannerBlockUp(${pi},${bi})" title="Move up">↑</button>` : ''}
           ${bi < total - 1 ? `<button class="btn-planner-move" onclick="movePlannerBlockDown(${pi},${bi})" title="Move down">↓</button>` : ''}
@@ -5671,8 +5671,8 @@ async function deleteBpEntry(id) {
   renderBpTable(bpLog);
 }
 
-// ONE-TIME SEED: call seedSivanthiyappanStatus() from browser console once
-async function seedSivanthiyappanStatus() {
+// ONE-TIME SEED — button passes pi+bi directly; fallback searches by name
+async function seedSivanthiyappanStatus(pi, bi) {
   const ROWS = [
     ['1',  'One Line Generation', 'Done'],
     ['2',  'Thinking Around the One Line', 'Done'],
@@ -5713,12 +5713,15 @@ async function seedSivanthiyappanStatus() {
     ['34', 'Sales, Promotions, Release (Meanwhile Work on Dubbing: Options: Hindi, Malayalam Based on Market)', ''],
   ];
 
-  const pi = state.planners.findIndex(p => /film/i.test(p.name));
-  if (pi === -1) { showToast('Filmmaking planner not found'); return; }
-  const bi = state.planners[pi].blocks.findIndex(b => /sivanthiyappan.*status/i.test(b.header));
-  if (bi === -1) { showToast('Sivanthiyappan Status block not found'); return; }
+  if (pi == null || bi == null) {
+    pi = state.planners.findIndex(p => /film/i.test(p.name));
+    if (pi === -1) { showToast('Filmmaking planner not found'); return; }
+    bi = state.planners[pi].blocks.findIndex(b => /sivanthiyappan.*status/i.test(b.header));
+    if (bi === -1) { showToast('Sivanthiyappan Status block not found'); return; }
+  }
 
   const block = state.planners[pi].blocks[bi];
+  if (!block) { showToast('Block not found'); return; }
   delete block.taskTable;
   delete block.taskRows;
   delete block.checklistType;
