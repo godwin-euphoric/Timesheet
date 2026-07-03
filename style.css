@@ -1122,6 +1122,8 @@ textarea#fm-notes:focus {
 .btn-planner-addcol-title:hover { border-color: var(--lime); color: var(--lime); }
 .btn-planner-import { border-style: solid; color: var(--primary); border-color: rgba(99,102,241,0.4); }
 .btn-planner-import:hover { border-color: var(--primary) !important; color: var(--primary) !important; }
+.btn-seed-data { border-style: solid; color: #22c55e; border-color: rgba(34,197,94,0.4); }
+.btn-seed-data:hover { border-color: #22c55e !important; color: #22c55e !important; }
 .btn-planner-move {
   background: none; border: none; cursor: pointer; color: var(--muted);
   font-size: 15px; opacity: 0.5; transition: opacity 0.15s, color 0.15s; padding: 4px 6px;

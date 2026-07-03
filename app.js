@@ -3525,6 +3525,7 @@ function renderPlannerBlock(pi, bi, block) {
             <button class="btn-planner-addcol-title" onclick="addPlannerColumn(${pi},${bi})" title="Add column">+ Col</button>
             <button class="btn-planner-addcol-title btn-planner-import" onclick="document.getElementById('planner-xl-${pi}-${bi}').click()" title="Import from Excel / CSV">⬆ Import</button>
             <input type="file" id="planner-xl-${pi}-${bi}" accept=".xlsx,.xls,.csv" style="display:none" onchange="importPlannerBlockExcel(${pi},${bi},this)">
+            ${/sivanthiyappan.*status/i.test(block.header) && !(block.rows||[]).some(r=>r.c1) ? `<button class="btn-planner-addcol-title btn-seed-data" onclick="seedSivanthiyappanStatus()">📥 Load Data</button>` : ''}
           ` : ''}
           ${bi > 0 ? `<button class="btn-planner-move" onclick="movePlannerBlockUp(${pi},${bi})" title="Move up">↑</button>` : ''}
           ${bi < total - 1 ? `<button class="btn-planner-move" onclick="movePlannerBlockDown(${pi},${bi})" title="Move down">↓</button>` : ''}
