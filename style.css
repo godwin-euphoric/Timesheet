@@ -1707,7 +1707,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .dp-th-evening  { width: 170px; }
 
 .dp-table tbody tr { border-bottom: 1px solid rgba(42,58,85,0.5); }
-.dp-table tbody tr.dp-alt td     { background: rgba(255,255,255,0.035); }
+.dp-table tbody tr.dp-alt td     { background: rgba(255,255,255,0.08); }
 .dp-table tbody tr.dp-today td   { background: rgba(200,255,0,0.07) !important; }
 .dp-table tbody tr.dp-today      { border-top: 1px solid rgba(200,255,0,0.25); border-bottom: 1px solid rgba(200,255,0,0.25); }
 .dp-table tbody tr.dp-frozen     { opacity: 0.5; }
