@@ -3395,7 +3395,8 @@ function renderPlannerBlock(pi, bi, block) {
       <button onclick="ctxTogglePlannerImage()">🖼 Add Image</button>
       <button onclick="ctxSetPlannerChecklist('simple')">✅ Simple Checklist</button>
       <button onclick="ctxSetPlannerChecklist('grid')">📅 Grid Checklist</button>
-      <button onclick="ctxSetPlannerTaskTable()">📋 Task Table</button>`;
+      <button onclick="ctxSetPlannerTaskTable()">📋 Task Table</button>
+      <button onclick="ctxToggleRowTabs()">${block.rowTabs ? '📋 Show Full Table' : '🔢 Show Rows as Tabs'}</button>`;
   }
 
   // ── body based on mode ──
@@ -3502,7 +3503,7 @@ function renderPlannerBlock(pi, bi, block) {
           ${cols.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="removePlannerColumn(${pi},${bi},${ci})">✕</button>` : ''}
         </div>
       </th>`).join('');
-    const bodyRows = rows.map((row, ri) => {
+    const renderTableRow = (row, ri) => {
       const cells = cols.map((_, ci) => `
         <td class="planner-cell-td">
           <textarea class="planner-cell" rows="1"
@@ -3512,8 +3513,23 @@ function renderPlannerBlock(pi, bi, block) {
         <td class="planner-row-del-td">
           <button class="btn-planner-icon" title="Remove row" onclick="removePlannerRow(${pi},${bi},${ri})">✕</button>
         </td></tr>`;
-    }).join('');
-    body = `<div class="table-scroll">
+    };
+
+    let rowTabsNav = '';
+    let bodyRows;
+    if (block.rowTabs) {
+      const ari = rows.length ? Math.max(0, Math.min(block.activeRowTab || 0, rows.length - 1)) : 0;
+      block.activeRowTab = ari;
+      rowTabsNav = `<div class="planner-row-tab-nav">${rows.map((row, ri) => {
+        const label = String(row['c0'] || '').split('\n')[0].trim().slice(0, 24) || `Row ${ri + 1}`;
+        return `<button class="planner-row-tab-btn${ri === ari ? ' active' : ''}" onclick="switchPlannerRowTab(${pi},${bi},${ri})">${escHtml(label)}</button>`;
+      }).join('')}</div>`;
+      bodyRows = rows.length ? renderTableRow(rows[ari], ari) : '';
+    } else {
+      bodyRows = rows.map(renderTableRow).join('');
+    }
+
+    body = `${rowTabsNav}<div class="table-scroll">
         <table class="planner-table">
           <thead><tr>${colThs}
             <th class="planner-row-del-td"></th>
@@ -4024,12 +4040,30 @@ async function addPlannerRow(pi, bi) {
   const newRow = {};
   block.cols.forEach((_, i) => { newRow['c' + i] = ''; });
   block.rows.push(newRow);
+  if (block.rowTabs) block.activeRowTab = block.rows.length - 1;
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
 
 async function removePlannerRow(pi, bi, ri) {
-  state.planners[pi].blocks[bi].rows.splice(ri, 1);
+  const block = state.planners[pi].blocks[bi];
+  block.rows.splice(ri, 1);
+  if (block.rowTabs && block.activeRowTab >= ri) block.activeRowTab = Math.max(0, block.activeRowTab - 1);
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+function switchPlannerRowTab(pi, bi, ri) {
+  state.planners[pi].blocks[bi].activeRowTab = ri;
+  renderPlannerTab();
+}
+
+async function ctxToggleRowTabs() {
+  hidePlannerBlockMenu();
+  if (_ctxPi === null || _ctxBi === null) return;
+  const block = state.planners[_ctxPi].blocks[_ctxBi];
+  block.rowTabs = !block.rowTabs;
+  if (block.rowTabs && block.activeRowTab == null) block.activeRowTab = 0;
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
