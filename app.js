@@ -5171,6 +5171,7 @@ function dpBuildTable() {
     tr.id = `dp-row-${ds}`;
     if (ds === todayStr_) tr.classList.add('dp-today');
     if (isWeekend) tr.classList.add('dp-frozen');
+    if (!isWeekend && (dow - 1) % 2 === 1) tr.classList.add('dp-alt'); // Tue/Thu shading
 
     // Date cell
     const tdDate = document.createElement('td');
