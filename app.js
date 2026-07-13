@@ -4074,7 +4074,7 @@ function updatePlannerCell(pi, bi, ri, ci, value) {
 //  DIET TAB
 // ══════════════════════════════════════════════════════════════════════════
 
-const DIET_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
+const DIET_MODELS = ['gemini-flash-latest', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'];
 const DIET_CIRC  = 2 * Math.PI * 52; // ≈ 326.73
 
 // ── Firestore ──────────────────────────────────────────────────────────────
