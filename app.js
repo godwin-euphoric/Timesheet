@@ -5195,17 +5195,21 @@ function dpBuildTable() {
     // Morning Work
     const tdWork = document.createElement('td');
     tdWork.className = 'dp-group-cell';
-    tdWork.appendChild(isWeekend
+    const workList = isWeekend
       ? dpBuildFrozenOptGroup(DP_WORK_OPTS, 'checkbox')
-      : dpBuildOptGroup(ds, dow, 'work', DP_WORK_OPTS, 'checkbox'));
+      : dpBuildOptGroup(ds, dow, 'work', DP_WORK_OPTS, 'checkbox');
+    workList.classList.add('dp-opt-grid');
+    tdWork.appendChild(workList);
     tr.appendChild(tdWork);
 
     // Morning Place
     const tdPlace = document.createElement('td');
     tdPlace.className = 'dp-group-cell';
-    tdPlace.appendChild(isWeekend
+    const placeList = isWeekend
       ? dpBuildFrozenOptGroup(DP_PLACE_OPTS, 'checkbox')
-      : dpBuildOptGroup(ds, dow, 'place', DP_PLACE_OPTS, 'checkbox'));
+      : dpBuildOptGroup(ds, dow, 'place', DP_PLACE_OPTS, 'checkbox');
+    placeList.classList.add('dp-opt-grid');
+    tdPlace.appendChild(placeList);
     tr.appendChild(tdPlace);
 
     // Evening Place
