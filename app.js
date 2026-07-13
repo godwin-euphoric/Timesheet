@@ -5000,7 +5000,7 @@ const DP_PLACE_OPTS = [
   { key: 'other',        label: 'Other', text: true },
   { key: 'movietheatre', label: 'Movie theatre' },
 ];
-const DP_EVENING_OPTS = [ // single-select
+const DP_EVENING_OPTS = [ // multi-select
   { key: 'snb',        label: 'S&B' },
   { key: 'home',       label: 'Home' },
   { key: 'other',      label: 'Other', text: true },
@@ -5009,18 +5009,18 @@ const DP_EVENING_OPTS = [ // single-select
 
 // Defaults keyed by day-of-week (1=Mon … 5=Fri)
 const DP_DAY_DEFAULTS = {
-  1: { classes: ['mma','gym'], work: ['ss','fm'], place: ['lib','home','mall'], evening: 'snb'  }, // Mon
-  2: { classes: ['med','mma'], work: ['ss','fm'], place: ['lib','home','mall'], evening: 'snb'  }, // Tue
-  3: { classes: ['med'],       work: ['movie'],   place: ['movietheatre'],      evening: 'home' }, // Wed
-  4: { classes: ['mma','gym'], work: ['ss','fm'], place: ['lib','home','mall'], evening: 'snb'  }, // Thu
-  5: { classes: ['mma','gym'], work: ['ss','fm'], place: ['ocw'],               evening: 'ocoworking' }, // Fri
+  1: { classes: ['mma','gym'], work: ['ss','fm'], place: ['lib','home','mall'], evening: ['snb']  }, // Mon
+  2: { classes: ['med','mma'], work: ['ss','fm'], place: ['lib','home','mall'], evening: ['snb']  }, // Tue
+  3: { classes: ['med'],       work: ['movie'],   place: ['movietheatre'],      evening: ['home'] }, // Wed
+  4: { classes: ['mma','gym'], work: ['ss','fm'], place: ['lib','home','mall'], evening: ['snb']  }, // Thu
+  5: { classes: ['mma','gym'], work: ['ss','fm'], place: ['ocw'],               evening: ['ocoworking'] }, // Fri
 };
 
 function dpDefaultsForDow(dow) {
-  const def = DP_DAY_DEFAULTS[dow] || { classes: [], work: [], place: [], evening: '' };
+  const def = DP_DAY_DEFAULTS[dow] || { classes: [], work: [], place: [], evening: [] };
   return {
     classes: [...def.classes], work: [...def.work], workText: {},
-    place: [...def.place], placeText: {}, evening: def.evening, eveningText: {},
+    place: [...def.place], placeText: {}, evening: [...def.evening], eveningText: {},
   };
 }
 
@@ -5073,7 +5073,8 @@ function dpNormalizeRow(raw, dow) {
     workText:    (raw.workText && typeof raw.workText === 'object') ? raw.workText : def.workText,
     place:       Array.isArray(raw.place) ? raw.place : def.place,
     placeText:   (raw.placeText && typeof raw.placeText === 'object') ? raw.placeText : def.placeText,
-    evening:     typeof raw.evening === 'string' ? raw.evening : def.evening,
+    evening:     Array.isArray(raw.evening) ? raw.evening
+                 : (typeof raw.evening === 'string' && raw.evening ? [raw.evening] : def.evening),
     eveningText: (raw.eveningText && typeof raw.eveningText === 'object') ? raw.eveningText : def.eveningText,
   };
 }
@@ -5211,8 +5212,8 @@ function dpBuildTable() {
     const tdEvening = document.createElement('td');
     tdEvening.className = 'dp-group-cell';
     tdEvening.appendChild(isWeekend
-      ? dpBuildFrozenOptGroup(DP_EVENING_OPTS, 'radio')
-      : dpBuildOptGroup(ds, dow, 'evening', DP_EVENING_OPTS, 'radio'));
+      ? dpBuildFrozenOptGroup(DP_EVENING_OPTS, 'checkbox')
+      : dpBuildOptGroup(ds, dow, 'evening', DP_EVENING_OPTS, 'checkbox'));
     tr.appendChild(tdEvening);
 
     tbody.appendChild(tr);
