@@ -3184,6 +3184,7 @@ function swReset() {
 // ══════════════════════════════════════════════════════════════════════════
 
 state.activePlannerIdx = 0;
+state.activeBlockIdx   = 0;
 let plannerSaveTimer   = null;
 
 function pId() { return 'p' + Math.random().toString(36).slice(2, 9); }
@@ -3335,7 +3336,6 @@ function renderPlannerTab() {
       onclick="switchPlanner(${i})">
       <span class="planner-tab-name" ondblclick="event.stopPropagation();startRenamePlanner(${i})">${escHtml(p.name)}</span>
       ${i === ai ? `<span class="planner-tab-rename-btn" onclick="event.stopPropagation();startRenamePlanner(${i})" title="Rename">✎</span>` : ''}
-      ${i === ai ? `<span class="planner-tab-blocks-btn" onclick="event.stopPropagation();togglePlannerBlocksDropdown(${i},this)" title="Jump to block">▾</span>` : ''}
       <span class="planner-tab-del" onclick="event.stopPropagation();deletePlanner(${i})" title="Delete">✕</span>
     </button>`).join('');
 
@@ -3350,15 +3350,24 @@ function renderPlannerTab() {
 
   const planner = planners[ai];
 
-  // Block headings nav — hidden; dropdown on tab handles navigation
-  if (blockNav) blockNav.innerHTML = '';
+  if (state.activeBlockIdx >= planner.blocks.length) state.activeBlockIdx = Math.max(0, planner.blocks.length - 1);
+  const bi = state.activeBlockIdx;
+
+  // Block tabs — second level of tabs, one per block
+  if (blockNav) {
+    blockNav.innerHTML = planner.blocks.map((b, i) =>
+      `<button class="planner-block-nav-btn${i === bi ? ' active' : ''}" onclick="switchPlannerBlock(${i})">${escHtml(b.header)}</button>`
+    ).join('');
+  }
+
+  const activeBlock = planner.blocks[bi];
 
   container.innerHTML =
     `<div class="planner-top-bar">
        <button class="btn-secondary planner-add-block-btn" onclick="addPlannerBlock()">+ Add Block</button>
        <button class="btn-secondary planner-export-btn" onclick="exportPlannerToExcel()" title="Export to Excel">⬇ Excel</button>
      </div>` +
-    planner.blocks.map((b, bi) => renderPlannerBlock(ai, bi, b)).join('');
+    (activeBlock ? renderPlannerBlock(ai, bi, activeBlock) : '');
 
   container.querySelectorAll('.planner-cell').forEach(ta => {
     autoResizeTa(ta);
@@ -3578,38 +3587,9 @@ function autoResizeTa(ta) {
   ta.style.height = ta.scrollHeight + 'px';
 }
 
-function scrollToPlannerBlock(bi) {
-  const el = document.getElementById(`planner-block-${bi}`);
-  if (!el) return;
-  const headerH = document.querySelector('header')?.offsetHeight || 64;
-  const top = el.getBoundingClientRect().top + window.pageYOffset - headerH - 8;
-  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-}
-
-function togglePlannerBlocksDropdown(pi, btn) {
-  const existing = document.getElementById('planner-blocks-dropdown');
-  if (existing) { existing.remove(); return; }
-
-  const planner = state.planners[pi];
-  if (!planner || !planner.blocks.length) return;
-
-  const rect = btn.getBoundingClientRect();
-  const dd = document.createElement('div');
-  dd.id = 'planner-blocks-dropdown';
-  dd.className = 'planner-blocks-dropdown';
-  dd.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
-  dd.style.left = rect.left + 'px';
-
-  dd.innerHTML = planner.blocks.map((b, bi) =>
-    `<button class="planner-blocks-dd-item" onclick="scrollToPlannerBlock(${bi});document.getElementById('planner-blocks-dropdown')?.remove()">${escHtml(b.header)}</button>`
-  ).join('');
-
-  document.body.appendChild(dd);
-  setTimeout(() => document.addEventListener('click', _closePlannerDD, { once: true }), 0);
-}
-
-function _closePlannerDD() {
-  document.getElementById('planner-blocks-dropdown')?.remove();
+function switchPlannerBlock(bi) {
+  state.activeBlockIdx = bi;
+  renderPlannerTab();
 }
 
 function scrollToPageTop() {
@@ -3618,6 +3598,7 @@ function scrollToPageTop() {
 
 function switchPlanner(idx) {
   state.activePlannerIdx = idx;
+  state.activeBlockIdx = 0;
   renderPlannerTab();
 }
 
@@ -3681,6 +3662,7 @@ async function addPlanner() {
   if (!name || !name.trim()) return;
   state.planners.push({ id: pId(), name: name.trim(), blocks: [] });
   state.activePlannerIdx = state.planners.length - 1;
+  state.activeBlockIdx = 0;
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -3689,6 +3671,7 @@ async function deletePlanner(idx) {
   if (!confirm(`Delete planner "${state.planners[idx].name}"?`)) return;
   state.planners.splice(idx, 1);
   if (state.activePlannerIdx >= state.planners.length) state.activePlannerIdx = Math.max(0, state.planners.length - 1);
+  state.activeBlockIdx = 0;
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -3696,6 +3679,7 @@ async function deletePlanner(idx) {
 async function addPlannerBlock() {
   const pi = state.activePlannerIdx;
   state.planners[pi].blocks.unshift({ id: pId(), header: 'New Block', cols: ['Column 1', 'Column 2'], rows: [{ c0: '', c1: '' }] });
+  state.activeBlockIdx = 0;
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -3704,6 +3688,8 @@ async function movePlannerBlockUp(pi, bi) {
   if (bi === 0) return;
   const blocks = state.planners[pi].blocks;
   [blocks[bi - 1], blocks[bi]] = [blocks[bi], blocks[bi - 1]];
+  if (state.activeBlockIdx === bi) state.activeBlockIdx = bi - 1;
+  else if (state.activeBlockIdx === bi - 1) state.activeBlockIdx = bi;
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -3712,6 +3698,8 @@ async function movePlannerBlockDown(pi, bi) {
   const blocks = state.planners[pi].blocks;
   if (bi >= blocks.length - 1) return;
   [blocks[bi], blocks[bi + 1]] = [blocks[bi + 1], blocks[bi]];
+  if (state.activeBlockIdx === bi) state.activeBlockIdx = bi + 1;
+  else if (state.activeBlockIdx === bi + 1) state.activeBlockIdx = bi;
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -3719,6 +3707,8 @@ async function movePlannerBlockDown(pi, bi) {
 async function deletePlannerBlock(pi, bi) {
   if (!confirm('Delete this block?')) return;
   state.planners[pi].blocks.splice(bi, 1);
+  if (bi < state.activeBlockIdx) state.activeBlockIdx--;
+  if (state.activeBlockIdx >= state.planners[pi].blocks.length) state.activeBlockIdx = Math.max(0, state.planners[pi].blocks.length - 1);
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -3753,6 +3743,7 @@ async function ctxDuplicatePlannerBlock() {
   copy.id = pId();
   copy.header = src.header + ' (Copy)';
   state.planners[_ctxPi].blocks.splice(_ctxBi + 1, 0, copy);
+  if (state.activeBlockIdx > _ctxBi) state.activeBlockIdx++;
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -3762,6 +3753,8 @@ async function ctxDeletePlannerBlock() {
   if (_ctxPi === null || _ctxBi === null) return;
   if (!confirm('Delete this block?')) return;
   state.planners[_ctxPi].blocks.splice(_ctxBi, 1);
+  if (_ctxBi < state.activeBlockIdx) state.activeBlockIdx--;
+  if (state.activeBlockIdx >= state.planners[_ctxPi].blocks.length) state.activeBlockIdx = Math.max(0, state.planners[_ctxPi].blocks.length - 1);
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -4985,7 +4978,6 @@ const DP_DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 let dpData = {};           // dateStr → { classes:[], work:[], workText:{}, place:[], placeText:{}, evening:'', eveningText:{} }
 let dpSaveTimer = null;
 let dpDirty = new Set();   // dateStrs with unsaved changes
-let dpTableBuilt = false;
 
 // ── Option definitions ──────────────────────────────────────────────────
 const DP_CLASS_OPTS = [
@@ -5032,32 +5024,22 @@ function dpDefaultsForDow(dow) {
   };
 }
 
-function dpGetMonday(d) {
-  const day = d.getDay(); // 0=Sun
-  const diff = day === 0 ? -6 : 1 - day;
-  const m = new Date(d);
-  m.setDate(d.getDate() + diff);
-  m.setHours(0, 0, 0, 0);
-  return m;
-}
-
 function dpDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+// Current week only: Sunday through Saturday.
 function dpAllDates() {
   const today = new Date();
-  const start = dpGetMonday(today);
-  start.setDate(start.getDate() - 7); // one week back (last Monday)
-
-  const end = new Date(today.getFullYear(), 11, 31); // Dec 31 this year
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay());
+  sunday.setHours(0, 0, 0, 0);
 
   const dates = [];
-  const cur = new Date(start);
-  while (cur <= end) {
-    const dow = cur.getDay();
-    if (dow >= 1 && dow <= 5) dates.push(new Date(cur)); // Mon–Fri only
-    cur.setDate(cur.getDate() + 1);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    dates.push(d);
   }
   return dates;
 }
@@ -5073,18 +5055,7 @@ async function loadDailyPlanTab() {
     dpData = {};
   }
 
-  if (!dpTableBuilt) {
-    dpBuildTable();
-    dpTableBuilt = true;
-  } else {
-    dpRefreshInputs();
-  }
-
-  // Double RAF: ensures browser has finished layout before measuring
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    dpSetTableHeight();
-    dpScrollToThisWeek();
-  }));
+  dpBuildTable();
 
   // Load weekly reference in parallel
   dpLoadWeeklyRef();
@@ -5190,14 +5161,15 @@ function dpBuildTable() {
   const dates = dpAllDates();
   const todayStr_ = todayStr();
 
-  dates.forEach((d, i) => {
+  dates.forEach(d => {
     const ds = dpDateStr(d);
-    const dow = d.getDay(); // 1=Mon…5=Fri
+    const dow = d.getDay(); // 0=Sun…6=Sat
+    const isWeekend = dow === 0 || dow === 6;
 
     const tr = document.createElement('tr');
     tr.id = `dp-row-${ds}`;
-    if (dow === 1 && i > 0) tr.classList.add('dp-week-start'); // Monday = new week
-    if (ds === todayStr_)   tr.classList.add('dp-today');
+    if (ds === todayStr_) tr.classList.add('dp-today');
+    if (isWeekend) tr.classList.add('dp-frozen');
 
     // Date cell
     const tdDate = document.createElement('td');
@@ -5214,59 +5186,70 @@ function dpBuildTable() {
     // Classes
     const tdClasses = document.createElement('td');
     tdClasses.className = 'dp-group-cell';
-    tdClasses.appendChild(dpBuildOptGroup(ds, dow, 'classes', DP_CLASS_OPTS, 'checkbox'));
+    tdClasses.appendChild(isWeekend
+      ? dpBuildFrozenOptGroup(DP_CLASS_OPTS, 'checkbox')
+      : dpBuildOptGroup(ds, dow, 'classes', DP_CLASS_OPTS, 'checkbox'));
     tr.appendChild(tdClasses);
 
     // Morning Work
     const tdWork = document.createElement('td');
     tdWork.className = 'dp-group-cell';
-    tdWork.appendChild(dpBuildOptGroup(ds, dow, 'work', DP_WORK_OPTS, 'checkbox'));
+    tdWork.appendChild(isWeekend
+      ? dpBuildFrozenOptGroup(DP_WORK_OPTS, 'checkbox')
+      : dpBuildOptGroup(ds, dow, 'work', DP_WORK_OPTS, 'checkbox'));
     tr.appendChild(tdWork);
 
     // Morning Place
     const tdPlace = document.createElement('td');
     tdPlace.className = 'dp-group-cell';
-    tdPlace.appendChild(dpBuildOptGroup(ds, dow, 'place', DP_PLACE_OPTS, 'checkbox'));
+    tdPlace.appendChild(isWeekend
+      ? dpBuildFrozenOptGroup(DP_PLACE_OPTS, 'checkbox')
+      : dpBuildOptGroup(ds, dow, 'place', DP_PLACE_OPTS, 'checkbox'));
     tr.appendChild(tdPlace);
 
     // Evening Place
     const tdEvening = document.createElement('td');
     tdEvening.className = 'dp-group-cell';
-    tdEvening.appendChild(dpBuildOptGroup(ds, dow, 'evening', DP_EVENING_OPTS, 'radio'));
+    tdEvening.appendChild(isWeekend
+      ? dpBuildFrozenOptGroup(DP_EVENING_OPTS, 'radio')
+      : dpBuildOptGroup(ds, dow, 'evening', DP_EVENING_OPTS, 'radio'));
     tr.appendChild(tdEvening);
 
     tbody.appendChild(tr);
   });
 }
 
-function dpRefreshInputs() {
-  // Table only has Mon–Fri rows, so a full rebuild from dpData is cheap and avoids
-  // fragile per-node option lookups.
-  dpBuildTable();
-}
+// Sat/Sun cells: same option list, permanently unchecked and disabled — no data entry.
+function dpBuildFrozenOptGroup(opts, mode) {
+  const list = document.createElement('div');
+  list.className = 'dp-opt-list';
 
-function dpSetTableHeight() {
-  const wrap = document.getElementById('dp-table-wrap');
-  const tbody = document.getElementById('dp-tbody');
-  if (!wrap || !tbody) return;
-  const allRows = Array.from(tbody.querySelectorAll('tr'));
-  if (!allRows.length) return;
-  const thead = wrap.querySelector('thead');
-  const theadH = thead ? thead.offsetHeight : 38;
-  // Measure exactly 5 rows (one Mon–Fri week) for the visible height
-  const rowsH = allRows.slice(0, 5).reduce((s, r) => s + r.offsetHeight, 0);
-  wrap.style.height = (theadH + rowsH + 1) + 'px';
-}
+  opts.forEach(opt => {
+    const label = document.createElement('label');
+    label.className = 'dp-opt dp-opt-frozen';
 
-function dpScrollToThisWeek() {
-  const monday = dpGetMonday(new Date());
-  const mondayStr = dpDateStr(monday);
-  const row = document.getElementById(`dp-row-${mondayStr}`);
-  const wrap = document.getElementById('dp-table-wrap');
-  if (!row || !wrap) return;
-  const thead = wrap.querySelector('thead');
-  const theadH = thead ? thead.offsetHeight : 0;
-  wrap.scrollTop = row.offsetTop - theadH;
+    const input = document.createElement('input');
+    input.type = mode === 'radio' ? 'radio' : 'checkbox';
+    input.disabled = true;
+
+    const span = document.createElement('span');
+    span.textContent = opt.label;
+
+    label.appendChild(input);
+    label.appendChild(span);
+
+    if (opt.text) {
+      const textInp = document.createElement('input');
+      textInp.type = 'text';
+      textInp.className = 'dp-opt-text';
+      textInp.disabled = true;
+      label.appendChild(textInp);
+    }
+
+    list.appendChild(label);
+  });
+
+  return list;
 }
 
 function dpScheduleSave() {
