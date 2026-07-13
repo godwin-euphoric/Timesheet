@@ -4980,13 +4980,57 @@ async function checkUserAccess() {
 //  DAILY PLAN TAB
 // ══════════════════════════════════════════════════════════════════════════
 
-const DP_COLS = ['c630', 'c730', 'c830', 'morning', 'evening'];
 const DP_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DP_DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-let dpData = {};           // dateStr → { c630, c730, c830, morning, evening }
+let dpData = {};           // dateStr → { classes:[], work:[], workText:{}, place:[], placeText:{}, evening:'', eveningText:{} }
 let dpSaveTimer = null;
 let dpDirty = new Set();   // dateStrs with unsaved changes
 let dpTableBuilt = false;
+
+// ── Option definitions ──────────────────────────────────────────────────
+const DP_CLASS_OPTS = [
+  { key: 'med', label: '6:30 Med' },
+  { key: 'mma', label: '7:30 MMA' },
+  { key: 'gym', label: 'Gym' },
+];
+const DP_WORK_OPTS = [
+  { key: 'ss',     label: 'SS' },
+  { key: 'fm',     label: 'Film making', text: true },
+  { key: 'others', label: 'Others',      text: true },
+  { key: 'none',   label: 'None' },
+  { key: 'movie',  label: 'Movie' },
+];
+const DP_PLACE_OPTS = [
+  { key: 'lib',          label: 'Library 1,2' },
+  { key: 'home',         label: 'Home' },
+  { key: 'mall',         label: 'Mall' },
+  { key: 'ocw',          label: 'Other coworking' },
+  { key: 'other',        label: 'Other', text: true },
+  { key: 'movietheatre', label: 'Movie theatre' },
+];
+const DP_EVENING_OPTS = [ // single-select
+  { key: 'snb',        label: 'S&B' },
+  { key: 'home',       label: 'Home' },
+  { key: 'other',      label: 'Other', text: true },
+  { key: 'ocoworking', label: 'OCoworking', text: true },
+];
+
+// Defaults keyed by day-of-week (1=Mon … 5=Fri)
+const DP_DAY_DEFAULTS = {
+  1: { classes: ['mma','gym'], work: ['ss','fm'], place: ['lib','home','mall'], evening: 'snb'  }, // Mon
+  2: { classes: ['med','mma'], work: ['ss','fm'], place: ['lib','home','mall'], evening: 'snb'  }, // Tue
+  3: { classes: ['med'],       work: ['movie'],   place: ['movietheatre'],      evening: 'home' }, // Wed
+  4: { classes: ['mma','gym'], work: ['ss','fm'], place: ['lib','home','mall'], evening: 'snb'  }, // Thu
+  5: { classes: ['mma','gym'], work: ['ss','fm'], place: ['ocw'],               evening: 'ocoworking' }, // Fri
+};
+
+function dpDefaultsForDow(dow) {
+  const def = DP_DAY_DEFAULTS[dow] || { classes: [], work: [], place: [], evening: '' };
+  return {
+    classes: [...def.classes], work: [...def.work], workText: {},
+    place: [...def.place], placeText: {}, evening: def.evening, eveningText: {},
+  };
+}
 
 function dpGetMonday(d) {
   const day = d.getDay(); // 0=Sun
@@ -5011,7 +5055,8 @@ function dpAllDates() {
   const dates = [];
   const cur = new Date(start);
   while (cur <= end) {
-    dates.push(new Date(cur));
+    const dow = cur.getDay();
+    if (dow >= 1 && dow <= 5) dates.push(new Date(cur)); // Mon–Fri only
     cur.setDate(cur.getDate() + 1);
   }
   return dates;
@@ -5045,6 +5090,100 @@ async function loadDailyPlanTab() {
   dpLoadWeeklyRef();
 }
 
+// Normalizes a stored row into the current schema, falling back to weekday
+// defaults for any field missing or mistyped (e.g. rows saved under the old
+// free-text schema before this checkbox redesign).
+function dpNormalizeRow(raw, dow) {
+  const def = dpDefaultsForDow(dow);
+  if (!raw) return def;
+  return {
+    classes:     Array.isArray(raw.classes) ? raw.classes : def.classes,
+    work:        Array.isArray(raw.work) ? raw.work : def.work,
+    workText:    (raw.workText && typeof raw.workText === 'object') ? raw.workText : def.workText,
+    place:       Array.isArray(raw.place) ? raw.place : def.place,
+    placeText:   (raw.placeText && typeof raw.placeText === 'object') ? raw.placeText : def.placeText,
+    evening:     typeof raw.evening === 'string' ? raw.evening : def.evening,
+    eveningText: (raw.eveningText && typeof raw.eveningText === 'object') ? raw.eveningText : def.eveningText,
+  };
+}
+
+function dpRowState(ds, dow) {
+  return dpNormalizeRow(dpData[ds], dow);
+}
+
+function dpMutateRow(ds, dow, fn) {
+  dpData[ds] = dpNormalizeRow(dpData[ds], dow);
+  fn(dpData[ds]);
+  dpDirty.add(ds);
+  dpScheduleSave();
+}
+
+function dpBuildOptGroup(ds, dow, groupKey, opts, mode) {
+  const row = dpRowState(ds, dow);
+  const list = document.createElement('div');
+  list.className = 'dp-opt-list';
+
+  opts.forEach(opt => {
+    const label = document.createElement('label');
+    label.className = 'dp-opt';
+
+    const input = document.createElement('input');
+    input.type = mode === 'radio' ? 'radio' : 'checkbox';
+    if (mode === 'radio') input.name = `dp-${groupKey}-${ds}`;
+    const isChecked = mode === 'radio' ? row[groupKey] === opt.key : row[groupKey].includes(opt.key);
+    input.checked = isChecked;
+
+    const span = document.createElement('span');
+    span.textContent = opt.label;
+
+    label.appendChild(input);
+    label.appendChild(span);
+
+    let textInp = null;
+    if (opt.text) {
+      textInp = document.createElement('input');
+      textInp.type = 'text';
+      textInp.className = 'dp-opt-text';
+      textInp.value = (row[groupKey + 'Text'] || {})[opt.key] || '';
+      textInp.disabled = !isChecked;
+      textInp.addEventListener('click', e => e.stopPropagation());
+      textInp.addEventListener('input', () => {
+        dpMutateRow(ds, dow, r => {
+          if (!r[groupKey + 'Text']) r[groupKey + 'Text'] = {};
+          r[groupKey + 'Text'][opt.key] = textInp.value;
+        });
+      });
+      label.appendChild(textInp);
+    }
+
+    input.addEventListener('change', () => {
+      dpMutateRow(ds, dow, r => {
+        if (mode === 'radio') {
+          r[groupKey] = input.checked ? opt.key : '';
+        } else {
+          const idx = r[groupKey].indexOf(opt.key);
+          if (input.checked && idx === -1) r[groupKey].push(opt.key);
+          if (!input.checked && idx !== -1) r[groupKey].splice(idx, 1);
+        }
+      });
+      if (textInp) textInp.disabled = !input.checked;
+      if (mode === 'radio') {
+        // Uncheck sibling radios' visual state is native; just sync their text inputs
+        list.querySelectorAll('input[type="radio"]').forEach(r => {
+          if (r !== input) {
+            const sib = r.closest('.dp-opt').querySelector('.dp-opt-text');
+            if (sib) sib.disabled = true;
+          }
+        });
+      }
+    });
+
+    list.appendChild(label);
+  });
+
+  return list;
+}
+
 function dpBuildTable() {
   const tbody = document.getElementById('dp-tbody');
   tbody.innerHTML = '';
@@ -5053,14 +5192,12 @@ function dpBuildTable() {
 
   dates.forEach((d, i) => {
     const ds = dpDateStr(d);
-    const dow = d.getDay(); // 0=Sun
-    const row = dpData[ds] || {};
+    const dow = d.getDay(); // 1=Mon…5=Fri
 
     const tr = document.createElement('tr');
     tr.id = `dp-row-${ds}`;
     if (dow === 1 && i > 0) tr.classList.add('dp-week-start'); // Monday = new week
     if (ds === todayStr_)   tr.classList.add('dp-today');
-    if (dow === 0)          tr.classList.add('dp-sunday');
 
     // Date cell
     const tdDate = document.createElement('td');
@@ -5070,43 +5207,42 @@ function dpBuildTable() {
 
     // Day cell
     const tdDay = document.createElement('td');
-    tdDay.className = 'dp-day-cell' + (dow === 6 ? ' dp-sat' : dow === 0 ? ' dp-sun' : '');
+    tdDay.className = 'dp-day-cell';
     tdDay.textContent = DP_DAYS[dow];
     tr.appendChild(tdDay);
 
-    // Editable cells
-    DP_COLS.forEach(col => {
-      const td = document.createElement('td');
-      td.className = 'dp-input-cell';
-      const inp = document.createElement('input');
-      inp.type = 'text';
-      inp.className = 'dp-input';
-      inp.id = `dp-inp-${ds}-${col}`;
-      inp.value = row[col] || '';
-      inp.addEventListener('input', () => {
-        if (!dpData[ds]) dpData[ds] = {};
-        dpData[ds][col] = inp.value;
-        dpDirty.add(ds);
-        dpScheduleSave();
-      });
-      td.appendChild(inp);
-      tr.appendChild(td);
-    });
+    // Classes
+    const tdClasses = document.createElement('td');
+    tdClasses.className = 'dp-group-cell';
+    tdClasses.appendChild(dpBuildOptGroup(ds, dow, 'classes', DP_CLASS_OPTS, 'checkbox'));
+    tr.appendChild(tdClasses);
+
+    // Morning Work
+    const tdWork = document.createElement('td');
+    tdWork.className = 'dp-group-cell';
+    tdWork.appendChild(dpBuildOptGroup(ds, dow, 'work', DP_WORK_OPTS, 'checkbox'));
+    tr.appendChild(tdWork);
+
+    // Morning Place
+    const tdPlace = document.createElement('td');
+    tdPlace.className = 'dp-group-cell';
+    tdPlace.appendChild(dpBuildOptGroup(ds, dow, 'place', DP_PLACE_OPTS, 'checkbox'));
+    tr.appendChild(tdPlace);
+
+    // Evening Place
+    const tdEvening = document.createElement('td');
+    tdEvening.className = 'dp-group-cell';
+    tdEvening.appendChild(dpBuildOptGroup(ds, dow, 'evening', DP_EVENING_OPTS, 'radio'));
+    tr.appendChild(tdEvening);
 
     tbody.appendChild(tr);
   });
 }
 
 function dpRefreshInputs() {
-  const dates = dpAllDates();
-  dates.forEach(d => {
-    const ds = dpDateStr(d);
-    const row = dpData[ds] || {};
-    DP_COLS.forEach(col => {
-      const inp = document.getElementById(`dp-inp-${ds}-${col}`);
-      if (inp && !dpDirty.has(ds)) inp.value = row[col] || '';
-    });
-  });
+  // Table only has Mon–Fri rows, so a full rebuild from dpData is cheap and avoids
+  // fragile per-node option lookups.
+  dpBuildTable();
 }
 
 function dpSetTableHeight() {
@@ -5117,8 +5253,8 @@ function dpSetTableHeight() {
   if (!allRows.length) return;
   const thead = wrap.querySelector('thead');
   const theadH = thead ? thead.offsetHeight : 38;
-  // Measure exactly 7 rows (one week) for the visible height
-  const rowsH = allRows.slice(0, 7).reduce((s, r) => s + r.offsetHeight, 0);
+  // Measure exactly 5 rows (one Mon–Fri week) for the visible height
+  const rowsH = allRows.slice(0, 5).reduce((s, r) => s + r.offsetHeight, 0);
   wrap.style.height = (theadH + rowsH + 1) + 'px';
 }
 
