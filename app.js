@@ -5187,74 +5187,37 @@ function dpBuildTable() {
     // Classes
     const tdClasses = document.createElement('td');
     tdClasses.className = 'dp-group-cell';
-    tdClasses.appendChild(isWeekend
-      ? dpBuildFrozenOptGroup(DP_CLASS_OPTS, 'checkbox')
-      : dpBuildOptGroup(ds, dow, 'classes', DP_CLASS_OPTS, 'checkbox'));
+    if (!isWeekend) tdClasses.appendChild(dpBuildOptGroup(ds, dow, 'classes', DP_CLASS_OPTS, 'checkbox'));
     tr.appendChild(tdClasses);
 
     // Morning Work
     const tdWork = document.createElement('td');
     tdWork.className = 'dp-group-cell';
-    const workList = isWeekend
-      ? dpBuildFrozenOptGroup(DP_WORK_OPTS, 'checkbox')
-      : dpBuildOptGroup(ds, dow, 'work', DP_WORK_OPTS, 'checkbox');
-    workList.classList.add('dp-opt-grid');
-    tdWork.appendChild(workList);
+    if (!isWeekend) {
+      const workList = dpBuildOptGroup(ds, dow, 'work', DP_WORK_OPTS, 'checkbox');
+      workList.classList.add('dp-opt-grid');
+      tdWork.appendChild(workList);
+    }
     tr.appendChild(tdWork);
 
     // Morning Place
     const tdPlace = document.createElement('td');
     tdPlace.className = 'dp-group-cell';
-    const placeList = isWeekend
-      ? dpBuildFrozenOptGroup(DP_PLACE_OPTS, 'checkbox')
-      : dpBuildOptGroup(ds, dow, 'place', DP_PLACE_OPTS, 'checkbox');
-    placeList.classList.add('dp-opt-grid');
-    tdPlace.appendChild(placeList);
+    if (!isWeekend) {
+      const placeList = dpBuildOptGroup(ds, dow, 'place', DP_PLACE_OPTS, 'checkbox');
+      placeList.classList.add('dp-opt-grid');
+      tdPlace.appendChild(placeList);
+    }
     tr.appendChild(tdPlace);
 
     // Evening Place
     const tdEvening = document.createElement('td');
     tdEvening.className = 'dp-group-cell';
-    tdEvening.appendChild(isWeekend
-      ? dpBuildFrozenOptGroup(DP_EVENING_OPTS, 'checkbox')
-      : dpBuildOptGroup(ds, dow, 'evening', DP_EVENING_OPTS, 'checkbox'));
+    if (!isWeekend) tdEvening.appendChild(dpBuildOptGroup(ds, dow, 'evening', DP_EVENING_OPTS, 'checkbox'));
     tr.appendChild(tdEvening);
 
     tbody.appendChild(tr);
   });
-}
-
-// Sat/Sun cells: same option list, permanently unchecked and disabled — no data entry.
-function dpBuildFrozenOptGroup(opts, mode) {
-  const list = document.createElement('div');
-  list.className = 'dp-opt-list';
-
-  opts.forEach(opt => {
-    const label = document.createElement('label');
-    label.className = 'dp-opt dp-opt-frozen';
-
-    const input = document.createElement('input');
-    input.type = mode === 'radio' ? 'radio' : 'checkbox';
-    input.disabled = true;
-
-    const span = document.createElement('span');
-    span.textContent = opt.label;
-
-    label.appendChild(input);
-    label.appendChild(span);
-
-    if (opt.text) {
-      const textInp = document.createElement('input');
-      textInp.type = 'text';
-      textInp.className = 'dp-opt-text';
-      textInp.disabled = true;
-      label.appendChild(textInp);
-    }
-
-    list.appendChild(label);
-  });
-
-  return list;
 }
 
 function dpScheduleSave() {
