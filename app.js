@@ -5061,20 +5061,32 @@ let dpData = {};           // dateStr → { classes:[], work:[], workText:{}, pl
 let dpSaveTimer = null;
 let dpDirty = new Set();   // dateStrs with unsaved changes
 
-// ── Option definitions ──────────────────────────────────────────────────
-const DP_CLASS_OPTS = [
+// ── Column definitions ───────────────────────────────────────────────────
+const DP_COLS = [
+  { key: 'med',     label: 'Meditation' },
+  { key: 'mma',     label: 'Morn MMA' },
+  { key: 'gym',     label: 'GYM' },
+  { key: 'place',   label: 'Morning Place' },
+  { key: 'work',    label: 'Morning Work' },
+  { key: 'evening', label: 'Evening Place' },
+];
+
+// Legacy checkbox option labels — kept only so old saved rows (arrays of
+// keys) can be migrated into readable starting text in the new free-text
+// columns. Not used for rendering any more.
+const DP_LEGACY_CLASS_OPTS = [
   { key: 'med', label: '6:30 Med' },
   { key: 'mma', label: '7:30 MMA' },
   { key: 'gym', label: 'Gym' },
 ];
-const DP_WORK_OPTS = [
+const DP_LEGACY_WORK_OPTS = [
   { key: 'ss',     label: 'SS' },
   { key: 'fm',     label: 'Film making', text: true },
   { key: 'others', label: 'Others',      text: true },
   { key: 'none',   label: 'None' },
   { key: 'movie',  label: 'Movie' },
 ];
-const DP_PLACE_OPTS = [
+const DP_LEGACY_PLACE_OPTS = [
   { key: 'lib',          label: 'Library 1,2' },
   { key: 'home',         label: 'Home' },
   { key: 'mall',         label: 'Mall' },
@@ -5082,27 +5094,39 @@ const DP_PLACE_OPTS = [
   { key: 'other',        label: 'Other', text: true },
   { key: 'movietheatre', label: 'Movie theatre' },
 ];
-const DP_EVENING_OPTS = [ // multi-select
+const DP_LEGACY_EVENING_OPTS = [
   { key: 'snb',        label: 'S&B' },
   { key: 'home',       label: 'Home' },
   { key: 'other',      label: 'Other', text: true },
   { key: 'ocoworking', label: 'OCoworking', text: true },
 ];
 
-// Defaults keyed by day-of-week (1=Mon … 5=Fri)
-const DP_DAY_DEFAULTS = {
-  1: { classes: ['mma','gym'], work: ['ss','fm'], place: ['lib','home','mall'], evening: ['snb']  }, // Mon
-  2: { classes: ['med','mma'], work: ['ss','fm'], place: ['lib','home','mall'], evening: ['snb']  }, // Tue
-  3: { classes: ['med'],       work: ['movie'],   place: ['movietheatre'],      evening: ['home'] }, // Wed
-  4: { classes: ['mma','gym'], work: ['ss','fm'], place: ['lib','home','mall'], evening: ['snb']  }, // Thu
-  5: { classes: ['mma','gym'], work: ['ss','fm'], place: ['ocw'],               evening: ['ocoworking'] }, // Fri
-};
+function dpDefaultsForDow() {
+  return { med: '', mma: '', gym: '', place: '', work: '', evening: '' };
+}
 
-function dpDefaultsForDow(dow) {
-  const def = DP_DAY_DEFAULTS[dow] || { classes: [], work: [], place: [], evening: [] };
+function dpLegacyOptText(opts, key, textMap) {
+  const opt = opts.find(o => o.key === key);
+  if (!opt) return '';
+  const extra = opt.text && textMap && textMap[key] ? textMap[key] : '';
+  return extra ? `${opt.label} (${extra})` : opt.label;
+}
+
+// Converts an old checkbox-based row (arrays of option keys) into the new
+// free-text schema, preserving whatever the user actually had selected.
+function dpMigrateLegacyRow(raw) {
+  const classes = Array.isArray(raw.classes) ? raw.classes : [];
+  const work    = Array.isArray(raw.work) ? raw.work : [];
+  const place   = Array.isArray(raw.place) ? raw.place : [];
+  const evening = Array.isArray(raw.evening) ? raw.evening
+                  : (typeof raw.evening === 'string' && raw.evening ? [raw.evening] : []);
   return {
-    classes: [...def.classes], work: [...def.work], workText: {},
-    place: [...def.place], placeText: {}, evening: [...def.evening], eveningText: {},
+    med:     classes.includes('med') ? dpLegacyOptText(DP_LEGACY_CLASS_OPTS, 'med') : '',
+    mma:     classes.includes('mma') ? dpLegacyOptText(DP_LEGACY_CLASS_OPTS, 'mma') : '',
+    gym:     classes.includes('gym') ? dpLegacyOptText(DP_LEGACY_CLASS_OPTS, 'gym') : '',
+    place:   place.map(k => dpLegacyOptText(DP_LEGACY_PLACE_OPTS, k, raw.placeText)).filter(Boolean).join(', '),
+    work:    work.map(k => dpLegacyOptText(DP_LEGACY_WORK_OPTS, k, raw.workText)).filter(Boolean).join(', '),
+    evening: evening.map(k => dpLegacyOptText(DP_LEGACY_EVENING_OPTS, k, raw.eveningText)).filter(Boolean).join(', '),
   };
 }
 
@@ -5126,116 +5150,102 @@ function dpAllDates() {
   return dates;
 }
 
+let dpColDesc = {}; // { med:'', mma:'', gym:'', place:'', work:'', evening:'' }
+
 async function loadDailyPlanTab() {
   // Load daily plan data
   const year = String(new Date().getFullYear());
   try {
     const doc = await db.collection('users').doc(state.user.uid)
                         .collection('dailyplan').doc(year).get();
-    dpData = doc.exists ? (doc.data().rows || {}) : {};
+    const data = doc.exists ? doc.data() : {};
+    dpData    = data.rows    || {};
+    dpColDesc = data.colDesc || {};
   } catch(e) {
     dpData = {};
+    dpColDesc = {};
   }
 
+  dpBuildDescRow();
   dpBuildTable();
 
   // Load weekly reference in parallel
   dpLoadWeeklyRef();
 }
 
-// Normalizes a stored row into the current schema, falling back to weekday
-// defaults for any field missing or mistyped (e.g. rows saved under the old
-// free-text schema before this checkbox redesign).
-function dpNormalizeRow(raw, dow) {
-  const def = dpDefaultsForDow(dow);
+// Normalizes a stored row into the current free-text schema. Rows saved
+// under the old checkbox schema (arrays of option keys) are migrated into
+// readable starting text; anything missing/blank just stays blank.
+function dpNormalizeRow(raw) {
+  const def = dpDefaultsForDow();
   if (!raw) return def;
+  const isLegacy = Array.isArray(raw.classes) || Array.isArray(raw.work) || Array.isArray(raw.place);
+  if (isLegacy) return dpMigrateLegacyRow(raw);
   return {
-    classes:     Array.isArray(raw.classes) ? raw.classes : def.classes,
-    work:        Array.isArray(raw.work) ? raw.work : def.work,
-    workText:    (raw.workText && typeof raw.workText === 'object') ? raw.workText : def.workText,
-    place:       Array.isArray(raw.place) ? raw.place : def.place,
-    placeText:   (raw.placeText && typeof raw.placeText === 'object') ? raw.placeText : def.placeText,
-    evening:     Array.isArray(raw.evening) ? raw.evening
-                 : (typeof raw.evening === 'string' && raw.evening ? [raw.evening] : def.evening),
-    eveningText: (raw.eveningText && typeof raw.eveningText === 'object') ? raw.eveningText : def.eveningText,
+    med:     typeof raw.med === 'string' ? raw.med : def.med,
+    mma:     typeof raw.mma === 'string' ? raw.mma : def.mma,
+    gym:     typeof raw.gym === 'string' ? raw.gym : def.gym,
+    place:   typeof raw.place === 'string' ? raw.place : def.place,
+    work:    typeof raw.work === 'string' ? raw.work : def.work,
+    evening: typeof raw.evening === 'string' ? raw.evening : def.evening,
   };
 }
 
-function dpRowState(ds, dow) {
-  return dpNormalizeRow(dpData[ds], dow);
+function dpRowState(ds) {
+  return dpNormalizeRow(dpData[ds]);
 }
 
-function dpMutateRow(ds, dow, fn) {
-  dpData[ds] = dpNormalizeRow(dpData[ds], dow);
+function dpMutateRow(ds, fn) {
+  dpData[ds] = dpNormalizeRow(dpData[ds]);
   fn(dpData[ds]);
   dpDirty.add(ds);
   dpScheduleSave();
 }
 
-function dpBuildOptGroup(ds, dow, groupKey, opts, mode) {
-  const row = dpRowState(ds, dow);
-  const list = document.createElement('div');
-  list.className = 'dp-opt-list';
-
-  opts.forEach(opt => {
-    const label = document.createElement('label');
-    label.className = 'dp-opt';
-
-    const input = document.createElement('input');
-    input.type = mode === 'radio' ? 'radio' : 'checkbox';
-    if (mode === 'radio') input.name = `dp-${groupKey}-${ds}`;
-    const isChecked = mode === 'radio' ? row[groupKey] === opt.key : row[groupKey].includes(opt.key);
-    input.checked = isChecked;
-
-    const span = document.createElement('span');
-    span.textContent = opt.label;
-
-    label.appendChild(input);
-    label.appendChild(span);
-
-    let textInp = null;
-    if (opt.text) {
-      textInp = document.createElement('input');
-      textInp.type = 'text';
-      textInp.className = 'dp-opt-text';
-      textInp.value = (row[groupKey + 'Text'] || {})[opt.key] || '';
-      textInp.disabled = !isChecked;
-      textInp.addEventListener('click', e => e.stopPropagation());
-      textInp.addEventListener('input', () => {
-        dpMutateRow(ds, dow, r => {
-          if (!r[groupKey + 'Text']) r[groupKey + 'Text'] = {};
-          r[groupKey + 'Text'][opt.key] = textInp.value;
-        });
-      });
-      label.appendChild(textInp);
-    }
-
-    input.addEventListener('change', () => {
-      dpMutateRow(ds, dow, r => {
-        if (mode === 'radio') {
-          r[groupKey] = input.checked ? opt.key : '';
-        } else {
-          const idx = r[groupKey].indexOf(opt.key);
-          if (input.checked && idx === -1) r[groupKey].push(opt.key);
-          if (!input.checked && idx !== -1) r[groupKey].splice(idx, 1);
-        }
-      });
-      if (textInp) textInp.disabled = !input.checked;
-      if (mode === 'radio') {
-        // Uncheck sibling radios' visual state is native; just sync their text inputs
-        list.querySelectorAll('input[type="radio"]').forEach(r => {
-          if (r !== input) {
-            const sib = r.closest('.dp-opt').querySelector('.dp-opt-text');
-            if (sib) sib.disabled = true;
-          }
-        });
-      }
-    });
-
-    list.appendChild(label);
+function dpBuildCellInput(ds, key) {
+  const row = dpRowState(ds);
+  const ta = document.createElement('textarea');
+  ta.className = 'dp-cell-input';
+  ta.rows = 1;
+  ta.value = row[key] || '';
+  ta.addEventListener('input', () => autoResizeTa(ta));
+  ta.addEventListener('blur', () => {
+    dpMutateRow(ds, r => { r[key] = ta.value; });
   });
+  return ta;
+}
 
-  return list;
+function dpBuildDescRow() {
+  const tr = document.getElementById('dp-desc-row');
+  if (!tr) return;
+  tr.innerHTML = `<td class="dp-desc-blank"></td><td class="dp-desc-blank"></td>` +
+    DP_COLS.map(col => `
+      <td class="dp-desc-cell">
+        <input type="text" class="dp-desc-input" placeholder="Describe…" value="${escHtml(dpColDesc[col.key] || '')}"
+          onblur="updateDpColDesc('${col.key}', this.value)">
+      </td>`).join('');
+}
+
+function updateDpColDesc(key, value) {
+  dpColDesc[key] = value;
+  dpScheduleDescSave();
+}
+
+let dpDescSaveTimer = null;
+function dpScheduleDescSave() {
+  clearTimeout(dpDescSaveTimer);
+  dpDescSaveTimer = setTimeout(dpFlushDescSave, 900);
+}
+
+async function dpFlushDescSave() {
+  const year = String(new Date().getFullYear());
+  try {
+    await db.collection('users').doc(state.user.uid)
+            .collection('dailyplan').doc(year)
+            .set({ colDesc: dpColDesc }, { merge: true });
+  } catch(e) {
+    showToast('Save failed: ' + e.message);
+  }
 }
 
 function dpBuildTable() {
@@ -5267,37 +5277,13 @@ function dpBuildTable() {
     tdDay.textContent = DP_DAYS[dow];
     tr.appendChild(tdDay);
 
-    // Classes
-    const tdClasses = document.createElement('td');
-    tdClasses.className = 'dp-group-cell';
-    if (!isWeekend) tdClasses.appendChild(dpBuildOptGroup(ds, dow, 'classes', DP_CLASS_OPTS, 'checkbox'));
-    tr.appendChild(tdClasses);
-
-    // Morning Work
-    const tdWork = document.createElement('td');
-    tdWork.className = 'dp-group-cell';
-    if (!isWeekend) {
-      const workList = dpBuildOptGroup(ds, dow, 'work', DP_WORK_OPTS, 'checkbox');
-      workList.classList.add('dp-opt-grid');
-      tdWork.appendChild(workList);
-    }
-    tr.appendChild(tdWork);
-
-    // Morning Place
-    const tdPlace = document.createElement('td');
-    tdPlace.className = 'dp-group-cell';
-    if (!isWeekend) {
-      const placeList = dpBuildOptGroup(ds, dow, 'place', DP_PLACE_OPTS, 'checkbox');
-      placeList.classList.add('dp-opt-grid');
-      tdPlace.appendChild(placeList);
-    }
-    tr.appendChild(tdPlace);
-
-    // Evening Place
-    const tdEvening = document.createElement('td');
-    tdEvening.className = 'dp-group-cell';
-    if (!isWeekend) tdEvening.appendChild(dpBuildOptGroup(ds, dow, 'evening', DP_EVENING_OPTS, 'checkbox'));
-    tr.appendChild(tdEvening);
+    // One editable text cell per column
+    DP_COLS.forEach(col => {
+      const td = document.createElement('td');
+      td.className = 'dp-group-cell';
+      if (!isWeekend) td.appendChild(dpBuildCellInput(ds, col.key));
+      tr.appendChild(td);
+    });
 
     tbody.appendChild(tr);
   });
