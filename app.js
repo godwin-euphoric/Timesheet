@@ -48,6 +48,7 @@ const state = {
   dietDate:         todayStr(),
   dietMonthCache:   {},
   dietSettings:     null,
+  todoistSettings:  null,
   userRole:         null,
 };
 
@@ -157,7 +158,9 @@ auth.onAuthStateChanged(user => {
   state.userDataCache  = null;
   state.dietMonthCache   = {};
   state.dietSettings     = null;
+  state.todoistSettings  = null;
   state.userRole         = null;
+  dpTodoistMeta = null;
 
   if (user) {
     document.getElementById('pwa-signin-overlay')?.classList.add('hidden');
@@ -2151,6 +2154,7 @@ async function loadSettingsTab() {
     setSaveState('settings-save-btn', false);
   }
   await populateDietSettingsFields();
+  await populateTodoistSettingsFields();
 }
 
 function applySettingsVisibility() {
@@ -4216,6 +4220,45 @@ async function populateDietSettingsFields() {
   if (tgtEl) tgtEl.value = ud.dietCalorieTarget || '';
 }
 
+// ── Todoist Sync ─────────────────────────────────────────────────────────
+
+async function loadTodoistSettings() {
+  const ud = await getUserData();
+  state.todoistSettings = {
+    proxyUrl:    ud.todoistProxyUrl    || '',
+    apiToken:    ud.todoistApiToken    || '',
+    projectName: ud.todoistProjectName || 'Daily Plan',
+  };
+  return state.todoistSettings;
+}
+
+async function saveTodoistSettings() {
+  const proxyUrl    = document.getElementById('todoist-proxy-url').value.trim().replace(/\/$/, '');
+  const apiToken    = document.getElementById('todoist-api-token').value.trim();
+  const projectName = document.getElementById('todoist-project-name').value.trim() || 'Daily Plan';
+  await saveUserData({ todoistProxyUrl: proxyUrl, todoistApiToken: apiToken, todoistProjectName: projectName });
+  state.todoistSettings = { proxyUrl, apiToken, projectName };
+  dpTodoistMeta = null; // project/section name may have changed — re-resolve next sync
+  showToast('Todoist settings saved');
+}
+
+function toggleTodoistTokenVisibility() {
+  const inp = document.getElementById('todoist-api-token');
+  const btn = document.getElementById('todoist-token-toggle');
+  if (inp.type === 'password') { inp.type = 'text';     btn.textContent = 'Hide'; }
+  else                         { inp.type = 'password'; btn.textContent = 'Show'; }
+}
+
+async function populateTodoistSettingsFields() {
+  const ud    = await getUserData();
+  const urlEl  = document.getElementById('todoist-proxy-url');
+  const tokEl  = document.getElementById('todoist-api-token');
+  const projEl = document.getElementById('todoist-project-name');
+  if (urlEl)  urlEl.value  = ud.todoistProxyUrl    || '';
+  if (tokEl)  tokEl.value  = ud.todoistApiToken    || '';
+  if (projEl) projEl.value = ud.todoistProjectName || 'Daily Plan';
+}
+
 // ── Gemini AI ──────────────────────────────────────────────────────────────
 
 function dietSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -5102,7 +5145,7 @@ const DP_LEGACY_EVENING_OPTS = [
 ];
 
 function dpDefaultsForDow() {
-  return { med: '', mma: '', gym: '', place: '', work: '', evening: '' };
+  return { med: '', mma: '', gym: '', place: '', work: '', evening: '', todoistIds: {} };
 }
 
 function dpLegacyOptText(opts, key, textMap) {
@@ -5127,6 +5170,7 @@ function dpMigrateLegacyRow(raw) {
     place:   place.map(k => dpLegacyOptText(DP_LEGACY_PLACE_OPTS, k, raw.placeText)).filter(Boolean).join(', '),
     work:    work.map(k => dpLegacyOptText(DP_LEGACY_WORK_OPTS, k, raw.workText)).filter(Boolean).join(', '),
     evening: evening.map(k => dpLegacyOptText(DP_LEGACY_EVENING_OPTS, k, raw.eveningText)).filter(Boolean).join(', '),
+    todoistIds: {},
   };
 }
 
@@ -5150,7 +5194,8 @@ function dpAllDates() {
   return dates;
 }
 
-let dpColDesc = {}; // { med:'', mma:'', gym:'', place:'', work:'', evening:'' }
+let dpColDesc   = {}; // { med:'', mma:'', gym:'', place:'', work:'', evening:'' }
+let dpColLabels = {}; // { med:'Meditation', ... } — user-editable overrides for DP_COLS labels
 
 async function loadDailyPlanTab() {
   // Load daily plan data
@@ -5159,18 +5204,25 @@ async function loadDailyPlanTab() {
     const doc = await db.collection('users').doc(state.user.uid)
                         .collection('dailyplan').doc(year).get();
     const data = doc.exists ? doc.data() : {};
-    dpData    = data.rows    || {};
-    dpColDesc = data.colDesc || {};
+    dpData      = data.rows      || {};
+    dpColDesc   = data.colDesc   || {};
+    dpColLabels = data.colLabels || {};
   } catch(e) {
     dpData = {};
     dpColDesc = {};
+    dpColLabels = {};
   }
 
+  dpBuildHeaderRow();
   dpBuildDescRow();
   dpBuildTable();
 
   // Load weekly reference in parallel
   dpLoadWeeklyRef();
+
+  // Pull any Todoist-side edits in, if configured
+  await loadTodoistSettings();
+  dpPullFromTodoist();
 }
 
 // Normalizes a stored row into the current free-text schema. Rows saved
@@ -5188,6 +5240,7 @@ function dpNormalizeRow(raw) {
     place:   typeof raw.place === 'string' ? raw.place : def.place,
     work:    typeof raw.work === 'string' ? raw.work : def.work,
     evening: typeof raw.evening === 'string' ? raw.evening : def.evening,
+    todoistIds: (raw.todoistIds && typeof raw.todoistIds === 'object') ? raw.todoistIds : {},
   };
 }
 
@@ -5211,8 +5264,31 @@ function dpBuildCellInput(ds, key) {
   ta.addEventListener('input', () => autoResizeTa(ta));
   ta.addEventListener('blur', () => {
     dpMutateRow(ds, r => { r[key] = ta.value; });
+    dpSyncCellToTodoist(ds, key, ta.value);
   });
   return ta;
+}
+
+function dpColLabel(col) {
+  return dpColLabels[col.key] || col.label;
+}
+
+function dpBuildHeaderRow() {
+  const tr = document.getElementById('dp-header-row');
+  if (!tr) return;
+  tr.innerHTML = `<th class="dp-th dp-th-date">Date</th><th class="dp-th dp-th-day">Day</th>` +
+    DP_COLS.map(col => `
+      <th class="dp-th dp-th-${col.key}">
+        <input type="text" class="dp-th-input" value="${escHtml(dpColLabel(col))}"
+          onblur="updateDpColLabel('${col.key}', this.value)" onclick="this.select()">
+      </th>`).join('');
+}
+
+function updateDpColLabel(key, value) {
+  const def = DP_COLS.find(c => c.key === key).label;
+  const v = value.trim();
+  dpColLabels[key] = (v && v !== def) ? v : '';
+  dpScheduleDescSave();
 }
 
 function dpBuildDescRow() {
@@ -5242,7 +5318,7 @@ async function dpFlushDescSave() {
   try {
     await db.collection('users').doc(state.user.uid)
             .collection('dailyplan').doc(year)
-            .set({ colDesc: dpColDesc }, { merge: true });
+            .set({ colDesc: dpColDesc, colLabels: dpColLabels }, { merge: true });
   } catch(e) {
     showToast('Save failed: ' + e.message);
   }
@@ -5313,6 +5389,156 @@ async function dpFlushSave() {
     setTimeout(() => { status.textContent = ''; status.className = 'dp-save-status'; }, 1800);
   } catch(e) {
     showToast('Save failed: ' + e.message);
+  }
+}
+
+// ── Todoist Sync ─────────────────────────────────────────────────────────
+// Mirrors each filled-in Daily Plan cell as a task in a Todoist project
+// (one section per column). Requires a Cloudflare Worker proxy (configured
+// in Settings) since Todoist's API can't be called directly from a browser.
+
+async function todoistFetch(path, opts = {}) {
+  const s = state.todoistSettings;
+  if (!s?.proxyUrl || !s?.apiToken) throw new Error('Todoist not configured in Settings.');
+  const res = await fetch(s.proxyUrl + path, {
+    ...opts,
+    headers: {
+      'Authorization': 'Bearer ' + s.apiToken,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) throw new Error(`Todoist API error ${res.status}`);
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+let dpTodoistMeta = null; // { projectId, sectionIds: { med:'123', ... } }
+
+// Finds (or creates) the Daily Plan project and one section per column,
+// matched by name. Cached for the session; cleared when settings change.
+async function dpEnsureTodoistProject() {
+  if (dpTodoistMeta) return dpTodoistMeta;
+  const s = state.todoistSettings;
+
+  const projects = await todoistFetch('/projects');
+  let project = projects.find(p => p.name === s.projectName);
+  if (!project) {
+    project = await todoistFetch('/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name: s.projectName }),
+    });
+  }
+
+  const sections = await todoistFetch(`/sections?project_id=${project.id}`);
+  const sectionIds = {};
+  for (const col of DP_COLS) {
+    const label = dpColLabel(col);
+    let section = sections.find(sec => sec.name === label);
+    if (!section) {
+      section = await todoistFetch('/sections', {
+        method: 'POST',
+        body: JSON.stringify({ project_id: project.id, name: label }),
+      });
+    }
+    sectionIds[col.key] = section.id;
+  }
+
+  dpTodoistMeta = { projectId: project.id, sectionIds };
+  return dpTodoistMeta;
+}
+
+// Pushes one cell's text to Todoist: creates/updates/deletes the task
+// tied to that date+column. Silently skips if Todoist isn't configured.
+async function dpSyncCellToTodoist(ds, key, text) {
+  if (!state.todoistSettings?.apiToken) return;
+  try {
+    const meta = await dpEnsureTodoistProject();
+    const row = dpData[ds]; // already normalized by dpMutateRow just before this call
+    row.todoistIds = row.todoistIds || {};
+    const existingId = row.todoistIds[key];
+    const trimmed = text.trim();
+
+    if (!trimmed) {
+      if (existingId) {
+        await todoistFetch(`/tasks/${existingId}`, { method: 'DELETE' });
+        delete row.todoistIds[key];
+        dpDirty.add(ds);
+        dpScheduleSave();
+      }
+      return;
+    }
+
+    if (existingId) {
+      await todoistFetch(`/tasks/${existingId}`, {
+        method: 'POST',
+        body: JSON.stringify({ content: trimmed }),
+      });
+    } else {
+      const task = await todoistFetch('/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          content: trimmed,
+          project_id: meta.projectId,
+          section_id: meta.sectionIds[key],
+          due_date: ds,
+        }),
+      });
+      row.todoistIds[key] = task.id;
+      dpDirty.add(ds);
+      dpScheduleSave();
+    }
+  } catch (e) {
+    showToast('Todoist sync failed: ' + e.message);
+  }
+}
+
+// Pulls the current state of this week's Todoist tasks back into the
+// Daily Plan grid — picks up edits/completions/new tasks made on the
+// Todoist side since the tab was last opened.
+async function dpPullFromTodoist() {
+  if (!state.todoistSettings?.apiToken) return;
+  try {
+    const meta = await dpEnsureTodoistProject();
+    const tasks = await todoistFetch(`/tasks?project_id=${meta.projectId}`);
+    const colBySection = {};
+    for (const [key, id] of Object.entries(meta.sectionIds)) colBySection[id] = key;
+
+    const dates = dpAllDates().map(dpDateStr);
+    let changed = false;
+
+    tasks.forEach(task => {
+      const ds = task.due?.date;
+      if (!ds || !dates.includes(ds)) return;
+      const key = colBySection[task.section_id];
+      if (!key) return;
+      dpData[ds] = dpNormalizeRow(dpData[ds]);
+      const row = dpData[ds];
+      row.todoistIds[key] = task.id;
+      if (row[key] !== task.content) { row[key] = task.content; changed = true; }
+    });
+
+    // Tasks removed/completed in Todoist since last sync — clear the linked cell
+    const liveIds = new Set(tasks.map(t => String(t.id)));
+    dates.forEach(ds => {
+      const row = dpData[ds];
+      if (!row?.todoistIds) return;
+      Object.keys(row.todoistIds).forEach(key => {
+        if (!liveIds.has(String(row.todoistIds[key]))) {
+          row[key] = '';
+          delete row.todoistIds[key];
+          changed = true;
+        }
+      });
+    });
+
+    if (changed) {
+      dates.forEach(ds => dpDirty.add(ds));
+      dpScheduleSave();
+      dpBuildTable();
+    }
+  } catch (e) {
+    console.error('Todoist pull failed', e);
   }
 }
 

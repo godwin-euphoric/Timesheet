@@ -446,15 +446,9 @@
       <div class="dp-table-wrap" id="dp-table-wrap">
         <table class="dp-table">
           <thead class="dp-thead">
-            <tr>
+            <tr id="dp-header-row">
               <th class="dp-th dp-th-date">Date</th>
               <th class="dp-th dp-th-day">Day</th>
-              <th class="dp-th dp-th-med">Meditation</th>
-              <th class="dp-th dp-th-mma">Morn MMA</th>
-              <th class="dp-th dp-th-gym">GYM</th>
-              <th class="dp-th dp-th-place">Morning Place</th>
-              <th class="dp-th dp-th-work">Morning Work</th>
-              <th class="dp-th dp-th-evening">Evening Place</th>
             </tr>
             <tr class="dp-desc-row" id="dp-desc-row"></tr>
           </thead>
@@ -643,6 +637,31 @@
       </div>
       <div style="margin-top:16px">
         <button class="btn-primary" onclick="saveDietSettings()">Save Diet Settings</button>
+      </div>
+    </div>
+
+    <div class="card settings-ts-only">
+      <div class="card-title">✅ Todoist Sync</div>
+      <p class="hint">Connects the Daily Plan tab to Todoist so each filled-in cell becomes a task there, and edits on either side sync back. Requires a small Cloudflare Worker proxy — see setup instructions provided separately.</p>
+      <div class="settings-diet-form">
+        <div class="field-group" style="flex:1;min-width:220px">
+          <label>Worker Proxy URL</label>
+          <input type="text" id="todoist-proxy-url" placeholder="https://todoist-proxy.yourname.workers.dev">
+        </div>
+        <div class="field-group" style="flex:1;min-width:220px">
+          <label>Todoist API Token</label>
+          <div style="display:flex;gap:8px">
+            <input type="password" id="todoist-api-token" placeholder="Todoist API token" style="flex:1">
+            <button onclick="toggleTodoistTokenVisibility()" class="btn-secondary" id="todoist-token-toggle">Show</button>
+          </div>
+        </div>
+        <div class="field-group" style="width:170px">
+          <label>Todoist Project Name</label>
+          <input type="text" id="todoist-project-name" placeholder="Daily Plan">
+        </div>
+      </div>
+      <div style="margin-top:16px">
+        <button class="btn-primary" onclick="saveTodoistSettings()">Save Todoist Settings</button>
       </div>
     </div>
 
