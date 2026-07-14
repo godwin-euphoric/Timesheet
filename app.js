@@ -3498,6 +3498,7 @@ function renderPlannerBlock(pi, bi, block) {
     const colThs = cols.map((col, ci) => `
       <th class="planner-col-th">
         <div class="planner-col-th-inner">
+          <button class="btn-planner-icon btn-planner-insert-col" title="Insert column before" onclick="insertPlannerColumnBefore(${pi},${bi},${ci})">⊕</button>
           <input class="planner-col-name" value="${escHtml(col)}"
             onblur="updatePlannerColName(${pi},${bi},${ci},this.value)" onclick="this.select()">
           ${cols.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="removePlannerColumn(${pi},${bi},${ci})">✕</button>` : ''}
@@ -4073,6 +4074,18 @@ async function addPlannerColumn(pi, bi) {
   const newIdx = block.cols.length;
   block.cols.push('Column ' + (newIdx + 1));
   block.rows.forEach(row => { row['c' + newIdx] = ''; });
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
+async function insertPlannerColumnBefore(pi, bi, ci) {
+  const block  = state.planners[pi].blocks[bi];
+  block.cols.splice(ci, 0, 'Column ' + (ci + 1));
+  const newLen = block.cols.length;
+  block.rows.forEach(row => {
+    for (let i = newLen - 1; i > ci; i--) row['c' + i] = row['c' + (i - 1)];
+    row['c' + ci] = '';
+  });
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }

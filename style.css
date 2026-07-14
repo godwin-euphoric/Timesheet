@@ -1176,6 +1176,7 @@ textarea#fm-notes:focus {
   border-radius: 4px; transition: all 0.12s; flex-shrink: 0;
 }
 .btn-planner-icon:hover { color: var(--red); background: rgba(248,113,113,0.1); }
+.btn-planner-insert-col:hover { color: var(--lime) !important; background: rgba(200,255,0,0.1) !important; }
 .btn-planner-sm {
   background: var(--card2); border: 1px solid var(--border);
   color: var(--muted); font-size: 11px; padding: 4px 8px;
