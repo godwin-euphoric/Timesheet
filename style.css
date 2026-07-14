@@ -1139,10 +1139,15 @@ textarea#fm-notes:focus {
 
 .planner-table { width: 100%; border-collapse: collapse; }
 .planner-table thead tr { background: #0D1628; }
-.planner-col-th { padding: 0; min-width: 180px; border-bottom: 2px solid var(--border); }
+.planner-col-th { padding: 0; min-width: 180px; border-bottom: 2px solid var(--border); position: relative; }
 .planner-col-th-inner {
   display: flex; align-items: center; gap: 4px; padding: 8px 12px;
 }
+.planner-col-resizer {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 6px;
+  cursor: col-resize; user-select: none; touch-action: none;
+}
+.planner-col-resizer:hover, .planner-col-resizer:active { background: rgba(99,102,241,0.35); }
 .planner-col-name {
   flex: 1; background: transparent; border: none; outline: none;
   font-size: 11px; font-weight: 700; text-transform: uppercase;

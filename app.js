@@ -3495,15 +3495,19 @@ function renderPlannerBlock(pi, bi, block) {
     // Default: table mode
     const cols = block.cols || ['Column 1', 'Column 2'];
     const rows = block.rows || [];
-    const colThs = cols.map((col, ci) => `
-      <th class="planner-col-th">
+    const colThs = cols.map((col, ci) => {
+      const w = block.colWidths && block.colWidths[ci];
+      return `
+      <th class="planner-col-th"${w ? ` style="width:${w};min-width:${w};"` : ''}>
         <div class="planner-col-th-inner">
           <button class="btn-planner-icon btn-planner-insert-col" title="Insert column before" onclick="insertPlannerColumnBefore(${pi},${bi},${ci})">⊕</button>
           <input class="planner-col-name" value="${escHtml(col)}"
             onblur="updatePlannerColName(${pi},${bi},${ci},this.value)" onclick="this.select()">
           ${cols.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="removePlannerColumn(${pi},${bi},${ci})">✕</button>` : ''}
         </div>
-      </th>`).join('');
+        <span class="planner-col-resizer" title="Drag to resize column" onmousedown="startPlannerColResize(event,${pi},${bi},${ci})"></span>
+      </th>`;
+    }).join('');
     const renderTableRow = (row, ri) => {
       const cells = cols.map((_, ci) => `
         <td class="planner-cell-td">
@@ -4081,6 +4085,7 @@ async function addPlannerColumn(pi, bi) {
 async function insertPlannerColumnBefore(pi, bi, ci) {
   const block  = state.planners[pi].blocks[bi];
   block.cols.splice(ci, 0, 'Column ' + (ci + 1));
+  if (block.colWidths) block.colWidths.splice(ci, 0, undefined);
   const newLen = block.cols.length;
   block.rows.forEach(row => {
     for (let i = newLen - 1; i > ci; i--) row['c' + i] = row['c' + (i - 1)];
@@ -4094,12 +4099,42 @@ async function removePlannerColumn(pi, bi, ci) {
   const block = state.planners[pi].blocks[bi];
   if (block.cols.length <= 1) return;
   block.cols.splice(ci, 1);
+  if (block.colWidths) block.colWidths.splice(ci, 1);
   block.rows.forEach(row => {
     for (let i = ci; i < block.cols.length; i++) row['c' + i] = row['c' + (i + 1)] || '';
     delete row['c' + block.cols.length];
   });
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
+}
+
+let _colResize = null;
+
+function startPlannerColResize(e, pi, bi, ci) {
+  e.preventDefault();
+  const th = e.target.closest('th');
+  _colResize = { pi, bi, ci, th, startX: e.clientX, startWidth: th.offsetWidth };
+  document.addEventListener('mousemove', movePlannerColResize);
+  document.addEventListener('mouseup', endPlannerColResize);
+}
+
+function movePlannerColResize(e) {
+  if (!_colResize) return;
+  const newWidth = Math.max(50, _colResize.startWidth + (e.clientX - _colResize.startX));
+  _colResize.th.style.width = newWidth + 'px';
+  _colResize.th.style.minWidth = newWidth + 'px';
+}
+
+async function endPlannerColResize() {
+  document.removeEventListener('mousemove', movePlannerColResize);
+  document.removeEventListener('mouseup', endPlannerColResize);
+  if (!_colResize) return;
+  const { pi, bi, ci, th } = _colResize;
+  _colResize = null;
+  const block = state.planners[pi].blocks[bi];
+  if (!block.colWidths) block.colWidths = [];
+  block.colWidths[ci] = th.style.width;
+  await saveUserData({ planners: state.planners });
 }
 
 function updatePlannerBlockHeader(pi, bi, value) {
