@@ -1898,16 +1898,35 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 .fm-period-sep { font-size: 14px; color: var(--muted); }
 .fm-tracker-period-block input[type="date"],
-.fm-tracker-period-block input[type="time"] {
+.fm-tracker-period-block .fm-time-select-btn {
   background: var(--card2); border: 1px solid var(--border);
   border-radius: 6px; padding: 5px 8px; font-size: 12px;
   color: var(--text); outline: none; color-scheme: dark;
   min-width: 0;
 }
 .fm-tracker-period-block input[type="date"] { flex: 1 1 110px; }
-.fm-tracker-period-block input[type="time"] { flex: 0 0 auto; width: 78px; }
+.fm-tracker-period-block .fm-time-select-btn {
+  flex: 0 0 auto; width: 88px; cursor: pointer; text-align: left; font-family: inherit;
+}
 .fm-tracker-period-block input[type="date"]:focus,
-.fm-tracker-period-block input[type="time"]:focus { border-color: var(--primary); }
+.fm-tracker-period-block .fm-time-select-btn:focus { border-color: var(--primary); }
+
+/* Custom scrollable time picker — a native <select> with 48 half-hour options renders as
+   a spinning wheel picker on iOS (no visible scrollbar, easy to overshoot the target time),
+   so this is a plain scrollable list instead, working identically on every platform. */
+.fm-time-picker { position: relative; flex: 0 0 auto; }
+.fm-time-select-btn.open { border-color: var(--primary); }
+.fm-time-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 150;
+  max-height: 220px; overflow-y: auto; min-width: 100px;
+  background: var(--card2); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.fm-time-option {
+  padding: 7px 12px; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.fm-time-option:hover { background: rgba(255,255,255,0.08); }
+.fm-time-option.active { background: var(--primary); color: #fff; font-weight: 600; }
 .fm-now-btn {
   padding: 5px 10px; font-size: 11px; font-weight: 600;
   background: var(--card2); border: 1px solid var(--border);

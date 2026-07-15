@@ -5667,15 +5667,82 @@ async function dpFlushRefSave() {
 
 const FM_TRACKER_DEFAULT_START = '2026-06-23T10:00';
 
+function _fmTimeLabel(hh, mm) {
+  const h12 = hh % 12 === 0 ? 12 : hh % 12;
+  return `${String(h12).padStart(2,'0')}:${String(mm).padStart(2,'0')} ${hh < 12 ? 'AM' : 'PM'}`;
+}
+
+// Native <select> with 48 half-hour options renders as an imprecise, scrollbar-less
+// wheel picker on iOS, so the time picker is a plain button + scrollable div list instead.
+// The button stores the raw "HH:MM" in data-value; .textContent is only the display label.
+function fmPopulateTimeSelects() {
+  ['start','end'].forEach(prefix => {
+    const list = document.getElementById(`fm-tracker-${prefix}-time-list`);
+    if (!list || list.children.length) return;
+    for (let hh = 0; hh < 24; hh++) {
+      for (let mm = 0; mm < 60; mm += 30) {
+        const val = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+        const opt = document.createElement('div');
+        opt.className = 'fm-time-option';
+        opt.dataset.value = val;
+        opt.textContent = _fmTimeLabel(hh, mm);
+        opt.onclick = () => _fmChooseTime(prefix, val);
+        list.appendChild(opt);
+      }
+    }
+  });
+}
+
+function _fmChooseTime(prefix, val) {
+  const btn = document.getElementById(`fm-tracker-${prefix}-time`);
+  if (btn) { btn.dataset.value = val; btn.textContent = _fmTimeLabel(...val.split(':').map(Number)); }
+  fmCloseTimeLists();
+  saveFMTrackerPeriod();
+}
+
+function fmToggleTimeList(prefix) {
+  fmPopulateTimeSelects();
+  const list = document.getElementById(`fm-tracker-${prefix}-time-list`);
+  const btn  = document.getElementById(`fm-tracker-${prefix}-time`);
+  const isOpen = list && !list.classList.contains('hidden');
+  fmCloseTimeLists();
+  if (!list || isOpen) return;
+  list.classList.remove('hidden');
+  btn?.classList.add('open');
+  const activeVal = btn?.dataset.value;
+  const activeEl = activeVal ? list.querySelector(`.fm-time-option[data-value="${activeVal}"]`) : null;
+  if (activeEl) { activeEl.classList.add('active'); activeEl.scrollIntoView({ block: 'center' }); }
+}
+
+function fmCloseTimeLists() {
+  document.querySelectorAll('.fm-time-dropdown').forEach(l => l.classList.add('hidden'));
+  document.querySelectorAll('.fm-time-select-btn').forEach(b => b.classList.remove('open'));
+  document.querySelectorAll('.fm-time-option.active').forEach(o => o.classList.remove('active'));
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.fm-time-picker')) fmCloseTimeLists();
+});
+
+function _fmRoundTo30(t) {
+  let [hh, mm] = (t || '00:00').split(':').map(Number);
+  mm = Math.round(mm / 30) * 30;
+  if (mm === 60) { mm = 0; hh = (hh + 1) % 24; }
+  return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+}
+
 function _fmSetDT(prefix, dtStr) {
+  fmPopulateTimeSelects();
   const [d, t] = (dtStr || '').split('T');
+  const val = _fmRoundTo30(t);
   document.getElementById(`fm-tracker-${prefix}-date`).value = d || '';
-  document.getElementById(`fm-tracker-${prefix}-time`).value = t || '';
+  const btn = document.getElementById(`fm-tracker-${prefix}-time`);
+  if (btn) { btn.dataset.value = val; btn.textContent = _fmTimeLabel(...val.split(':').map(Number)); }
 }
 
 function _fmGetDT(prefix) {
   const d = document.getElementById(`fm-tracker-${prefix}-date`)?.value || '';
-  const t = document.getElementById(`fm-tracker-${prefix}-time`)?.value || '00:00';
+  const t = document.getElementById(`fm-tracker-${prefix}-time`)?.dataset.value || '00:00';
   return d ? `${d}T${t}` : '';
 }
 

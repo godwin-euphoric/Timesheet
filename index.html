@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Timesheet</title>
-  <link rel="stylesheet" href="style.css?v=68">
+  <link rel="stylesheet" href="style.css?v=69">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -131,11 +131,17 @@
         <div class="fm-period-row">
           <span class="fm-period-lbl">From</span>
           <input type="date" id="fm-tracker-start-date" onchange="saveFMTrackerPeriod()">
-          <input type="time" id="fm-tracker-start-time" step="1800" onchange="saveFMTrackerPeriod()">
+          <div class="fm-time-picker" id="fm-tracker-start-time-picker">
+            <button type="button" class="fm-time-select-btn" id="fm-tracker-start-time" onclick="fmToggleTimeList('start')"></button>
+            <div class="fm-time-dropdown hidden" id="fm-tracker-start-time-list"></div>
+          </div>
           <span class="fm-period-sep">→</span>
           <span class="fm-period-lbl">To</span>
           <input type="date" id="fm-tracker-end-date" onchange="saveFMTrackerPeriod()">
-          <input type="time" id="fm-tracker-end-time" step="1800" onchange="saveFMTrackerPeriod()">
+          <div class="fm-time-picker" id="fm-tracker-end-time-picker">
+            <button type="button" class="fm-time-select-btn" id="fm-tracker-end-time" onclick="fmToggleTimeList('end')"></button>
+            <div class="fm-time-dropdown hidden" id="fm-tracker-end-time-list"></div>
+          </div>
           <button class="fm-now-btn" onclick="fmSetNow()">Now</button>
         </div>
       </div>
@@ -806,7 +812,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=73"></script>
+<script src="app.js?v=74"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
