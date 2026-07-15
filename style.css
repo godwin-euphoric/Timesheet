@@ -753,16 +753,32 @@ textarea#fm-notes:focus {
   padding-bottom: 20px; padding-top: 4px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
-/* Two-row thead: offsets are computed at runtime (syncMonthlyStickyOffsets in app.js)
-   since .top-controls height varies as its content wraps. Fallbacks below match the
-   common single-line layout in case JS hasn't run yet. */
+/* .table-scroll sets overflow-x:auto with no overflow-y — per the CSS overflow spec,
+   a 'visible' axis paired with a non-visible one computes to 'auto', so this element is
+   ALREADY an implicit vertical scroll container. That makes it (not the page) the sticky
+   containing block for anything sticky inside it. Rather than fight that with page-relative
+   pixel math, give it an explicit bounded height so it's an intentional scroll box, and
+   stick the thead to the top of THAT box (no page-layout offsets needed). */
+#tab-monthly .table-scroll {
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+}
+/* Two-row thead, sticky within .table-scroll: row1 sticks at the very top; row2's offset
+   is row1's own rendered height (kept in sync at runtime by syncMonthlyStickyOffsets in
+   app.js, since it depends on font metrics/wrapping, not on anything elsewhere on the page). */
 #monthly-thead tr:first-child th {
-  position: sticky; top: var(--monthly-thead1-top, 176px); z-index: 100;
+  position: sticky; top: 0; z-index: 100;
   background: #0D1628;
 }
 #monthly-thead tr:last-child th {
-  position: sticky; top: var(--monthly-thead2-top, 214px); z-index: 100;
+  position: sticky; top: var(--monthly-thead2-top, 34px); z-index: 100;
   background: #0D1628;
+}
+/* Mobile's thead has a single row (renderMonthlyTableMobile), where :first-child and
+   :last-child both match that same <tr> — without this, the :last-child rule above wins
+   the cascade and sticks the only header row below a phantom "row1" offset. */
+#monthly-thead tr:only-child th {
+  top: 0;
 }
 
 /* ══ Summary card header ═════════════════════════════════════════════════════ */
