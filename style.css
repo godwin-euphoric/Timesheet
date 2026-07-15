@@ -753,13 +753,15 @@ textarea#fm-notes:focus {
   padding-bottom: 20px; padding-top: 4px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
-/* Two-row thead: first row at top: 64 + ~112 = 176, second row 38px lower */
+/* Two-row thead: offsets are computed at runtime (syncMonthlyStickyOffsets in app.js)
+   since .top-controls height varies as its content wraps. Fallbacks below match the
+   common single-line layout in case JS hasn't run yet. */
 #monthly-thead tr:first-child th {
-  position: sticky; top: 176px; z-index: 100;
+  position: sticky; top: var(--monthly-thead1-top, 176px); z-index: 100;
   background: #0D1628;
 }
 #monthly-thead tr:last-child th {
-  position: sticky; top: 214px; z-index: 100;
+  position: sticky; top: var(--monthly-thead2-top, 214px); z-index: 100;
   background: #0D1628;
 }
 

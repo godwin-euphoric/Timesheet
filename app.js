@@ -898,6 +898,38 @@ async function loadMonthlyTab() {
   renderLeaveTags();
   loadLeaveDropdown(data);
   await renderMonthlyTable(data);
+  initMonthlyStickyOffsets();
+}
+
+// Keeps the two sticky thead rows pinned right below .top-controls, whose height
+// isn't fixed — it wraps onto more lines on narrower screens or long leave reasons.
+// A ResizeObserver recomputes the offsets whenever either element actually changes size.
+let monthlyStickyObserver = null;
+function syncMonthlyStickyOffsets() {
+  if (window.innerWidth <= 768) return; // mobile layout doesn't use these sticky rules
+  const topControls = document.querySelector('#tab-monthly .top-controls');
+  const row1 = document.querySelector('#monthly-thead tr:first-child');
+  const row2 = document.querySelector('#monthly-thead tr:last-child');
+  if (!topControls || !row1 || !row2) return;
+  const headerEl = document.querySelector('header');
+  const headerH  = headerEl ? headerEl.offsetHeight : 64;
+  const row1Top  = headerH + topControls.offsetHeight;
+  const row2Top  = row1Top + row1.offsetHeight;
+  document.documentElement.style.setProperty('--monthly-thead1-top', `${row1Top}px`);
+  document.documentElement.style.setProperty('--monthly-thead2-top', `${row2Top}px`);
+}
+function initMonthlyStickyOffsets() {
+  syncMonthlyStickyOffsets();
+  if (monthlyStickyObserver) return; // observers already attached, just re-synced above
+  monthlyStickyObserver = new ResizeObserver(() => syncMonthlyStickyOffsets());
+  // Observe the .top-controls and <thead> elements themselves (not their inner rows) —
+  // renderMonthlyTable() replaces the thead's innerHTML on every redraw, which would
+  // disconnect an observer watching a <tr> directly. The thead/top-controls nodes persist.
+  const topControls = document.querySelector('#tab-monthly .top-controls');
+  const thead = document.getElementById('monthly-thead');
+  if (topControls) monthlyStickyObserver.observe(topControls);
+  if (thead) monthlyStickyObserver.observe(thead);
+  window.addEventListener('resize', syncMonthlyStickyOffsets);
 }
 
 function loadLeaveDropdown(data) {
