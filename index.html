@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Timesheet</title>
-  <link rel="stylesheet" href="style.css?v=69">
+  <link rel="stylesheet" href="style.css?v=70">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -68,6 +68,7 @@
     <nav class="tabs">
       <button class="tab-btn active" data-tab="main">Main</button>
       <button class="tab-btn" data-tab="diet">Diet</button>
+      <button class="tab-btn" data-tab="regimen">Regimen</button>
       <button class="tab-btn" data-tab="monthly">Monthly</button>
       <button class="tab-btn" data-tab="yearly">Yearly</button>
       <button class="tab-btn" data-tab="habits">Habits</button>
@@ -401,6 +402,125 @@
 
     </div><!-- end diet-content -->
   </div><!-- end tab-diet -->
+
+  <!-- ══ REGIMEN ════════════════════════════════════════════════════════════ -->
+  <div id="tab-regimen" class="tab-content">
+
+    <!-- Gate: shown when settings not configured -->
+    <div id="regimen-gate" class="diet-gate hidden">
+      <div class="diet-gate-msg">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <p>Enter your <strong>Gemini API key</strong> in Settings → Diet Settings to enable the Regimen tab.</p>
+        <button class="btn-primary" onclick="document.querySelector('[data-tab=settings]').click()">Go to Settings</button>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div id="regimen-content" class="hidden">
+
+      <!-- Date navigation -->
+      <div class="diet-date-nav">
+        <button class="diet-date-arrow" onclick="regPrevDay()">&#8592;</button>
+        <span id="reg-date-label">MON, JUN 8</span>
+        <button class="diet-date-arrow" onclick="regNextDay()">&#8594;</button>
+      </div>
+
+      <!-- Calorie summary card -->
+      <div class="diet-summary-card">
+        <div class="diet-summary-top">
+          <div class="calorie-ring-wrap">
+            <svg class="calorie-ring" viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="52"/>
+              <circle class="ring-progress" id="reg-ring-progress" cx="60" cy="60" r="52"
+                      stroke-dasharray="326.73" stroke-dashoffset="326.73"/>
+            </svg>
+            <div class="ring-center-text">
+              <span id="reg-consumed-num">0</span>
+              <small>of <span id="reg-target-num">1800</span> kcal</small>
+            </div>
+          </div>
+          <div class="diet-macros-row">
+            <div class="macro-tile"><strong id="reg-protein">0g</strong><small>PROTEIN</small></div>
+            <div class="macro-tile"><strong id="reg-carbs">0g</strong><small>CARBS</small></div>
+            <div class="macro-tile"><strong id="reg-fat">0g</strong><small>FAT</small></div>
+            <div class="macro-tile"><strong id="reg-fibre">0g</strong><small>FIBRE</small></div>
+          </div>
+          <div class="diet-macros-row reg-macros-row-2">
+            <div class="macro-tile"><strong id="reg-protein-source">—</strong><small>PROTEIN (SOURCES)</small></div>
+          </div>
+          <div class="reg-junk-row">
+            <span class="reg-junk-label">Junk food today?</span>
+            <div class="reg-junk-toggle">
+              <button type="button" class="reg-junk-btn" id="reg-junk-yes" onclick="setRegJunk('yes')">Yes</button>
+              <button type="button" class="reg-junk-btn" id="reg-junk-no" onclick="setRegJunk('no')">No</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Warning banner -->
+      <div id="reg-warning-banner" class="diet-warning hidden"></div>
+
+      <!-- Log food -->
+      <div class="diet-log-section">
+        <div class="diet-log-label">LOG FOOD</div>
+        <div class="diet-input-row">
+          <input type="text" id="reg-food-input" class="diet-text-input"
+                 placeholder="e.g. 1 paneer sandwich, 2 eggs"
+                 onkeydown="if(event.key==='Enter')logRegFood()">
+          <button class="diet-mic-btn" id="reg-mic-btn" onclick="regStartMic()" title="Voice input">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+          </button>
+          <button class="diet-send-btn" id="reg-send-btn" onclick="logRegFood()">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+        <div id="reg-ai-spinner" class="diet-ai-spinner hidden">
+          <div class="diet-spinner"></div> Analyzing with AI...
+        </div>
+        <div class="diet-food-card-box">
+          <div id="reg-food-list" class="diet-food-list">
+            <div class="diet-empty">Nothing logged yet — add your first meal</div>
+          </div>
+          <div id="reg-food-save-row" class="diet-food-save-row hidden">
+            <button class="btn-primary diet-food-save-btn" onclick="saveRegFoodQtyChanges()">Save Changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workout log -->
+      <div class="diet-log-section">
+        <div class="diet-log-label">LOG WORKOUT</div>
+        <div class="diet-input-row">
+          <input type="text" id="reg-workout-input" class="diet-text-input"
+                 placeholder="e.g. Leg day, 5k run"
+                 onkeydown="if(event.key==='Enter')logRegWorkout()">
+          <button class="diet-send-btn" onclick="logRegWorkout()">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+        <div id="reg-workout-list" class="reg-workout-list">
+          <div class="diet-empty">No workouts logged yet</div>
+        </div>
+      </div>
+
+      <!-- Pro / Pro+ summary -->
+      <div class="diet-log-section">
+        <div class="diet-log-label">DAY SUMMARY</div>
+        <div class="reg-mode-toggle">
+          <button type="button" class="reg-mode-btn" id="reg-mode-pro" onclick="setRegMode('pro')">Pro</button>
+          <button type="button" class="reg-mode-btn" id="reg-mode-proplus" onclick="setRegMode('pro+')">Pro+</button>
+        </div>
+        <textarea id="reg-summary-text" class="reg-summary-textarea" rows="6"
+                  placeholder="Auto-fills once today's conditions are met — edit freely, or hit Regenerate to recompute."
+                  onblur="saveRegSummaryEdit()"></textarea>
+        <div class="reg-summary-actions">
+          <button class="btn-secondary" onclick="recalcRegSummary(true)">Regenerate</button>
+        </div>
+      </div>
+
+    </div><!-- end regimen-content -->
+  </div><!-- end tab-regimen -->
 
   <!-- ══ MONTHLY ════════════════════════════════════════════════════════════ -->
   <div id="tab-monthly" class="tab-content">
@@ -738,7 +858,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=74"></script>
+<script src="app.js?v=75"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

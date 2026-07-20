@@ -1665,6 +1665,48 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 .diet-error-footer { display: flex; gap: 8px; justify-content: flex-end; }
 
+/* ══ Regimen Tab ═════════════════════════════════════════════════════════════ */
+.reg-macros-row-2 { margin-top: 8px; }
+.reg-junk-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.reg-junk-label { font-size: 13px; color: var(--muted); }
+.reg-junk-toggle { display: flex; gap: 8px; }
+.reg-junk-btn {
+  background: var(--card2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer;
+  transition: all 0.15s;
+}
+.reg-junk-btn.active-yes { background: rgba(248,113,113,0.15); border-color: #F87171; color: #F87171; }
+.reg-junk-btn.active-no  { background: rgba(200,255,0,0.12); border-color: var(--lime); color: var(--lime); }
+
+.reg-workout-list { margin-top: 12px; }
+.reg-workout-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--card2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; margin-bottom: 6px; font-size: 13px;
+}
+.reg-workout-row .reg-workout-del {
+  background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px;
+}
+.reg-workout-row .reg-workout-del:hover { color: #F87171; }
+
+.reg-mode-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+.reg-mode-btn {
+  flex: 1; background: var(--card2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer;
+  transition: all 0.15s;
+}
+.reg-mode-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.reg-summary-textarea {
+  width: 100%; background: var(--card2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-size: 13px; line-height: 1.7; padding: 12px; resize: vertical;
+  font-family: inherit; outline: none;
+}
+.reg-summary-textarea:focus { border-color: var(--primary); }
+.reg-summary-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+
 /* ══ Admin tab ════════════════════════════════════════════════════════════ */
 .admin-table th, .admin-table td { font-size: 13px; }
 .admin-table td:first-child { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

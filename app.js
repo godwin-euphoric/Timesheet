@@ -48,6 +48,10 @@ const state = {
   dietDate:         todayStr(),
   dietMonthCache:   {},
   dietSettings:     null,
+  // Regimen tab
+  regDate:          todayStr(),
+  regMonthCache:    {},
+  regMode:          'pro+',
   userRole:         null,
 };
 
@@ -157,6 +161,7 @@ auth.onAuthStateChanged(user => {
   state.userDataCache  = null;
   state.dietMonthCache   = {};
   state.dietSettings     = null;
+  state.regMonthCache    = {};
   state.userRole         = null;
 
   if (user) {
@@ -280,7 +285,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, diet: loadDietTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, diet: loadDietTab, regimen: loadRegimenTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -5034,6 +5039,487 @@ async function calcDietSuccessDays() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+//  REGIMEN TAB
+// ══════════════════════════════════════════════════════════════════════════
+// Reuses the Diet tab's Gemini key/calorie target (state.dietSettings), callGemini,
+// parseFoodWithAI, dietCalcTotals, DIET_CIRC and getCalorieTarget — same underlying
+// nutrition pipeline, separate day-log ("regimen_months") and its own UI ids/state.
+
+// Foods matching these names count toward "Protein (sources)". Placeholder — user will
+// supply the real dedicated protein-source list later; until then this stays empty and
+// the tile/condition simply don't activate.
+const REG_PROTEIN_SOURCES = [];
+
+// ── Firestore ──────────────────────────────────────────────────────────────
+
+function regMonthRef(month) {
+  return db.collection('users').doc(state.user.uid).collection('regimen_months').doc(month);
+}
+
+async function getRegMonthData(month) {
+  if (state.regMonthCache[month]) return state.regMonthCache[month];
+  const doc  = await regMonthRef(month).get();
+  const data = doc.exists ? doc.data() : { days: {} };
+  if (!data.days) data.days = {};
+  state.regMonthCache[month] = data;
+  return data;
+}
+
+async function saveRegMonthData(month, data) {
+  await regMonthRef(month).set(data);
+  state.regMonthCache[month] = data;
+}
+
+function regDayState(mData, dateStr) {
+  if (!mData.days[dateStr]) mData.days[dateStr] = {};
+  const d = mData.days[dateStr];
+  if (!d.foods)    d.foods    = [];
+  if (!d.workouts) d.workouts = [];
+  if (!d.junk)     d.junk     = null;
+  if (!d.mode)     d.mode     = 'pro+';
+  if (!d.summary)  d.summary  = '';
+  return d;
+}
+
+// ── Tab load ───────────────────────────────────────────────────────────────
+
+async function loadRegimenTab() {
+  await loadDietSettings();
+  const { geminiApiKey } = state.dietSettings || {};
+  const gate    = document.getElementById('regimen-gate');
+  const content = document.getElementById('regimen-content');
+  if (!geminiApiKey) {
+    gate.classList.remove('hidden');
+    content.classList.add('hidden');
+    return;
+  }
+  gate.classList.add('hidden');
+  content.classList.remove('hidden');
+  await renderRegDay(state.regDate);
+}
+
+// ── Day rendering ──────────────────────────────────────────────────────────
+
+async function renderRegDay(dateStr) {
+  const month  = dateStr.slice(0, 7);
+  const mData  = await getRegMonthData(month);
+  const day    = regDayState(mData, dateStr);
+  const target = getCalorieTarget();
+
+  document.getElementById('reg-date-label').textContent = formatDietDateLabel(dateStr);
+  renderRegSummaryRing(day.foods, target);
+  renderRegFoodCards(day.foods, dateStr);
+  document.getElementById('reg-food-save-row')?.classList.add('hidden');
+  renderRegWorkoutList(day.workouts, dateStr);
+  renderRegJunkButtons(day.junk);
+  renderRegModeButtons(day.mode);
+  document.getElementById('reg-summary-text').value = day.summary || '';
+  await recalcRegSummary();
+}
+
+function renderRegSummaryRing(foods, target) {
+  const t   = dietCalcTotals(foods);
+  const pct = target > 0 ? t.kcal / target : 0;
+
+  const offset = DIET_CIRC * (1 - Math.min(pct, 1));
+  const ringEl = document.getElementById('reg-ring-progress');
+  ringEl.style.strokeDashoffset = offset;
+  let ringColor = '#C8FF00';
+  if      (pct >= 1)    ringColor = '#F87171';
+  else if (pct >= 0.75) ringColor = '#F59E0B';
+  ringEl.style.stroke = ringColor;
+
+  const card = document.querySelector('#regimen-content .diet-summary-card');
+  card?.classList.remove('diet-bg-success', 'diet-bg-over');
+  if (t.kcal > 0 && pct < 1) card?.classList.add('diet-bg-success');
+  else if (t.kcal > 0 && pct >= 1) card?.classList.add('diet-bg-over');
+
+  document.getElementById('reg-consumed-num').textContent = t.kcal;
+  document.getElementById('reg-target-num').textContent   = target;
+  document.getElementById('reg-protein').textContent = t.protein + 'g';
+  document.getElementById('reg-carbs').textContent   = t.carbs   + 'g';
+  document.getElementById('reg-fat').textContent     = t.fat     + 'g';
+  document.getElementById('reg-fibre').textContent   = t.fibre   + 'g';
+
+  const sourceGrams = regCalcProteinFromSources(foods);
+  document.getElementById('reg-protein-source').textContent =
+    REG_PROTEIN_SOURCES.length ? sourceGrams + 'g' : '—';
+
+  renderRegWarning(pct, t.kcal, target);
+}
+
+function renderRegWarning(pct, kcal, target) {
+  const banner = document.getElementById('reg-warning-banner');
+  if (pct >= 1) {
+    banner.className = 'diet-warning diet-warning-red';
+    banner.textContent = `⚠️ You've hit your ${target} kcal daily target!`;
+  } else if (pct >= 0.75) {
+    banner.className = 'diet-warning diet-warning-yellow';
+    banner.textContent = `ℹ️ You're at ${Math.round(pct * 100)}% of your daily target`;
+  } else {
+    banner.className = 'diet-warning hidden';
+  }
+}
+
+// Placeholder: sums protein only from foods whose name matches REG_PROTEIN_SOURCES.
+// Returns 0 (UI shows "—") until that list is supplied.
+function regCalcProteinFromSources(foods) {
+  if (!REG_PROTEIN_SOURCES.length) return 0;
+  let grams = 0;
+  for (const f of foods) {
+    if (REG_PROTEIN_SOURCES.some(src => (f.name || '').toLowerCase().includes(src.toLowerCase()))) {
+      grams += (f.protein_g_per_unit || 0) * (f.quantity || 1);
+    }
+  }
+  return Math.round(grams * 10) / 10;
+}
+
+// ── Food cards ─────────────────────────────────────────────────────────────
+
+function renderRegFoodCards(foods, dateStr) {
+  const list = document.getElementById('reg-food-list');
+  if (!foods.length) {
+    list.innerHTML = '<div class="diet-empty">Nothing logged yet — add your first meal</div>';
+    return;
+  }
+  const ds = escHtml(dateStr);
+  const rows = foods.map(f => {
+    const q       = f.quantity || 1;
+    const kcal    = Math.round((f.calories_per_unit  || 0) * q);
+    const protein = Math.round((f.protein_g_per_unit || 0) * q * 10) / 10;
+    const carbs   = Math.round((f.carbs_g_per_unit   || 0) * q * 10) / 10;
+    const fat     = Math.round((f.fat_g_per_unit     || 0) * q * 10) / 10;
+    return `<tr id="reg-card-${f.id}">
+  <td class="col-name">${escHtml(f.name)}</td>
+  <td class="col-time">${escHtml(f.logged_at || '')}</td>
+  <td class="col-qty">
+    <input class="diet-qty-input" type="number" value="${q}" min="0.5" step="0.5"
+           oninput="markRegFoodDirty()">
+    <span class="diet-qty-unit">${escHtml(f.unit || '')}</span>
+  </td>
+  <td class="col-kcal">${kcal}</td>
+  <td class="col-num">${protein}g</td>
+  <td class="col-num">${carbs}g</td>
+  <td class="col-num">${fat}g</td>
+  <td><button class="diet-food-del" onclick="deleteRegFood('${ds}','${f.id}')">×</button></td>
+</tr>`;
+  }).join('');
+  const totals = foods.reduce((t, f) => {
+    const q = f.quantity || 1;
+    t.kcal    += Math.round((f.calories_per_unit  || 0) * q);
+    t.protein += (f.protein_g_per_unit || 0) * q;
+    t.carbs   += (f.carbs_g_per_unit   || 0) * q;
+    t.fat     += (f.fat_g_per_unit     || 0) * q;
+    return t;
+  }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+  list.innerHTML = `<table class="diet-food-table">
+  <thead><tr>
+    <th>FOOD</th><th>TIME</th><th>QTY</th>
+    <th>KCAL</th><th>P</th><th>C</th><th>F</th><th></th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot><tr class="diet-total-row">
+    <td colspan="3"><span class="diet-total-label">TOTAL</span></td>
+    <td class="col-kcal">${totals.kcal}</td>
+    <td class="col-num">${Math.round(totals.protein * 10) / 10}g</td>
+    <td class="col-num">${Math.round(totals.carbs * 10) / 10}g</td>
+    <td class="col-num">${Math.round(totals.fat * 10) / 10}g</td>
+    <td></td>
+  </tr></tfoot>
+</table>`;
+}
+
+function markRegFoodDirty() {
+  document.getElementById('reg-food-save-row')?.classList.remove('hidden');
+}
+
+async function saveRegFoodQtyChanges() {
+  const dateStr = state.regDate;
+  const inputs  = document.querySelectorAll('#reg-food-list .diet-qty-input');
+  if (!inputs.length) return;
+  const month = dateStr.slice(0, 7);
+  const mData = await getRegMonthData(month);
+  const day   = regDayState(mData, dateStr);
+  let changed = false;
+  inputs.forEach(inp => {
+    const row = inp.closest('tr');
+    const id  = row?.id?.replace('reg-card-', '');
+    if (!id) return;
+    const item = day.foods.find(f => f.id === id);
+    if (item) {
+      const newQty = parseFloat(inp.value) || 0.5;
+      if (Math.abs((item.quantity || 1) - newQty) > 0.001) { item.quantity = newQty; changed = true; }
+    }
+  });
+  if (changed) {
+    await saveRegMonthData(month, mData);
+    await renderRegDay(dateStr);
+    showToast('Saved');
+  } else {
+    document.getElementById('reg-food-save-row')?.classList.add('hidden');
+  }
+}
+
+// ── Log food ───────────────────────────────────────────────────────────────
+
+async function logRegFood() {
+  const inp  = document.getElementById('reg-food-input');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  const spinner = document.getElementById('reg-ai-spinner');
+  const sendBtn = document.getElementById('reg-send-btn');
+  inp.value        = '';
+  spinner.classList.remove('hidden');
+  sendBtn.disabled = true;
+
+  try {
+    const items = await parseFoodWithAI(text);
+    if (!items?.length) { showToast('AI could not parse that — try again'); return; }
+
+    const now   = new Date();
+    const tTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const month = state.regDate.slice(0, 7);
+    const mData = await getRegMonthData(month);
+    const day   = regDayState(mData, state.regDate);
+
+    for (const item of items) {
+      day.foods.push({
+        id:                 pId(),
+        name:               (item.name             || 'Unknown').trim(),
+        quantity:           parseFloat(item.quantity)            || 1,
+        unit:               (item.unit              || 'serving').trim(),
+        calories_per_unit:  parseFloat(item.calories_per_unit)  || 0,
+        protein_g_per_unit: parseFloat(item.protein_g_per_unit) || 0,
+        carbs_g_per_unit:   parseFloat(item.carbs_g_per_unit)   || 0,
+        fat_g_per_unit:     parseFloat(item.fat_g_per_unit)     || 0,
+        fibre_g_per_unit:   parseFloat(item.fibre_g_per_unit)   || 0,
+        logged_at:          tTime,
+      });
+    }
+
+    await saveRegMonthData(month, mData);
+    await renderRegDay(state.regDate);
+    showToast('Logged: ' + items.map(i => i.name).join(', '));
+  } catch (e) {
+    showDietError(e, `Input: "${text}"`);
+  } finally {
+    spinner.classList.add('hidden');
+    sendBtn.disabled = false;
+  }
+}
+
+async function deleteRegFood(dateStr, id) {
+  const month = dateStr.slice(0, 7);
+  const mData = await getRegMonthData(month);
+  const day   = regDayState(mData, dateStr);
+  day.foods   = day.foods.filter(f => f.id !== id);
+  await saveRegMonthData(month, mData);
+  await renderRegDay(dateStr);
+}
+
+// ── Voice input ────────────────────────────────────────────────────────────
+
+let _regRecognition = null;
+let _regMicActive   = false;
+
+function regStartMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showToast('Voice input not supported in this browser'); return; }
+  if (_regMicActive) { _regRecognition?.stop(); return; }
+
+  _regRecognition = new SR();
+  _regRecognition.lang = 'en-IN';
+  _regRecognition.interimResults = false;
+  _regRecognition.maxAlternatives = 1;
+
+  const micBtn = document.getElementById('reg-mic-btn');
+  micBtn.classList.add('recording');
+  _regMicActive = true;
+
+  _regRecognition.onresult = e => {
+    document.getElementById('reg-food-input').value = e.results[0][0].transcript;
+  };
+  _regRecognition.onend   = () => { micBtn.classList.remove('recording'); _regMicActive = false; };
+  _regRecognition.onerror = () => { micBtn.classList.remove('recording'); _regMicActive = false; };
+  _regRecognition.start();
+}
+
+// ── Workout log ────────────────────────────────────────────────────────────
+
+function renderRegWorkoutList(workouts, dateStr) {
+  const list = document.getElementById('reg-workout-list');
+  if (!workouts.length) {
+    list.innerHTML = '<div class="diet-empty">No workouts logged yet</div>';
+    return;
+  }
+  const ds = escHtml(dateStr);
+  list.innerHTML = workouts.map(w => `
+    <div class="reg-workout-row">
+      <span>${escHtml(w.name)}</span>
+      <button class="reg-workout-del" onclick="deleteRegWorkout('${ds}','${w.id}')">×</button>
+    </div>`).join('');
+}
+
+async function logRegWorkout() {
+  const inp  = document.getElementById('reg-workout-input');
+  const name = inp.value.trim();
+  if (!name) return;
+  inp.value = '';
+
+  const month = state.regDate.slice(0, 7);
+  const mData = await getRegMonthData(month);
+  const day   = regDayState(mData, state.regDate);
+  day.workouts.push({ id: pId(), name });
+  await saveRegMonthData(month, mData);
+  renderRegWorkoutList(day.workouts, state.regDate);
+  await recalcRegSummary();
+  showToast('Workout logged');
+}
+
+async function deleteRegWorkout(dateStr, id) {
+  const month = dateStr.slice(0, 7);
+  const mData = await getRegMonthData(month);
+  const day   = regDayState(mData, dateStr);
+  day.workouts = day.workouts.filter(w => w.id !== id);
+  await saveRegMonthData(month, mData);
+  renderRegWorkoutList(day.workouts, dateStr);
+  await recalcRegSummary();
+}
+
+// ── Junk toggle ────────────────────────────────────────────────────────────
+
+function renderRegJunkButtons(junk) {
+  document.getElementById('reg-junk-yes')?.classList.toggle('active-yes', junk === 'yes');
+  document.getElementById('reg-junk-no')?.classList.toggle('active-no', junk === 'no');
+}
+
+async function setRegJunk(val) {
+  const month = state.regDate.slice(0, 7);
+  const mData = await getRegMonthData(month);
+  const day   = regDayState(mData, state.regDate);
+  day.junk    = val;
+  await saveRegMonthData(month, mData);
+  renderRegJunkButtons(val);
+  await recalcRegSummary();
+}
+
+// ── Pro / Pro+ mode & summary ──────────────────────────────────────────────
+
+function renderRegModeButtons(mode) {
+  document.getElementById('reg-mode-pro')?.classList.toggle('active', mode === 'pro');
+  document.getElementById('reg-mode-proplus')?.classList.toggle('active', mode === 'pro+');
+}
+
+async function setRegMode(mode) {
+  const month = state.regDate.slice(0, 7);
+  const mData = await getRegMonthData(month);
+  const day   = regDayState(mData, state.regDate);
+  day.mode    = mode;
+  await saveRegMonthData(month, mData);
+  renderRegModeButtons(mode);
+  await recalcRegSummary(true);
+}
+
+async function saveRegSummaryEdit() {
+  const text  = document.getElementById('reg-summary-text').value;
+  const month = state.regDate.slice(0, 7);
+  const mData = await getRegMonthData(month);
+  const day   = regDayState(mData, state.regDate);
+  day.summary = text;
+  await saveRegMonthData(month, mData);
+}
+
+// Recomputes the auto-summary from today's tracked state and overwrites the textarea
+// once all applicable conditions are met (Pro+ additionally requires the calorie target
+// to be met; Pro drops that condition and the "Calorie Target met" line entirely).
+async function recalcRegSummary(force = false) {
+  const dateStr = state.regDate;
+  const month   = dateStr.slice(0, 7);
+  const mData   = await getRegMonthData(month);
+  const day     = regDayState(mData, dateStr);
+  const target  = getCalorieTarget();
+  const totals  = dietCalcTotals(day.foods);
+
+  const junkOk    = day.junk === 'no';
+  const workoutOk = day.workouts.length > 0;
+  const proteinOk = REG_PROTEIN_SOURCES.length > 0 && regCalcProteinFromSources(day.foods) > 0;
+  const calorieOk = totals.kcal > 0 && totals.kcal <= target;
+
+  const met = day.mode === 'pro+'
+    ? (junkOk && workoutOk && proteinOk && calorieOk)
+    : (junkOk && workoutOk && proteinOk);
+
+  if (!met) {
+    if (force) showToast('Not all conditions are met yet — summary left blank');
+    day.summary = '';
+    await saveRegMonthData(month, mData);
+    document.getElementById('reg-summary-text').value = '';
+    return;
+  }
+
+  const dayNum = await calcRegSuccessDays();
+  const lines = [
+    `Day ${dayNum}`,
+    'Protein Completed',
+    'No Junk Taken',
+    'Workouts : ' + day.workouts.map(w => w.name).join(', '),
+  ];
+  if (day.mode === 'pro+') lines.push('Calorie Target met');
+
+  day.summary = lines.join('\n');
+  await saveRegMonthData(month, mData);
+  document.getElementById('reg-summary-text').value = day.summary;
+}
+
+// Counts days (up to today) whose tracked state met that day's own mode criteria —
+// surfaced here as the summary's "Day ___" line (the streak concept from the Diet tab's
+// day-count circle, which this tab intentionally omits as a visual element).
+async function calcRegSuccessDays() {
+  const target = getCalorieTarget();
+  let y = 2026, m = 6;
+  const today = todayStr();
+  const [ey, em] = today.slice(0, 7).split('-').map(Number);
+  let count = 0;
+  while (y < ey || (y === ey && m <= em)) {
+    const month = `${y}-${String(m).padStart(2, '0')}`;
+    const mData = await getRegMonthData(month);
+    for (const [ds, d] of Object.entries(mData.days || {})) {
+      if (ds > today) continue;
+      const totals    = dietCalcTotals(d.foods || []);
+      const junkOk    = d.junk === 'no';
+      const workoutOk = (d.workouts || []).length > 0;
+      const proteinOk = REG_PROTEIN_SOURCES.length > 0 && regCalcProteinFromSources(d.foods || []) > 0;
+      const calorieOk = totals.kcal > 0 && totals.kcal <= target;
+      const met = (d.mode || 'pro+') === 'pro+'
+        ? (junkOk && workoutOk && proteinOk && calorieOk)
+        : (junkOk && workoutOk && proteinOk);
+      if (met) count++;
+    }
+    m++; if (m > 12) { y++; m = 1; }
+  }
+  return count;
+}
+
+// ── Date navigation ────────────────────────────────────────────────────────
+
+function regPrevDay() {
+  const [y, m, d] = state.regDate.split('-').map(Number);
+  const dt  = new Date(y, m - 1, d - 1);
+  state.regDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  renderRegDay(state.regDate);
+}
+
+function regNextDay() {
+  const [y, m, d] = state.regDate.split('-').map(Number);
+  const dt   = new Date(y, m - 1, d + 1);
+  const next = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  if (next > todayStr()) { showToast("Can't go to a future date"); return; }
+  state.regDate = next;
+  renderRegDay(state.regDate);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 //  ACCESS CONTROL & ADMIN
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -5257,8 +5743,8 @@ async function shareFMTracker() {
 function applyRoleVisibility(role) {
   const showFor = {
     timesheet: new Set(['main', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
-    diet:      new Set(['diet', 'settings', 'health']),
-    both:      new Set(['main', 'diet', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
+    diet:      new Set(['diet', 'regimen', 'settings', 'health']),
+    both:      new Set(['main', 'diet', 'regimen', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
   };
   const visible = showFor[role] || showFor.both;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
