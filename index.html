@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Timesheet</title>
-  <link rel="stylesheet" href="style.css?v=74">
+  <link rel="stylesheet" href="style.css?v=75">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -428,15 +428,21 @@
       <!-- Calorie summary card -->
       <div class="diet-summary-card">
         <div class="diet-summary-top">
-          <div class="calorie-ring-wrap">
-            <svg class="calorie-ring" viewBox="0 0 120 120">
-              <circle class="ring-bg" cx="60" cy="60" r="52"/>
-              <circle class="ring-progress" id="reg-ring-progress" cx="60" cy="60" r="52"
-                      stroke-dasharray="326.73" stroke-dashoffset="326.73"/>
+          <div class="reg-ring-outer-wrap">
+            <svg class="reg-day-ring-svg" viewBox="0 0 140 140">
+              <circle class="reg-day-ring-bg" cx="70" cy="70" r="66"/>
             </svg>
-            <div class="ring-center-text">
-              <span id="reg-consumed-num">0</span>
-              <small>of <span id="reg-target-num">1800</span> kcal</small>
+            <div class="reg-day-badge"><span id="reg-day-count-num">0</span><small>day</small></div>
+            <div class="calorie-ring-wrap">
+              <svg class="calorie-ring" viewBox="0 0 120 120">
+                <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                <circle class="ring-progress" id="reg-ring-progress" cx="60" cy="60" r="52"
+                        stroke-dasharray="326.73" stroke-dashoffset="326.73"/>
+              </svg>
+              <div class="ring-center-text">
+                <span id="reg-consumed-num">0</span>
+                <small>of <span id="reg-target-num">1800</span> kcal</small>
+              </div>
             </div>
           </div>
           <div class="diet-macros-row">
@@ -447,13 +453,6 @@
           </div>
           <div class="diet-macros-row reg-macros-row-2">
             <div class="macro-tile"><strong id="reg-protein-source">—</strong><small>PROTEIN (SOURCES)</small></div>
-          </div>
-          <div class="reg-junk-row">
-            <span class="reg-junk-label">Junk food today?</span>
-            <div class="reg-junk-toggle">
-              <button type="button" class="reg-junk-btn" id="reg-junk-yes" onclick="setRegJunk('yes')">Yes</button>
-              <button type="button" class="reg-junk-btn" id="reg-junk-no" onclick="setRegJunk('no')">No</button>
-            </div>
           </div>
         </div>
       </div>
@@ -501,6 +500,13 @@
         </div>
         <div id="reg-workout-list" class="reg-workout-list">
           <div class="diet-empty">No workouts logged yet</div>
+        </div>
+        <div class="reg-junk-row">
+          <span class="reg-junk-label">Junk food today?</span>
+          <div class="reg-junk-toggle">
+            <button type="button" class="reg-junk-btn" id="reg-junk-yes" onclick="setRegJunk('yes')">Yes</button>
+            <button type="button" class="reg-junk-btn" id="reg-junk-no" onclick="setRegJunk('no')">No</button>
+          </div>
         </div>
       </div>
 
@@ -770,6 +776,14 @@
       <div class="card-title">🏆 Diet Success Leaderboard</div>
       <div id="admin-leaderboard"><span class="empty-inline">Loading…</span></div>
     </div>
+    <div class="card">
+      <div class="card-title">🥩 Protein Sources</div>
+      <div class="admin-protein-add-row">
+        <input type="text" id="admin-protein-input" placeholder="Add a protein source…">
+        <button class="btn-primary admin-btn" onclick="addRegProteinSource()">Add</button>
+      </div>
+      <div id="admin-protein-list"><span class="empty-inline">Loading…</span></div>
+    </div>
   </div>
 
   <!-- ══ HEALTH ════════════════════════════════════════════════════════════ -->
@@ -860,7 +874,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=80"></script>
+<script src="app.js?v=81"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

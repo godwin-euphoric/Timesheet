@@ -52,6 +52,7 @@ const state = {
   regDate:          todayStr(),
   regMonthCache:    {},
   regMode:          'pro+',
+  regProteinSources: null,
   userRole:         null,
 };
 
@@ -162,6 +163,7 @@ auth.onAuthStateChanged(user => {
   state.dietMonthCache   = {};
   state.dietSettings     = null;
   state.regMonthCache    = {};
+  state.regProteinSources = null;
   state.userRole         = null;
 
   if (user) {
@@ -5045,15 +5047,36 @@ async function calcDietSuccessDays() {
 // parseFoodWithAI, dietCalcTotals, DIET_CIRC and getCalorieTarget — same underlying
 // nutrition pipeline, separate day-log ("regimen_months") and its own UI ids/state.
 
-// Foods matching these names count toward "Protein (sources)". Placeholder — user will
-// supply the real dedicated protein-source list later; until then this stays empty and
-// the tile/condition simply don't activate.
-const REG_PROTEIN_SOURCES = [
+// Foods matching a name in this list count toward "Protein (sources)". Seeded into
+// Firestore (app_config/regimen) the first time it's read, then managed from the
+// Admin tab — edits there apply to every user, since it's a shared config doc.
+const REG_PROTEIN_SOURCES_SEED = [
   'Egg', 'Egg white', 'Chicken breast', 'Chicken thigh', 'Seer fish', 'Rohu', 'Salmon',
   'Tuna', 'Prawns', 'Chickpeas', 'Rajma', 'Moong dal', 'Masoor dal', 'Black chana',
-  'Horse gram', 'Kollu', 'Roasted chana', 'Peanuts', 'Paneer', 'Greek yogurt', 'Curd',
+  'Horse gram', 'Kollu', 'Roasted chana', 'Peanuts', 'Paneer', 'Greek yogurt',
   'Milk', 'Soya chunks', 'Tofu', 'Oats', 'Wheat bread', 'Whey protein', 'Whey isolate',
 ];
+
+function regConfigRef() {
+  return db.collection('app_config').doc('regimen');
+}
+
+async function getRegProteinSources() {
+  if (state.regProteinSources) return state.regProteinSources;
+  const doc = await regConfigRef().get();
+  if (doc.exists && Array.isArray(doc.data().proteinSources)) {
+    state.regProteinSources = doc.data().proteinSources;
+  } else {
+    state.regProteinSources = [...REG_PROTEIN_SOURCES_SEED];
+    await regConfigRef().set({ proteinSources: state.regProteinSources }, { merge: true });
+  }
+  return state.regProteinSources;
+}
+
+async function saveRegProteinSources(list) {
+  state.regProteinSources = list;
+  await regConfigRef().set({ proteinSources: list }, { merge: true });
+}
 
 // ── Firestore ──────────────────────────────────────────────────────────────
 
@@ -5090,6 +5113,7 @@ function regDayState(mData, dateStr) {
 
 async function loadRegimenTab() {
   await loadDietSettings();
+  await getRegProteinSources();
   const { geminiApiKey } = state.dietSettings || {};
   const gate    = document.getElementById('regimen-gate');
   const content = document.getElementById('regimen-content');
@@ -5113,6 +5137,7 @@ async function renderRegDay(dateStr) {
 
   document.getElementById('reg-date-label').textContent = formatDietDateLabel(dateStr);
   renderRegSummaryRing(day.foods, target);
+  document.getElementById('reg-day-count-num').textContent = await calcRegSuccessDays();
   renderRegFoodCards(day.foods, dateStr);
   document.getElementById('reg-food-save-row')?.classList.add('hidden');
   renderRegWorkoutList(day.workouts, dateStr);
@@ -5148,7 +5173,7 @@ function renderRegSummaryRing(foods, target) {
 
   const sourceGrams = regCalcProteinFromSources(foods);
   document.getElementById('reg-protein-source').textContent =
-    REG_PROTEIN_SOURCES.length ? sourceGrams + 'g' : '—';
+    (state.regProteinSources || []).length ? sourceGrams + 'g' : '—';
 
   renderRegWarning(pct, t.kcal, target);
 }
@@ -5170,7 +5195,7 @@ function renderRegWarning(pct, kcal, target) {
 // Returns 0 (UI shows "—") until that list is supplied.
 function regIsProteinSource(food) {
   const name = (food.name || '').toLowerCase();
-  return REG_PROTEIN_SOURCES.some(src => name.includes(src.toLowerCase()));
+  return (state.regProteinSources || []).some(src => name.includes(src.toLowerCase()));
 }
 
 function regFoodProteinPP(food) {
@@ -5178,7 +5203,7 @@ function regFoodProteinPP(food) {
 }
 
 function regCalcProteinFromSources(foods) {
-  if (!REG_PROTEIN_SOURCES.length) return 0;
+  if (!(state.regProteinSources || []).length) return 0;
   let grams = 0;
   for (const f of foods) grams += regFoodProteinPP(f);
   return Math.round(grams * 10) / 10;
@@ -5481,7 +5506,7 @@ async function recalcRegSummary(force = false) {
 
   const junkOk    = day.junk === 'no';
   const workoutOk = day.workouts.length > 0;
-  const proteinOk = REG_PROTEIN_SOURCES.length > 0 && regCalcProteinFromSources(day.foods) > 0;
+  const proteinOk = (state.regProteinSources || []).length > 0 && regCalcProteinFromSources(day.foods) > 0;
   const calorieOk = totals.kcal > 0 && totals.kcal <= target;
 
   const met = day.mode === 'pro+'
@@ -5530,7 +5555,7 @@ async function calcRegSuccessDays() {
       const totals    = dietCalcTotals(d.foods || []);
       const junkOk    = d.junk === 'no';
       const workoutOk = (d.workouts || []).length > 0;
-      const proteinOk = REG_PROTEIN_SOURCES.length > 0 && regCalcProteinFromSources(d.foods || []) > 0;
+      const proteinOk = (state.regProteinSources || []).length > 0 && regCalcProteinFromSources(d.foods || []) > 0;
       const calorieOk = totals.kcal > 0 && totals.kcal <= target;
       const met = (d.mode || 'pro+') === 'pro+'
         ? (junkOk && workoutOk && proteinOk && calorieOk)
@@ -5850,7 +5875,53 @@ async function requestAccess() {
 async function loadAdminTab() {
   if (!isAdmin()) return;
   await updateDietStats();  // ensure admin's own stats are current
-  await Promise.all([loadPendingRequests(), loadAllUsers(), loadDietLeaderboard()]);
+  await Promise.all([loadPendingRequests(), loadAllUsers(), loadDietLeaderboard(), loadRegProteinSourcesAdmin()]);
+}
+
+async function loadRegProteinSourcesAdmin() {
+  const container = document.getElementById('admin-protein-list');
+  if (!container) return;
+  container.innerHTML = '<span class="empty-inline">Loading…</span>';
+  try {
+    state.regProteinSources = null; // force a fresh read from Firestore
+    await getRegProteinSources();
+    renderRegProteinSourcesAdmin();
+  } catch (e) {
+    container.innerHTML = `<span class="empty-inline" style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+function renderRegProteinSourcesAdmin() {
+  const container = document.getElementById('admin-protein-list');
+  if (!container) return;
+  const list = state.regProteinSources || [];
+  if (!list.length) { container.innerHTML = '<span class="empty-inline">No protein sources yet</span>'; return; }
+  container.innerHTML = `<div class="admin-protein-chips">${list.map(item => `
+    <span class="admin-protein-chip">${escHtml(item)}
+      <button class="admin-protein-remove" title="Remove" onclick="removeRegProteinSource('${escHtml(item).replace(/'/g, "\\'")}')">×</button>
+    </span>`).join('')}</div>`;
+}
+
+async function addRegProteinSource() {
+  const input = document.getElementById('admin-protein-input');
+  const value = (input?.value || '').trim();
+  if (!value) return;
+  await getRegProteinSources();
+  const list = state.regProteinSources || [];
+  if (list.some(x => x.toLowerCase() === value.toLowerCase())) { showToast('Already in the list'); return; }
+  const updated = [...list, value];
+  await saveRegProteinSources(updated);
+  input.value = '';
+  renderRegProteinSourcesAdmin();
+  showToast(`✓ Added ${value}`);
+}
+
+async function removeRegProteinSource(item) {
+  await getRegProteinSources();
+  const updated = (state.regProteinSources || []).filter(x => x !== item);
+  await saveRegProteinSources(updated);
+  renderRegProteinSourcesAdmin();
+  showToast(`Removed ${item}`);
 }
 
 async function loadPendingRequests() {
