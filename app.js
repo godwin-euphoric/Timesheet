@@ -5048,7 +5048,12 @@ async function calcDietSuccessDays() {
 // Foods matching these names count toward "Protein (sources)". Placeholder — user will
 // supply the real dedicated protein-source list later; until then this stays empty and
 // the tile/condition simply don't activate.
-const REG_PROTEIN_SOURCES = [];
+const REG_PROTEIN_SOURCES = [
+  'Egg', 'Egg white', 'Chicken breast', 'Chicken thigh', 'Seer fish', 'Rohu', 'Salmon',
+  'Tuna', 'Prawns', 'Chickpeas', 'Rajma', 'Moong dal', 'Masoor dal', 'Black chana',
+  'Horse gram', 'Kollu', 'Roasted chana', 'Peanuts', 'Paneer', 'Greek yogurt', 'Curd',
+  'Milk', 'Soya chunks', 'Tofu', 'Oats', 'Wheat bread', 'Whey protein', 'Whey isolate',
+];
 
 // ── Firestore ──────────────────────────────────────────────────────────────
 
@@ -5163,14 +5168,19 @@ function renderRegWarning(pct, kcal, target) {
 
 // Placeholder: sums protein only from foods whose name matches REG_PROTEIN_SOURCES.
 // Returns 0 (UI shows "—") until that list is supplied.
+function regIsProteinSource(food) {
+  const name = (food.name || '').toLowerCase();
+  return REG_PROTEIN_SOURCES.some(src => name.includes(src.toLowerCase()));
+}
+
+function regFoodProteinPP(food) {
+  return regIsProteinSource(food) ? Math.round((food.protein_g_per_unit || 0) * (food.quantity || 1) * 10) / 10 : 0;
+}
+
 function regCalcProteinFromSources(foods) {
   if (!REG_PROTEIN_SOURCES.length) return 0;
   let grams = 0;
-  for (const f of foods) {
-    if (REG_PROTEIN_SOURCES.some(src => (f.name || '').toLowerCase().includes(src.toLowerCase()))) {
-      grams += (f.protein_g_per_unit || 0) * (f.quantity || 1);
-    }
-  }
+  for (const f of foods) grams += regFoodProteinPP(f);
   return Math.round(grams * 10) / 10;
 }
 
@@ -5189,6 +5199,7 @@ function renderRegFoodCards(foods, dateStr) {
     const protein = Math.round((f.protein_g_per_unit || 0) * q * 10) / 10;
     const carbs   = Math.round((f.carbs_g_per_unit   || 0) * q * 10) / 10;
     const fat     = Math.round((f.fat_g_per_unit     || 0) * q * 10) / 10;
+    const pp      = regFoodProteinPP(f);
     return `<tr id="reg-card-${f.id}">
   <td class="col-name">${escHtml(f.name)}</td>
   <td class="col-time">${escHtml(f.logged_at || '')}</td>
@@ -5201,6 +5212,7 @@ function renderRegFoodCards(foods, dateStr) {
   <td class="col-num">${protein}g</td>
   <td class="col-num">${carbs}g</td>
   <td class="col-num">${fat}g</td>
+  <td class="col-num">${pp ? pp + 'g' : '—'}</td>
   <td><button class="diet-food-del" onclick="deleteRegFood('${ds}','${f.id}')">×</button></td>
 </tr>`;
   }).join('');
@@ -5210,12 +5222,13 @@ function renderRegFoodCards(foods, dateStr) {
     t.protein += (f.protein_g_per_unit || 0) * q;
     t.carbs   += (f.carbs_g_per_unit   || 0) * q;
     t.fat     += (f.fat_g_per_unit     || 0) * q;
+    t.pp      += regFoodProteinPP(f);
     return t;
-  }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+  }, { kcal: 0, protein: 0, carbs: 0, fat: 0, pp: 0 });
   list.innerHTML = `<table class="diet-food-table">
   <thead><tr>
     <th>FOOD</th><th>TIME</th><th>QTY</th>
-    <th>KCAL</th><th>P</th><th>C</th><th>F</th><th></th>
+    <th>KCAL</th><th>P</th><th>C</th><th>F</th><th>PP</th><th></th>
   </tr></thead>
   <tbody>${rows}</tbody>
   <tfoot><tr class="diet-total-row">
@@ -5224,6 +5237,7 @@ function renderRegFoodCards(foods, dateStr) {
     <td class="col-num">${Math.round(totals.protein * 10) / 10}g</td>
     <td class="col-num">${Math.round(totals.carbs * 10) / 10}g</td>
     <td class="col-num">${Math.round(totals.fat * 10) / 10}g</td>
+    <td class="col-num">${Math.round(totals.pp * 10) / 10}g</td>
     <td></td>
   </tr></tfoot>
 </table>`;
