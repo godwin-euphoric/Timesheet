@@ -5433,6 +5433,24 @@ async function saveRegSummaryEdit() {
 // Recomputes the auto-summary from today's tracked state and overwrites the textarea
 // once all applicable conditions are met (Pro+ additionally requires the calorie target
 // to be met; Pro drops that condition and the "Calorie Target met" line entirely).
+// Read-only checklist of the day's mandatory conditions, so it's visible which ones are
+// blocking the summary from populating even when it isn't fully met yet.
+function renderRegConditions(mode, junkOk, workoutOk, proteinOk, calorieOk) {
+  const el = document.getElementById('reg-conditions-status');
+  if (!el) return;
+  const rows = [
+    ['No junk food', junkOk],
+    ['Workout logged', workoutOk],
+    ['Protein from sources', proteinOk],
+  ];
+  if (mode === 'pro+') rows.push(['Calorie target met', calorieOk]);
+  el.innerHTML = rows.map(([label, ok]) => `
+    <div class="reg-cond-row">
+      <span>${escHtml(label)}</span>
+      <span class="reg-cond-status ${ok ? 'met' : 'unmet'}">${ok ? 'Met' : 'Not met'}</span>
+    </div>`).join('');
+}
+
 async function recalcRegSummary(force = false) {
   const dateStr = state.regDate;
   const month   = dateStr.slice(0, 7);
@@ -5449,6 +5467,8 @@ async function recalcRegSummary(force = false) {
   const met = day.mode === 'pro+'
     ? (junkOk && workoutOk && proteinOk && calorieOk)
     : (junkOk && workoutOk && proteinOk);
+
+  renderRegConditions(day.mode, junkOk, workoutOk, proteinOk, calorieOk);
 
   if (!met) {
     if (force) showToast('Not all conditions are met yet — summary left blank');

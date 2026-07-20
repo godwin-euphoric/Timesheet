@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Timesheet</title>
-  <link rel="stylesheet" href="style.css?v=70">
+  <link rel="stylesheet" href="style.css?v=71">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -511,6 +511,7 @@
           <button type="button" class="reg-mode-btn" id="reg-mode-pro" onclick="setRegMode('pro')">Pro</button>
           <button type="button" class="reg-mode-btn" id="reg-mode-proplus" onclick="setRegMode('pro+')">Pro+</button>
         </div>
+        <div id="reg-conditions-status" class="reg-conditions"></div>
         <textarea id="reg-summary-text" class="reg-summary-textarea" rows="6"
                   placeholder="Auto-fills once today's conditions are met — edit freely, or hit Regenerate to recompute."
                   onblur="saveRegSummaryEdit()"></textarea>
@@ -858,7 +859,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=75"></script>
+<script src="app.js?v=76"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
