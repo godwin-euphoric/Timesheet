@@ -1699,8 +1699,8 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   transition: all 0.15s;
 }
 .reg-mode-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
-.reg-pp-row { background: rgba(200,255,0,0.08); }
-.reg-pp-row .reg-pp-cell { color: var(--lime); font-weight: 700; }
+.reg-pp-row { background: rgba(34,197,94,0.12); }
+.reg-pp-row .reg-pp-cell { color: #22C55E; font-weight: 700; }
 .reg-conditions { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .reg-cond-row {
   display: flex; align-items: center; justify-content: space-between;
