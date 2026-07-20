@@ -5200,7 +5200,7 @@ function renderRegFoodCards(foods, dateStr) {
     const carbs   = Math.round((f.carbs_g_per_unit   || 0) * q * 10) / 10;
     const fat     = Math.round((f.fat_g_per_unit     || 0) * q * 10) / 10;
     const pp      = regFoodProteinPP(f);
-    return `<tr id="reg-card-${f.id}">
+    return `<tr id="reg-card-${f.id}" class="${pp ? 'reg-pp-row' : ''}">
   <td class="col-name">${escHtml(f.name)}</td>
   <td class="col-time">${escHtml(f.logged_at || '')}</td>
   <td class="col-qty">
@@ -5212,7 +5212,7 @@ function renderRegFoodCards(foods, dateStr) {
   <td class="col-num">${protein}g</td>
   <td class="col-num">${carbs}g</td>
   <td class="col-num">${fat}g</td>
-  <td class="col-num">${pp ? pp + 'g' : '—'}</td>
+  <td class="col-num reg-pp-cell">${pp ? pp + 'g' : '—'}</td>
   <td><button class="diet-food-del" onclick="deleteRegFood('${ds}','${f.id}')">×</button></td>
 </tr>`;
   }).join('');
