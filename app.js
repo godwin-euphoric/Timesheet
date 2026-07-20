@@ -5543,7 +5543,7 @@ async function recalcRegSummary(force = false) {
     'No Junk Taken',
     'Workout : ' + day.workouts.map(w => w.name).join(', '),
   ];
-  if (day.mode === 'pro+') lines.push('Calorie Target met');
+  if (day.mode === 'pro+') lines.push(`Calorie target met (${target})`);
 
   day.summary = lines.join('\n');
   await saveRegMonthData(month, mData);
