@@ -1,7 +1,7 @@
 {
-  "name": "Timesheet",
-  "short_name": "Timesheet",
-  "description": "Track your daily work hours",
+  "name": "Vitals",
+  "short_name": "Vitals",
+  "description": "Track your work hours, diet, habits, and health in one place",
   "start_url": "/Timesheet/",
   "scope": "/Timesheet/",
   "display": "standalone",
