@@ -4217,6 +4217,7 @@ async function loadDietSettings() {
   state.dietSettings = {
     geminiApiKey:  ud.dietGeminiKey     || '',
     calorieTarget: ud.dietCalorieTarget || 0,
+    regimenMode:   ud.regimenMode       || null,
   };
   return state.dietSettings;
 }
@@ -4244,6 +4245,11 @@ async function populateDietSettingsFields() {
   const tgtEl = document.getElementById('diet-calorie-target');
   if (keyEl) keyEl.value = ud.dietGeminiKey     || '';
   if (tgtEl) tgtEl.value = ud.dietCalorieTarget || '';
+
+  const proEl     = document.getElementById('reg-mode-radio-pro');
+  const proPlusEl = document.getElementById('reg-mode-radio-proplus');
+  if (proEl)     proEl.checked     = ud.regimenMode === 'pro';
+  if (proPlusEl) proPlusEl.checked = ud.regimenMode === 'pro+';
 }
 
 // ── Gemini AI ──────────────────────────────────────────────────────────────
@@ -5126,10 +5132,18 @@ function regDayState(mData, dateStr) {
 async function loadRegimenTab() {
   await loadDietSettings();
   await getRegProteinSources();
-  const { geminiApiKey } = state.dietSettings || {};
+  const { geminiApiKey, regimenMode } = state.dietSettings || {};
   const gate    = document.getElementById('regimen-gate');
   const content = document.getElementById('regimen-content');
+  const gateMsg = document.getElementById('regimen-gate-msg');
   if (!geminiApiKey) {
+    if (gateMsg) gateMsg.innerHTML = 'Enter your <strong>Gemini API key</strong> in Settings → Diet Settings to enable the Regimen tab.';
+    gate.classList.remove('hidden');
+    content.classList.add('hidden');
+    return;
+  }
+  if (!regimenMode) {
+    if (gateMsg) gateMsg.innerHTML = 'Select your <strong>Regimen Mode</strong> (Pro or Pro+) in Settings → Regimen Mode to enable the Regimen tab.';
     gate.classList.remove('hidden');
     content.classList.add('hidden');
     return;
@@ -5153,7 +5167,6 @@ async function renderRegDay(dateStr) {
   document.getElementById('reg-food-save-row')?.classList.add('hidden');
   renderRegWorkoutList(day.workouts, dateStr);
   renderRegJunkButtons(day.junk);
-  renderRegModeButtons(day.mode);
   document.getElementById('reg-summary-text').value = day.summary || '';
   await recalcRegSummary();
 }
@@ -5455,20 +5468,19 @@ async function setRegJunk(val) {
 }
 
 // ── Pro / Pro+ mode & summary ──────────────────────────────────────────────
+// Mode is a global per-user setting (Settings → Regimen Mode), not chosen per day.
 
-function renderRegModeButtons(mode) {
-  document.getElementById('reg-mode-pro')?.classList.toggle('active', mode === 'pro');
-  document.getElementById('reg-mode-proplus')?.classList.toggle('active', mode === 'pro+');
+function renderRegModeLabel(mode) {
+  const el = document.getElementById('reg-mode-label');
+  if (el) el.textContent = mode === 'pro+' ? 'Pro+' : mode === 'pro' ? 'Pro' : '—';
 }
 
-async function setRegMode(mode) {
-  const month = state.regDate.slice(0, 7);
-  const mData = await getRegMonthData(month);
-  const day   = regDayState(mData, state.regDate);
-  day.mode    = mode;
-  await saveRegMonthData(month, mData);
-  renderRegModeButtons(mode);
-  await recalcRegSummary(true);
+async function saveRegimenMode(mode) {
+  await saveUserData({ regimenMode: mode });
+  if (!state.dietSettings) state.dietSettings = {};
+  state.dietSettings.regimenMode = mode;
+  showToast(`Regimen mode set to ${mode === 'pro+' ? 'Pro+' : 'Pro'}`);
+  await renderRegDay(state.regDate);
 }
 
 async function saveRegSummaryEdit() {
@@ -5514,6 +5526,9 @@ async function recalcRegSummary(force = false) {
   const day     = regDayState(mData, dateStr);
   const target  = getCalorieTarget();
   const totals  = dietCalcTotals(day.foods);
+
+  day.mode = state.dietSettings?.regimenMode || day.mode || 'pro+';
+  renderRegModeLabel(day.mode);
 
   const junkOk    = day.junk === 'no';
   const workoutOk = day.workouts.length > 0;

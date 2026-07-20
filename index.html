@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=79">
+  <link rel="stylesheet" href="style.css?v=80">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -410,7 +410,7 @@
     <div id="regimen-gate" class="diet-gate hidden">
       <div class="diet-gate-msg">
         <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <p>Enter your <strong>Gemini API key</strong> in Settings → Diet Settings to enable the Regimen tab.</p>
+        <p id="regimen-gate-msg">Enter your <strong>Gemini API key</strong> in Settings → Diet Settings to enable the Regimen tab.</p>
         <button class="btn-primary" onclick="document.querySelector('[data-tab=settings]').click()">Go to Settings</button>
       </div>
     </div>
@@ -512,9 +512,9 @@
       <!-- Pro / Pro+ summary -->
       <div class="diet-log-section">
         <div class="diet-log-label">DAY SUMMARY</div>
-        <div class="reg-mode-toggle">
-          <button type="button" class="reg-mode-btn" id="reg-mode-pro" onclick="setRegMode('pro')">Pro</button>
-          <button type="button" class="reg-mode-btn" id="reg-mode-proplus" onclick="setRegMode('pro+')">Pro+</button>
+        <div class="reg-mode-indicator">
+          Mode: <strong id="reg-mode-label">—</strong>
+          <button type="button" class="reg-mode-change-link" onclick="document.querySelector('[data-tab=settings]').click()">Change in Settings</button>
         </div>
         <div id="reg-conditions-status" class="reg-conditions"></div>
         <textarea id="reg-summary-text" class="reg-summary-textarea" rows="6"
@@ -724,6 +724,21 @@
       </div>
     </div>
 
+    <div class="card settings-diet-only">
+      <div class="card-title">🎯 Regimen Mode</div>
+      <p class="hint">Choose the mode used for the Regimen tab's day summary. Pro+ additionally requires hitting your calorie target.</p>
+      <div class="reg-mode-radio-row">
+        <label class="reg-mode-radio">
+          <input type="radio" name="reg-mode-radio" id="reg-mode-radio-pro" value="pro" onchange="saveRegimenMode('pro')">
+          Pro
+        </label>
+        <label class="reg-mode-radio">
+          <input type="radio" name="reg-mode-radio" id="reg-mode-radio-proplus" value="pro+" onchange="saveRegimenMode('pro+')">
+          Pro+
+        </label>
+      </div>
+    </div>
+
     <div class="card settings-ts-only">
       <div class="card-title">🧹 Data Cleanup</div>
       <p class="hint">Find logged hours stored under category names that are no longer in your category list (e.g. renamed or deleted categories). These count toward old totals but aren't shown in the summary.</p>
@@ -873,7 +888,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=83"></script>
+<script src="app.js?v=84"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
