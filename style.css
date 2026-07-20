@@ -1668,16 +1668,16 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 /* ══ Regimen Tab ═════════════════════════════════════════════════════════════ */
 .reg-macros-row-2 { margin-top: 8px; }
 
-/* Day-count badge shown inside the calorie ring, above the kcal text */
-.reg-ring-wrap-with-day .ring-center-text { padding-top: 22px; }
+/* Day-count badge shown centered inside the calorie ring (kcal text hidden) */
+.reg-ring-wrap-with-day .ring-center-text { display: none; }
 .reg-day-badge-inline {
-  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
-  z-index: 2; display: flex; align-items: baseline; gap: 3px;
-  background: var(--lime); color: #0B0F14; border-radius: 12px;
-  padding: 2px 10px; white-space: nowrap;
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 2; display: flex; align-items: baseline; gap: 4px;
+  background: var(--lime); color: #0B0F14; border-radius: 14px;
+  padding: 4px 14px; white-space: nowrap;
 }
-.reg-day-badge-inline span { font-size: 13px; font-weight: 800; line-height: 1; }
-.reg-day-badge-inline small { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.reg-day-badge-inline span { font-size: 20px; font-weight: 800; line-height: 1; }
+.reg-day-badge-inline small { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 .reg-junk-row {
   display: flex; align-items: center; justify-content: space-between;
   margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
