@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=80">
+  <link rel="stylesheet" href="style.css?v=81">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -67,8 +67,7 @@
     </div>
     <nav class="tabs">
       <button class="tab-btn active" data-tab="main">Main</button>
-      <button class="tab-btn" data-tab="diet">Diet</button>
-      <button class="tab-btn" data-tab="regimen">Regimen</button>
+      <button class="tab-btn" data-tab="regimen">Diet</button>
       <button class="tab-btn" data-tab="monthly">Monthly</button>
       <button class="tab-btn" data-tab="yearly">Yearly</button>
       <button class="tab-btn" data-tab="habits">Habits</button>
@@ -274,135 +273,6 @@
 
   </div>
 
-  <!-- ══ DIET ══════════════════════════════════════════════════════════════ -->
-  <div id="tab-diet" class="tab-content">
-
-    <!-- Gate: shown when settings not configured -->
-    <div id="diet-gate" class="diet-gate hidden">
-      <div class="diet-gate-msg">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <p>Enter your <strong>Gemini API key</strong> in Settings → Diet Settings to enable the Diet tab.</p>
-        <button class="btn-primary" onclick="document.querySelector('[data-tab=settings]').click()">Go to Settings</button>
-      </div>
-    </div>
-
-    <!-- Main content -->
-    <div id="diet-content" class="hidden">
-
-      <!-- Date navigation -->
-      <div class="diet-date-nav">
-        <button class="diet-date-arrow" onclick="dietPrevDay()">&#8592;</button>
-        <span id="diet-date-label">MON, JUN 8</span>
-        <button class="diet-date-arrow" onclick="dietNextDay()">&#8594;</button>
-      </div>
-
-      <!-- Calorie summary card -->
-      <div class="diet-summary-card">
-        <button class="diet-share-btn" onclick="shareDietSummary()" title="Share">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
-        </button>
-        <div class="diet-summary-top">
-          <div class="calorie-ring-wrap">
-            <svg class="calorie-ring" viewBox="0 0 120 120">
-              <circle class="ring-bg" cx="60" cy="60" r="52"/>
-              <circle class="ring-progress" id="diet-ring-progress" cx="60" cy="60" r="52"
-                      stroke-dasharray="326.73" stroke-dashoffset="326.73"/>
-            </svg>
-            <div class="ring-center-text">
-              <span id="diet-consumed-num">0</span>
-              <small>of <span id="diet-target-num">1800</span> kcal</small>
-            </div>
-          </div>
-          <div class="diet-macros-row">
-            <div class="macro-tile"><strong id="diet-protein">0g</strong><small>PROTEIN</small></div>
-            <div class="macro-tile"><strong id="diet-carbs">0g</strong><small>CARBS</small></div>
-            <div class="macro-tile"><strong id="diet-fat">0g</strong><small>FAT</small></div>
-            <div class="macro-tile"><strong id="diet-fibre">0g</strong><small>FIBRE</small></div>
-          </div>
-          <div class="diet-day-circle-wrap">
-            <div class="diet-day-circle">
-              <span id="diet-day-count-num">0</span>
-              <small>days</small>
-            </div>
-            <div class="diet-day-circle-label">Controlled diet</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Warning banner -->
-      <div id="diet-warning-banner" class="diet-warning hidden"></div>
-
-      <!-- Log food -->
-      <div class="diet-log-section">
-        <div class="diet-log-label">LOG FOOD</div>
-        <div class="diet-input-row">
-          <input type="text" id="diet-food-input" class="diet-text-input"
-                 placeholder="e.g. 1 paneer sandwich, 2 eggs"
-                 onkeydown="if(event.key==='Enter')logDietFood()">
-          <button class="diet-mic-btn" id="diet-mic-btn" onclick="dietStartMic()" title="Voice input">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
-          </button>
-          <button class="diet-send-btn" id="diet-send-btn" onclick="logDietFood()">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-          </button>
-        </div>
-        <div id="diet-ai-spinner" class="diet-ai-spinner hidden">
-          <div class="diet-spinner"></div> Analyzing with AI...
-        </div>
-        <div class="diet-food-card-box">
-          <div id="diet-food-list" class="diet-food-list">
-            <div class="diet-empty">Nothing logged yet — add your first meal</div>
-          </div>
-          <div id="diet-food-save-row" class="diet-food-save-row hidden">
-            <button class="btn-primary diet-food-save-btn" onclick="saveFoodQtyChanges()">Save Changes</button>
-          </div>
-        </div>
-        <div class="diet-weight-row">
-          <span class="diet-weight-label">Weight</span>
-          <input type="number" id="diet-weight-input" class="diet-weight-input"
-                 step="0.1" min="20" max="300" placeholder="kg"
-                 onkeydown="if(event.key==='Enter')saveDayWeight()">
-          <button class="btn-secondary diet-weight-save-btn" onclick="saveDayWeight()">Save</button>
-        </div>
-      </div>
-
-      <!-- Weight line chart -->
-      <div class="card diet-chart-card" id="diet-weight-chart-card" style="display:none">
-        <div class="diet-chart-header">
-          <div class="card-title" style="margin:0">Weight</div>
-          <span class="diet-chart-sub" id="diet-weight-chart-label"></span>
-        </div>
-        <div class="diet-chart-wrap">
-          <canvas id="diet-weight-chart"></canvas>
-        </div>
-        <div id="diet-weight-entries-list"></div>
-      </div>
-
-      <!-- Monthly bar chart -->
-      <div class="card diet-chart-card">
-        <div class="diet-chart-header">
-          <div class="card-title" style="margin:0">Monthly Calories</div>
-          <span class="diet-chart-sub" id="diet-monthly-chart-label"></span>
-        </div>
-        <div class="diet-chart-wrap">
-          <canvas id="diet-monthly-chart"></canvas>
-        </div>
-      </div>
-
-      <!-- Yearly line chart -->
-      <div class="card diet-chart-card">
-        <div class="diet-chart-header">
-          <div class="card-title" style="margin:0">Yearly Calories</div>
-          <span class="diet-chart-sub" id="diet-yearly-chart-label"></span>
-        </div>
-        <div class="diet-chart-wrap">
-          <canvas id="diet-yearly-chart"></canvas>
-        </div>
-      </div>
-
-    </div><!-- end diet-content -->
-  </div><!-- end tab-diet -->
-
   <!-- ══ REGIMEN ════════════════════════════════════════════════════════════ -->
   <div id="tab-regimen" class="tab-content">
 
@@ -410,7 +280,7 @@
     <div id="regimen-gate" class="diet-gate hidden">
       <div class="diet-gate-msg">
         <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <p id="regimen-gate-msg">Enter your <strong>Gemini API key</strong> in Settings → Diet Settings to enable the Regimen tab.</p>
+        <p id="regimen-gate-msg">Enter your <strong>Gemini API key</strong> in Settings → Diet Settings to enable the Diet tab.</p>
         <button class="btn-primary" onclick="document.querySelector('[data-tab=settings]').click()">Go to Settings</button>
       </div>
     </div>
@@ -726,7 +596,7 @@
 
     <div class="card settings-diet-only">
       <div class="card-title">🎯 Regimen Mode</div>
-      <p class="hint">Choose the mode used for the Regimen tab's day summary. Pro+ additionally requires hitting your calorie target.</p>
+      <p class="hint">Choose the mode used for the Diet tab's day summary. Pro+ additionally requires hitting your calorie target.</p>
       <div class="reg-mode-radio-row">
         <label class="reg-mode-radio">
           <input type="radio" name="reg-mode-radio" id="reg-mode-radio-pro" value="pro" onchange="saveRegimenMode('pro')">
@@ -888,7 +758,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=84"></script>
+<script src="app.js?v=85"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

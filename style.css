@@ -1375,27 +1375,6 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   background: var(--card); border: 1px solid var(--border);
   border-radius: 14px; transition: border-color 0.3s;
 }
-.diet-share-btn {
-  position: absolute; top: 14px; right: 14px;
-  background: none; border: none; cursor: pointer;
-  color: var(--muted); padding: 4px; border-radius: 6px;
-  transition: color 0.15s; line-height: 0;
-}
-.diet-share-btn:hover { color: var(--lime); }
-
-/* Day count circle (right of macros) */
-.diet-day-circle-wrap {
-  display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0;
-}
-.diet-day-circle {
-  width: 80px; height: 80px; border-radius: 50%;
-  border: 4px solid var(--lime);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: rgba(200,255,0,0.06);
-}
-.diet-day-circle span { font-size: 24px; font-weight: 700; color: var(--lime); line-height: 1; }
-.diet-day-circle small { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
-.diet-day-circle-label { font-size: 11px; color: var(--muted); }
 
 /* Summary card bg tint based on calorie status */
 .diet-summary-card.diet-bg-success {
@@ -1574,62 +1553,12 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .diet-qty-unit { font-size: 11px; color: var(--muted); margin-left: 4px; }
 .diet-total-row td { border-top: 1px solid var(--border); font-weight: 600; padding-top: 9px; }
 .diet-total-label { color: var(--muted); font-size: 10px; letter-spacing: .06em; }
-.diet-weight-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 0 4px; border-top: 1px solid var(--border); margin-top: 12px;
-}
-.diet-weight-label { font-size: 13px; color: var(--muted); flex-shrink: 0; }
-.diet-weight-input {
-  width: 80px; height: 32px; text-align: center;
-  background: var(--card2); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text); font-size: 14px; outline: none;
-  transition: border-color 0.15s;
-}
-.diet-weight-input:focus { border-color: var(--lime); }
-.diet-weight-input::-webkit-outer-spin-button,
-.diet-weight-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.diet-weight-input[type=number] { -moz-appearance: textfield; }
-.diet-weight-save-btn { height: 32px; padding: 0 14px; font-size: 12px; }
-.weight-entries-list {
-  display: flex; flex-direction: column; gap: 3px;
-  max-height: 180px; overflow-y: auto;
-  margin-top: 12px; padding-top: 10px;
-  border-top: 1px solid rgba(255,255,255,0.07);
-}
-.weight-entry-row { display: flex; align-items: center; gap: 8px; }
-.weight-entry-date { font-size: 12px; color: var(--muted); min-width: 42px; }
-.weight-entry-input {
-  width: 62px; background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
-  color: var(--lime); font-size: 13px; font-weight: 600;
-  padding: 3px 6px; text-align: right;
-}
-.weight-entry-input:focus { border-color: var(--lime); outline: none; }
-.weight-entry-input::-webkit-outer-spin-button,
-.weight-entry-input::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; }
-.weight-entry-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
-.weight-entry-unit { font-size: 11px; color: var(--muted); }
-.weight-entry-del {
-  margin-left: auto; background: none; border: none;
-  color: rgba(248,113,113,0.4); cursor: pointer;
-  font-size: 12px; padding: 2px 6px; border-radius: 4px; line-height: 1;
-}
-.weight-entry-del:hover { color: #f87171; background: rgba(248,113,113,0.1); }
 .diet-food-del {
   background: none; border: none; color: var(--muted); cursor: pointer;
   font-size: 16px; padding: 0 2px; border-radius: 4px;
   transition: color 0.15s; line-height: 1;
 }
 .diet-food-del:hover { color: var(--red); }
-
-/* Charts */
-.diet-chart-card { margin-bottom: 20px; }
-.diet-chart-header {
-  display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
-}
-.diet-chart-sub { font-size: 12px; color: var(--muted); }
-.diet-chart-wrap { width: 100%; overflow-x: auto; }
-.diet-chart-wrap canvas { display: block; }
 
 /* Settings diet form */
 .settings-diet-form {
