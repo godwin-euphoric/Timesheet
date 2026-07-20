@@ -5504,7 +5504,7 @@ async function recalcRegSummary(force = false) {
     `Day ${dayNum} (${modeLabel})`,
     'Protein Completed',
     'No Junk Taken',
-    'Workouts : ' + day.workouts.map(w => w.name).join(', '),
+    'Workout : ' + day.workouts.map(w => w.name).join(', '),
   ];
   if (day.mode === 'pro+') lines.push('Calorie Target met');
 
