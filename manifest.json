@@ -1,6 +1,6 @@
 {
-  "name": "Daily Log",
-  "short_name": "Daily Log",
+  "name": "Check-in",
+  "short_name": "Check-in",
   "description": "Track your work hours, diet, habits, and health in one place",
   "start_url": "/Timesheet/",
   "scope": "/Timesheet/",
