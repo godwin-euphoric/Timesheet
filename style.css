@@ -1716,7 +1716,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   font-family: inherit; outline: none;
 }
 .reg-summary-textarea:focus { border-color: var(--primary); }
-.reg-summary-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.reg-summary-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 
 /* ══ Admin tab ════════════════════════════════════════════════════════════ */
 .admin-table th, .admin-table td { font-size: 13px; }

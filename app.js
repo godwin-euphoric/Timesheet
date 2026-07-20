@@ -5444,6 +5444,12 @@ async function saveRegSummaryEdit() {
   await saveRegMonthData(month, mData);
 }
 
+function shareRegSummaryToWhatsapp() {
+  const text = document.getElementById('reg-summary-text').value.trim();
+  if (!text) { showToast('Nothing to share yet'); return; }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+}
+
 // Recomputes the auto-summary from today's tracked state and overwrites the textarea
 // once all applicable conditions are met (Pro+ additionally requires the calorie target
 // to be met; Pro drops that condition and the "Calorie Target met" line entirely).
@@ -5493,8 +5499,9 @@ async function recalcRegSummary(force = false) {
   }
 
   const dayNum = await calcRegSuccessDays();
+  const modeLabel = day.mode === 'pro+' ? 'Pro+' : 'Pro';
   const lines = [
-    `Day ${dayNum}`,
+    `Day ${dayNum} (${modeLabel})`,
     'Protein Completed',
     'No Junk Taken',
     'Workouts : ' + day.workouts.map(w => w.name).join(', '),
