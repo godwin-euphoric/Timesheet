@@ -1672,12 +1672,12 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .reg-ring-wrap-with-day .ring-center-text { display: none; }
 .reg-day-badge-inline {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  z-index: 2; display: flex; align-items: baseline; gap: 4px;
+  z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 2px;
   background: var(--lime); color: #0B0F14; border-radius: 14px;
-  padding: 4px 14px; white-space: nowrap;
+  padding: 6px 10px; white-space: nowrap; text-align: center;
 }
-.reg-day-badge-inline span { font-size: 20px; font-weight: 800; line-height: 1; }
-.reg-day-badge-inline small { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.reg-day-badge-inline small { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1; }
+.reg-day-badge-inline span { font-size: 16px; font-weight: 800; line-height: 1; }
 .reg-junk-row {
   display: flex; align-items: center; justify-content: space-between;
   margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);

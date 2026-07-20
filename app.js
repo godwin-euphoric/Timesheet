@@ -5149,7 +5149,6 @@ async function renderRegDay(dateStr) {
 
   document.getElementById('reg-date-label').textContent = formatDietDateLabel(dateStr);
   renderRegSummaryRing(day.foods, target);
-  document.getElementById('reg-day-count-num').textContent = await calcRegSuccessDays();
   renderRegFoodCards(day.foods, dateStr);
   document.getElementById('reg-food-save-row')?.classList.add('hidden');
   renderRegWorkoutList(day.workouts, dateStr);
@@ -5532,10 +5531,13 @@ async function recalcRegSummary(force = false) {
     day.summary = '';
     await saveRegMonthData(month, mData);
     document.getElementById('reg-summary-text').value = '';
+    document.getElementById('reg-day-line')?.classList.add('hidden');
     return;
   }
 
   const dayNum = await calcRegSuccessDays();
+  document.getElementById('reg-day-count-num').textContent = dayNum;
+  document.getElementById('reg-day-line')?.classList.remove('hidden');
   const modeLabel = day.mode === 'pro+' ? 'Pro+' : 'Pro';
   const lines = [
     `Day ${dayNum} (${modeLabel})`,

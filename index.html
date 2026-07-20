@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=77">
+  <link rel="stylesheet" href="style.css?v=78">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -434,7 +434,10 @@
               <circle class="ring-progress" id="reg-ring-progress" cx="60" cy="60" r="52"
                       stroke-dasharray="326.73" stroke-dashoffset="326.73"/>
             </svg>
-            <div class="reg-day-badge-inline"><span id="reg-day-count-num">0</span><small>DAY</small></div>
+            <div class="reg-day-badge-inline">
+              <small>100 DAYS CHALLENGE</small>
+              <span id="reg-day-line">DAY <span id="reg-day-count-num">0</span></span>
+            </div>
             <div class="ring-center-text">
               <span id="reg-consumed-num">0</span>
               <small>of <span id="reg-target-num">1800</span> kcal</small>
@@ -869,7 +872,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=82"></script>
+<script src="app.js?v=83"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
