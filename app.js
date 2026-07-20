@@ -5063,12 +5063,24 @@ function regConfigRef() {
 
 async function getRegProteinSources() {
   if (state.regProteinSources) return state.regProteinSources;
-  const doc = await regConfigRef().get();
-  if (doc.exists && Array.isArray(doc.data().proteinSources)) {
-    state.regProteinSources = doc.data().proteinSources;
-  } else {
-    state.regProteinSources = [...REG_PROTEIN_SOURCES_SEED];
-    await regConfigRef().set({ proteinSources: state.regProteinSources }, { merge: true });
+  try {
+    const doc = await regConfigRef().get();
+    if (doc.exists && Array.isArray(doc.data().proteinSources)) {
+      state.regProteinSources = doc.data().proteinSources;
+      return state.regProteinSources;
+    }
+  } catch (e) {
+    console.error('getRegProteinSources: read failed, falling back to seed list', e);
+  }
+  // Either the doc doesn't exist yet or the read failed (e.g. security rules)
+  // — fall back to the built-in seed so the tab still renders either way.
+  state.regProteinSources = [...REG_PROTEIN_SOURCES_SEED];
+  if (isAdmin()) {
+    try {
+      await regConfigRef().set({ proteinSources: state.regProteinSources }, { merge: true });
+    } catch (e) {
+      console.error('getRegProteinSources: seeding app_config/regimen failed', e);
+    }
   }
   return state.regProteinSources;
 }
