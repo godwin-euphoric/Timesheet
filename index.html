@@ -69,7 +69,6 @@
       <button class="tab-btn active" data-tab="main">Main</button>
       <button class="tab-btn" data-tab="diet">Diet</button>
       <button class="tab-btn" data-tab="monthly">Monthly</button>
-      <button class="tab-btn" data-tab="dailyplan">Daily Plan</button>
       <button class="tab-btn" data-tab="yearly">Yearly</button>
       <button class="tab-btn" data-tab="habits">Habits</button>
       <button class="tab-btn" data-tab="log">Journal</button>
@@ -440,54 +439,6 @@
 
   </div>
 
-  <!-- ══ DAILY PLAN ══════════════════════════════════════════════════════ -->
-  <div id="tab-dailyplan" class="tab-content">
-
-    <!-- Daily plan table (top) -->
-    <div class="card dp-plan-card">
-      <div class="dp-plan-header">
-        <span class="card-title">Daily Plan (PrePlanning only)</span>
-        <span class="dp-save-status" id="dp-save-status"></span>
-      </div>
-      <div class="dp-table-wrap" id="dp-table-wrap">
-        <table class="dp-table">
-          <thead class="dp-thead">
-            <tr id="dp-header-row">
-              <th class="dp-th dp-th-date">Date</th>
-              <th class="dp-th dp-th-day">Day</th>
-            </tr>
-            <tr class="dp-desc-row" id="dp-desc-row"></tr>
-          </thead>
-          <tbody id="dp-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Weekly reference table (below) -->
-    <div class="card dp-ref-card">
-      <div class="dp-ref-header">
-        <span class="card-title">Weekly Reference</span>
-        <span class="dp-ref-status" id="dp-ref-status"></span>
-      </div>
-      <div class="dp-ref-wrap">
-        <table class="dp-ref-table">
-          <thead>
-            <tr>
-              <th class="dp-ref-th dp-ref-th-day">Day</th>
-              <th class="dp-ref-th dp-ref-th-slot">6:30</th>
-              <th class="dp-ref-th dp-ref-th-730">7:30</th>
-              <th class="dp-ref-th dp-ref-th-slot">8:30</th>
-              <th class="dp-ref-th dp-ref-th-morning">Morning Locations</th>
-              <th class="dp-ref-th dp-ref-th-evening">Evening</th>
-            </tr>
-          </thead>
-          <tbody id="dp-ref-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-  </div>
-
   <!-- ══ YEARLY ════════════════════════════════════════════════════════════ -->
   <div id="tab-yearly" class="tab-content">
 
@@ -643,31 +594,6 @@
       </div>
       <div style="margin-top:16px">
         <button class="btn-primary" onclick="saveDietSettings()">Save Diet Settings</button>
-      </div>
-    </div>
-
-    <div class="card settings-ts-only">
-      <div class="card-title">✅ Todoist Sync</div>
-      <p class="hint">Connects the Daily Plan tab to Todoist so each filled-in cell becomes a task there, and edits on either side sync back. Requires a small Cloudflare Worker proxy — see setup instructions provided separately.</p>
-      <div class="settings-diet-form">
-        <div class="field-group" style="flex:1;min-width:220px">
-          <label>Worker Proxy URL</label>
-          <input type="text" id="todoist-proxy-url" placeholder="https://todoist-proxy.yourname.workers.dev">
-        </div>
-        <div class="field-group" style="flex:1;min-width:220px">
-          <label>Todoist API Token</label>
-          <div style="display:flex;gap:8px">
-            <input type="password" id="todoist-api-token" placeholder="Todoist API token" style="flex:1">
-            <button onclick="toggleTodoistTokenVisibility()" class="btn-secondary" id="todoist-token-toggle">Show</button>
-          </div>
-        </div>
-        <div class="field-group" style="width:170px">
-          <label>Todoist Project Name</label>
-          <input type="text" id="todoist-project-name" placeholder="Daily Plan">
-        </div>
-      </div>
-      <div style="margin-top:16px">
-        <button class="btn-primary" onclick="saveTodoistSettings()">Save Todoist Settings</button>
       </div>
     </div>
 
