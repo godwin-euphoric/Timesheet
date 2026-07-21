@@ -5510,9 +5510,9 @@ async function renderSummaryMacroChart() {
   const proteinKcal = protein * 4, carbsKcal = carbs * 4, fatKcal = fat * 9;
   const totalKcal = proteinKcal + carbsKcal + fatKcal;
   const segments = [
-    { label: 'Protein', value: proteinKcal, grams: protein, color: '#C8FF00' },
-    { label: 'Carbs',   value: carbsKcal,   grams: carbs,   color: '#60a5fa' },
-    { label: 'Fat',     value: fatKcal,     grams: fat,     color: '#F59E0B' },
+    { label: 'Protein', value: proteinKcal, grams: protein, color: '#22C55E' },
+    { label: 'Carbs',   value: carbsKcal,   grams: carbs,   color: '#EAB308' },
+    { label: 'Fat',     value: fatKcal,     grams: fat,     color: '#EF4444' },
   ];
   const canvas = document.getElementById('summary-macro-chart');
   if (canvas) drawPieChart(canvas, segments);
