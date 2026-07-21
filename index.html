@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=84">
+  <link rel="stylesheet" href="style.css?v=85">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -439,11 +439,12 @@
 
     <!-- Macro breakdown -->
     <div class="diet-log-section">
-      <div class="diet-log-label">MACRO BREAKDOWN</div>
+      <div class="diet-log-label">MONTHLY MACRO BREAKDOWN</div>
       <div class="chart-card chart-card-pie">
         <canvas id="summary-macro-chart" class="chart-canvas-pie"></canvas>
         <div id="summary-macro-legend" class="macro-legend"></div>
       </div>
+      <div id="summary-macro-ideal" class="macro-ideal-row"></div>
     </div>
 
   </div><!-- end tab-summary -->
@@ -803,7 +804,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=89"></script>
+<script src="app.js?v=90"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

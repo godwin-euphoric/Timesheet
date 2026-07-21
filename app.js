@@ -5412,6 +5412,8 @@ async function removeUser(uid, email) {
 // Weight log + line chart, plus month-scoped calorie bar chart and macro pie
 // chart built from the Diet tab's own regimen_months data (getRegMonthData).
 
+const SUMMARY_IDEAL_MACRO = { protein: 35, carbs: 40, fat: 35 };
+
 function summaryWeightRef() {
   return db.collection('users').doc(state.user.uid).collection('summary_data').doc('weight');
 }
@@ -5510,9 +5512,9 @@ async function renderSummaryMacroChart() {
   const proteinKcal = protein * 4, carbsKcal = carbs * 4, fatKcal = fat * 9;
   const totalKcal = proteinKcal + carbsKcal + fatKcal;
   const segments = [
-    { label: 'Protein', value: proteinKcal, grams: protein, color: '#22C55E' },
-    { label: 'Carbs',   value: carbsKcal,   grams: carbs,   color: '#EAB308' },
-    { label: 'Fat',     value: fatKcal,     grams: fat,     color: '#EF4444' },
+    { label: 'Protein', value: proteinKcal, color: '#22C55E' },
+    { label: 'Carbs',   value: carbsKcal,   color: '#EAB308' },
+    { label: 'Fat',     value: fatKcal,     color: '#EF4444' },
   ];
   const canvas = document.getElementById('summary-macro-chart');
   if (canvas) drawPieChart(canvas, segments);
@@ -5523,8 +5525,14 @@ async function renderSummaryMacroChart() {
       <div class="macro-legend-row">
         <span class="macro-legend-dot" style="background:${s.color}"></span>
         <span class="macro-legend-label">${s.label}</span>
-        <span class="macro-legend-value">${Math.round(s.grams)}g (${Math.round(s.value / totalKcal * 100)}%)</span>
       </div>`).join('') : '<div class="diet-empty">No data logged this month</div>';
+  }
+
+  const idealEl = document.getElementById('summary-macro-ideal');
+  if (idealEl) {
+    idealEl.innerHTML = `Ideal split — <span style="color:#22C55E">Protein ${SUMMARY_IDEAL_MACRO.protein}%</span> ·
+      <span style="color:#EAB308">Carbs ${SUMMARY_IDEAL_MACRO.carbs}%</span> ·
+      <span style="color:#EF4444">Fat ${SUMMARY_IDEAL_MACRO.fat}%</span>`;
   }
 }
 
@@ -5656,6 +5664,7 @@ function drawPieChart(canvas, segments) {
     return;
   }
   let start = -Math.PI / 2;
+  const labels = [];
   segments.forEach(seg => {
     if (seg.value <= 0) return;
     const angle = (seg.value / total) * Math.PI * 2;
@@ -5665,7 +5674,21 @@ function drawPieChart(canvas, segments) {
     ctx.arc(cx, cy, r, start, start + angle);
     ctx.closePath();
     ctx.fill();
+    labels.push({ pct: Math.round(seg.value / total * 100), mid: start + angle / 2 });
     start += angle;
+  });
+
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  labels.forEach(l => {
+    const lx = cx + Math.cos(l.mid) * r * 0.62;
+    const ly = cy + Math.sin(l.mid) * r * 0.62;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(`${l.pct}%`, lx, ly);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`${l.pct}%`, lx, ly);
   });
 }
 
