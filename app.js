@@ -52,6 +52,9 @@ const state = {
   regMode:          'pro+',
   regProteinSources: null,
   userRole:         null,
+  // Summary tab
+  weightEntries:    null,
+  summaryMonth:     currentMonth(),
 };
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -162,6 +165,8 @@ auth.onAuthStateChanged(user => {
   state.regMonthCache    = {};
   state.regProteinSources = null;
   state.userRole         = null;
+  state.weightEntries    = null;
+  state.summaryMonth     = currentMonth();
 
   if (user) {
     document.getElementById('pwa-signin-overlay')?.classList.add('hidden');
@@ -284,7 +289,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -5166,8 +5171,8 @@ async function shareFMTracker() {
 function applyRoleVisibility(role) {
   const showFor = {
     timesheet: new Set(['main', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
-    diet:      new Set(['regimen', 'settings', 'health']),
-    both:      new Set(['main', 'regimen', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
+    diet:      new Set(['regimen', 'summary', 'settings', 'health']),
+    both:      new Set(['main', 'regimen', 'summary', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
   };
   const visible = showFor[role] || showFor.both;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
@@ -5399,6 +5404,269 @@ async function removeUser(uid, email) {
       document.getElementById('admin-users-list').innerHTML = '<span class="empty-inline">No users yet</span>';
     }
   } catch (e) { showToast('Error: ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  SUMMARY TAB
+// ══════════════════════════════════════════════════════════════════════════
+// Weight log + line chart, plus month-scoped calorie bar chart and macro pie
+// chart built from the Diet tab's own regimen_months data (getRegMonthData).
+
+function summaryWeightRef() {
+  return db.collection('users').doc(state.user.uid).collection('summary_data').doc('weight');
+}
+
+async function getWeightEntries() {
+  if (state.weightEntries) return state.weightEntries;
+  const doc = await summaryWeightRef().get();
+  state.weightEntries = doc.exists ? (doc.data().entries || {}) : {};
+  return state.weightEntries;
+}
+
+async function saveWeightEntry(dateStr, value) {
+  const num = parseFloat(value);
+  if (!dateStr || isNaN(num) || num <= 0) { showToast('Enter a valid date and weight'); return; }
+  await summaryWeightRef().set({ entries: { [dateStr]: num } }, { merge: true });
+  const entries = await getWeightEntries();
+  entries[dateStr] = num;
+  showToast('Weight saved');
+  renderWeightSection();
+}
+
+async function deleteWeightEntry(dateStr) {
+  await summaryWeightRef().update({ [`entries.${dateStr}`]: firebase.firestore.FieldValue.delete() });
+  const entries = await getWeightEntries();
+  delete entries[dateStr];
+  renderWeightSection();
+}
+
+async function addWeightEntry() {
+  const dateEl = document.getElementById('summary-weight-date');
+  const valEl  = document.getElementById('summary-weight-input');
+  await saveWeightEntry(dateEl.value, valEl.value);
+  valEl.value = '';
+}
+
+async function renderWeightSection() {
+  const entries = await getWeightEntries();
+  const dates = Object.keys(entries).sort().reverse();
+  const listEl = document.getElementById('summary-weight-list');
+  if (listEl) {
+    listEl.innerHTML = dates.length ? dates.map(d => `
+      <div class="weight-entry-row">
+        <span class="weight-entry-date">${formatDietDateLabel(d)}</span>
+        <input type="number" step="0.1" class="weight-entry-input" value="${entries[d]}"
+               onblur="saveWeightEntry('${d}', this.value)">
+        <span class="weight-entry-unit">kg</span>
+        <button class="weight-entry-del" onclick="deleteWeightEntry('${d}')" title="Delete">&times;</button>
+      </div>`).join('') : '<div class="diet-empty">No weight entries yet</div>';
+  }
+  renderWeightChart(entries);
+}
+
+function renderWeightChart(entries) {
+  const canvas = document.getElementById('summary-weight-chart');
+  if (!canvas) return;
+  const dates  = Object.keys(entries).sort();
+  const points = dates.map(d => ({ x: d, y: entries[d] }));
+  drawLineChart(canvas, points, { color: '#C8FF00' });
+}
+
+async function changeSummaryMonth() {
+  const el = document.getElementById('summary-month');
+  if (el && el.value) state.summaryMonth = el.value;
+  await renderSummaryCalorieChart();
+  await renderSummaryMacroChart();
+}
+
+async function renderSummaryCalorieChart() {
+  const month  = state.summaryMonth;
+  const mData  = await getRegMonthData(month);
+  const [y, m] = month.split('-').map(Number);
+  const numDays = daysInMonth(y, m);
+  const values = [];
+  const labels = [];
+  for (let day = 1; day <= numDays; day++) {
+    const dateStr = `${month}-${String(day).padStart(2, '0')}`;
+    const foods = mData.days[dateStr]?.foods || [];
+    values.push(dietCalcTotals(foods).kcal);
+    labels.push(String(day));
+  }
+  const canvas = document.getElementById('summary-calorie-chart');
+  if (canvas) drawBarChart(canvas, values, labels, { color: '#C8FF00', target: getCalorieTarget() });
+}
+
+async function renderSummaryMacroChart() {
+  const month = state.summaryMonth;
+  const mData = await getRegMonthData(month);
+  let protein = 0, carbs = 0, fat = 0;
+  for (const dateStr in mData.days) {
+    if (dateStr.slice(0, 7) !== month) continue;
+    const t = dietCalcTotals(mData.days[dateStr].foods || []);
+    protein += t.protein;
+    carbs   += t.carbs;
+    fat     += t.fat;
+  }
+  const proteinKcal = protein * 4, carbsKcal = carbs * 4, fatKcal = fat * 9;
+  const totalKcal = proteinKcal + carbsKcal + fatKcal;
+  const segments = [
+    { label: 'Protein', value: proteinKcal, grams: protein, color: '#C8FF00' },
+    { label: 'Carbs',   value: carbsKcal,   grams: carbs,   color: '#60a5fa' },
+    { label: 'Fat',     value: fatKcal,     grams: fat,     color: '#F59E0B' },
+  ];
+  const canvas = document.getElementById('summary-macro-chart');
+  if (canvas) drawPieChart(canvas, segments);
+
+  const legendEl = document.getElementById('summary-macro-legend');
+  if (legendEl) {
+    legendEl.innerHTML = totalKcal > 0 ? segments.map(s => `
+      <div class="macro-legend-row">
+        <span class="macro-legend-dot" style="background:${s.color}"></span>
+        <span class="macro-legend-label">${s.label}</span>
+        <span class="macro-legend-value">${Math.round(s.grams)}g (${Math.round(s.value / totalKcal * 100)}%)</span>
+      </div>`).join('') : '<div class="diet-empty">No data logged this month</div>';
+  }
+}
+
+async function loadSummaryTab() {
+  const monthEl = document.getElementById('summary-month');
+  if (monthEl) monthEl.value = state.summaryMonth;
+  const dateEl = document.getElementById('summary-weight-date');
+  if (dateEl && !dateEl.value) dateEl.value = todayStr();
+  await renderWeightSection();
+  await renderSummaryCalorieChart();
+  await renderSummaryMacroChart();
+}
+
+// ── Generic canvas chart helpers ────────────────────────────────────────────
+
+function _chartSetup(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || canvas.parentElement.clientWidth || 300;
+  const h = canvas.clientHeight || 180;
+  canvas.width  = w * dpr;
+  canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+
+function drawLineChart(canvas, points, opts = {}) {
+  const { ctx, w, h } = _chartSetup(canvas);
+  if (points.length === 0) return;
+  const pad = { l: 36, r: 12, t: 12, b: 20 };
+  const values = points.map(p => p.y);
+  const minY = Math.min(...values), maxY = Math.max(...values);
+  const range = (maxY - minY) || 1;
+  const plotW = w - pad.l - pad.r, plotH = h - pad.t - pad.b;
+  const color = opts.color || '#C8FF00';
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(maxY.toFixed(1), pad.l - 6, pad.t + 8);
+  ctx.fillText(minY.toFixed(1), pad.l - 6, h - pad.b);
+
+  if (points.length === 1) {
+    const x = pad.l + plotW / 2, y = h - pad.b - ((points[0].y - minY) / range) * plotH;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+    return;
+  }
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const x = pad.l + (i / (points.length - 1)) * plotW;
+    const y = h - pad.b - ((p.y - minY) / range) * plotH;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = color;
+  points.forEach((p, i) => {
+    const x = pad.l + (i / (points.length - 1)) * plotW;
+    const y = h - pad.b - ((p.y - minY) / range) * plotH;
+    ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+function drawBarChart(canvas, values, labels, opts = {}) {
+  const { ctx, w, h } = _chartSetup(canvas);
+  const pad = { l: 34, r: 10, t: 12, b: 20 };
+  const plotW = w - pad.l - pad.r, plotH = h - pad.t - pad.b;
+  const color = opts.color || '#C8FF00';
+  const maxVal = Math.max(...values, opts.target || 0, 1);
+  const barGap = 2;
+  const barW = Math.max(plotW / values.length - barGap, 1);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(Math.round(maxVal), pad.l - 6, pad.t + 8);
+
+  values.forEach((v, i) => {
+    const barH = (v / maxVal) * plotH;
+    const x = pad.l + i * (barW + barGap);
+    const y = h - pad.b - barH;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, barW, barH);
+  });
+
+  if (opts.target > 0) {
+    const ty = h - pad.b - (opts.target / maxVal) * plotH;
+    ctx.strokeStyle = '#F87171';
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.l, ty); ctx.lineTo(w - pad.r, ty); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.textAlign = 'center';
+  const labelStep = Math.ceil(labels.length / 10);
+  labels.forEach((lb, i) => {
+    if (i % labelStep !== 0) return;
+    const x = pad.l + i * (barW + barGap) + barW / 2;
+    ctx.fillText(lb, x, h - 6);
+  });
+}
+
+function drawPieChart(canvas, segments) {
+  const { ctx, w, h } = _chartSetup(canvas);
+  const total = segments.reduce((s, x) => s + x.value, 0);
+  const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 8;
+  if (total <= 0) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    return;
+  }
+  let start = -Math.PI / 2;
+  segments.forEach(seg => {
+    if (seg.value <= 0) return;
+    const angle = (seg.value / total) * Math.PI * 2;
+    ctx.fillStyle = seg.color;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, start + angle);
+    ctx.closePath();
+    ctx.fill();
+    start += angle;
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════
