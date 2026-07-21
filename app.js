@@ -4540,6 +4540,7 @@ function renderRegSummaryRing(foods, target) {
 
   document.getElementById('reg-consumed-num').textContent = t.kcal;
   document.getElementById('reg-target-num').textContent   = target;
+  document.getElementById('reg-total-kcal').textContent   = t.kcal;
   document.getElementById('reg-protein').textContent = t.protein + 'g';
   document.getElementById('reg-carbs').textContent   = t.carbs   + 'g';
   document.getElementById('reg-fat').textContent     = t.fat     + 'g';

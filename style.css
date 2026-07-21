@@ -1597,7 +1597,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 /* ══ Regimen Tab ═════════════════════════════════════════════════════════════ */
 .reg-macros-col { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 8px; }
 .reg-macros-col .diet-macros-row { max-width: none; }
-.reg-macros-row-2 { grid-template-columns: 1fr; }
+.reg-macros-row-2 { grid-template-columns: 1fr 1fr; }
 
 /* Smaller ring for the Regimen tab */
 .reg-ring-small { width: 96px; height: 96px; }
