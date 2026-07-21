@@ -5509,19 +5509,18 @@ async function renderSummaryMacroChart() {
     carbs   += t.carbs;
     fat     += t.fat;
   }
-  const proteinKcal = protein * 4, carbsKcal = carbs * 4, fatKcal = fat * 9;
-  const totalKcal = proteinKcal + carbsKcal + fatKcal;
+  const totalGrams = protein + carbs + fat;
   const segments = [
-    { label: 'Protein', value: proteinKcal, color: '#22C55E' },
-    { label: 'Carbs',   value: carbsKcal,   color: '#EAB308' },
-    { label: 'Fat',     value: fatKcal,     color: '#EF4444' },
+    { label: 'Protein', value: protein, color: '#22C55E' },
+    { label: 'Carbs',   value: carbs,   color: '#EAB308' },
+    { label: 'Fat',     value: fat,     color: '#EF4444' },
   ];
   const canvas = document.getElementById('summary-macro-chart');
   if (canvas) drawPieChart(canvas, segments);
 
   const legendEl = document.getElementById('summary-macro-legend');
   if (legendEl) {
-    legendEl.innerHTML = totalKcal > 0 ? segments.map(s => `
+    legendEl.innerHTML = totalGrams > 0 ? segments.map(s => `
       <div class="macro-legend-row">
         <span class="macro-legend-dot" style="background:${s.color}"></span>
         <span class="macro-legend-label">${s.label}</span>
