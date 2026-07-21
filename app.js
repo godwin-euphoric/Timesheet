@@ -5412,8 +5412,6 @@ async function removeUser(uid, email) {
 // Weight log + line chart, plus month-scoped calorie bar chart and macro pie
 // chart built from the Diet tab's own regimen_months data (getRegMonthData).
 
-const SUMMARY_IDEAL_MACRO = { protein: 35, carbs: 40, fat: 35 };
-
 function summaryWeightRef() {
   return db.collection('users').doc(state.user.uid).collection('summary_data').doc('weight');
 }
@@ -5478,7 +5476,6 @@ async function changeSummaryMonth() {
   const el = document.getElementById('summary-month');
   if (el && el.value) state.summaryMonth = el.value;
   await renderSummaryCalorieChart();
-  await renderSummaryMacroChart();
 }
 
 async function renderSummaryCalorieChart() {
@@ -5498,43 +5495,6 @@ async function renderSummaryCalorieChart() {
   if (canvas) drawBarChart(canvas, values, labels, { color: '#C8FF00', target: getCalorieTarget() });
 }
 
-async function renderSummaryMacroChart() {
-  const month = state.summaryMonth;
-  const mData = await getRegMonthData(month);
-  let protein = 0, carbs = 0, fat = 0;
-  for (const dateStr in mData.days) {
-    if (dateStr.slice(0, 7) !== month) continue;
-    const t = dietCalcTotals(mData.days[dateStr].foods || []);
-    protein += t.protein;
-    carbs   += t.carbs;
-    fat     += t.fat;
-  }
-  const totalGrams = protein + carbs + fat;
-  const segments = [
-    { label: 'Protein', value: protein, color: '#22C55E' },
-    { label: 'Carbs',   value: carbs,   color: '#EAB308' },
-    { label: 'Fat',     value: fat,     color: '#EF4444' },
-  ];
-  const canvas = document.getElementById('summary-macro-chart');
-  if (canvas) drawPieChart(canvas, segments);
-
-  const legendEl = document.getElementById('summary-macro-legend');
-  if (legendEl) {
-    legendEl.innerHTML = totalGrams > 0 ? segments.map(s => `
-      <div class="macro-legend-row">
-        <span class="macro-legend-dot" style="background:${s.color}"></span>
-        <span class="macro-legend-label">${s.label}</span>
-      </div>`).join('') : '<div class="diet-empty">No data logged this month</div>';
-  }
-
-  const idealEl = document.getElementById('summary-macro-ideal');
-  if (idealEl) {
-    idealEl.innerHTML = `Ideal split — <span style="color:#22C55E">Protein ${SUMMARY_IDEAL_MACRO.protein}%</span> ·
-      <span style="color:#EAB308">Carbs ${SUMMARY_IDEAL_MACRO.carbs}%</span> ·
-      <span style="color:#EF4444">Fat ${SUMMARY_IDEAL_MACRO.fat}%</span>`;
-  }
-}
-
 async function loadSummaryTab() {
   const monthEl = document.getElementById('summary-month');
   if (monthEl) monthEl.value = state.summaryMonth;
@@ -5542,7 +5502,6 @@ async function loadSummaryTab() {
   if (dateEl && !dateEl.value) dateEl.value = todayStr();
   await renderWeightSection();
   await renderSummaryCalorieChart();
-  await renderSummaryMacroChart();
 }
 
 // ── Generic canvas chart helpers ────────────────────────────────────────────
@@ -5632,6 +5591,12 @@ function drawBarChart(canvas, values, labels, opts = {}) {
     const y = h - pad.b - barH;
     ctx.fillStyle = color;
     ctx.fillRect(x, y, barW, barH);
+    if (v > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(Math.round(v), x + barW / 2, Math.max(y - 3, pad.t + 8));
+    }
   });
 
   if (opts.target > 0) {
@@ -5649,45 +5614,6 @@ function drawBarChart(canvas, values, labels, opts = {}) {
     if (i % labelStep !== 0) return;
     const x = pad.l + i * (barW + barGap) + barW / 2;
     ctx.fillText(lb, x, h - 6);
-  });
-}
-
-function drawPieChart(canvas, segments) {
-  const { ctx, w, h } = _chartSetup(canvas);
-  const total = segments.reduce((s, x) => s + x.value, 0);
-  const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 8;
-  if (total <= 0) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-    return;
-  }
-  let start = -Math.PI / 2;
-  const labels = [];
-  segments.forEach(seg => {
-    if (seg.value <= 0) return;
-    const angle = (seg.value / total) * Math.PI * 2;
-    ctx.fillStyle = seg.color;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, r, start, start + angle);
-    ctx.closePath();
-    ctx.fill();
-    labels.push({ pct: Math.round(seg.value / total * 100), mid: start + angle / 2 });
-    start += angle;
-  });
-
-  ctx.font = 'bold 12px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  labels.forEach(l => {
-    const lx = cx + Math.cos(l.mid) * r * 0.62;
-    const ly = cy + Math.sin(l.mid) * r * 0.62;
-    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-    ctx.lineWidth = 3;
-    ctx.strokeText(`${l.pct}%`, lx, ly);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(`${l.pct}%`, lx, ly);
   });
 }
 
