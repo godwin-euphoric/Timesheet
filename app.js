@@ -44,8 +44,7 @@ const state = {
   userDataCache:    null, // user-level doc (fmCategories, fmLog)
   lastAdjustment:   null,
   lastMonthlyEdit:  null,
-  // Diet tab (legacy leaderboard data only — see REGIMEN TAB section)
-  dietMonthCache:   {},
+  // Diet tab (Gemini key / calorie target — shared with Regimen tab)
   dietSettings:     null,
   // Regimen tab
   regDate:          todayStr(),
@@ -159,7 +158,6 @@ auth.onAuthStateChanged(user => {
   state.cache = {};
   state.allMonthsCache = null;
   state.userDataCache  = null;
-  state.dietMonthCache   = {};
   state.dietSettings     = null;
   state.regMonthCache    = {};
   state.regProteinSources = null;
@@ -4188,27 +4186,6 @@ function updatePlannerCell(pi, bi, ri, ci, value) {
 const DIET_MODELS = ['gemini-flash-latest', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'];
 const DIET_CIRC  = 2 * Math.PI * 52; // ≈ 326.73
 
-// ── Firestore ──────────────────────────────────────────────────────────────
-
-function dietMonthRef(month) {
-  return db.collection('users').doc(state.user.uid).collection('diet_months').doc(month);
-}
-
-async function getDietMonthData(month) {
-  if (state.dietMonthCache[month]) return state.dietMonthCache[month];
-  const doc  = await dietMonthRef(month).get();
-  const data = doc.exists ? doc.data() : { days: {} };
-  if (!data.days) data.days = {};
-  state.dietMonthCache[month] = data;
-  return data;
-}
-
-async function saveDietMonthData(month, data) {
-  await dietMonthRef(month).set(data);
-  state.dietMonthCache[month] = data;
-  updateDietStats();  // fire-and-forget
-}
-
 // ── Settings ───────────────────────────────────────────────────────────────
 
 async function loadDietSettings() {
@@ -5254,8 +5231,7 @@ async function requestAccess() {
 
 async function loadAdminTab() {
   if (!isAdmin()) return;
-  await updateDietStats();  // ensure admin's own stats are current
-  await Promise.all([loadPendingRequests(), loadAllUsers(), loadDietLeaderboard(), loadRegProteinSourcesAdmin()]);
+  await Promise.all([loadPendingRequests(), loadAllUsers(), loadRegProteinSourcesAdmin()]);
 }
 
 async function loadRegProteinSourcesAdmin() {
@@ -5411,7 +5387,6 @@ async function removeUser(uid, email) {
   try {
     const batch = db.batch();
     batch.delete(db.collection('user_roles').doc(uid));
-    batch.delete(db.collection('diet_stats').doc(uid));
     // Reset request status so they can re-request
     const reqRef = db.collection('access_requests').doc(uid);
     const reqDoc = await reqRef.get();
@@ -5423,69 +5398,7 @@ async function removeUser(uid, email) {
     if (tbody && !tbody.children.length) {
       document.getElementById('admin-users-list').innerHTML = '<span class="empty-inline">No users yet</span>';
     }
-    await loadDietLeaderboard();
   } catch (e) { showToast('Error: ' + e.message); }
-}
-
-async function loadDietLeaderboard() {
-  const container = document.getElementById('admin-leaderboard');
-  if (!container) return;
-  container.innerHTML = '<span class="empty-inline">Loading…</span>';
-  try {
-    const snap = await db.collection('diet_stats').get();
-    if (snap.empty) { container.innerHTML = '<span class="empty-inline">No diet stats yet</span>'; return; }
-    const admin = isAdmin();
-    const stats = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.successDays || 0) - (a.successDays || 0));
-    const rows  = stats.map((d, i) => `<tr>
-      <td>${i + 1}</td>
-      <td>${escHtml(d.displayName || '—')}</td>
-      <td>${escHtml(d.email || '—')}</td>
-      <td><strong style="color:var(--lime)">${d.successDays || 0}</strong></td>
-      <td>${d.totalDays || 0}</td>
-      ${admin ? `<td><button class="lb-remove-btn" onclick="removeDietLeaderboardEntry('${d.id}')">✕ Remove</button></td>` : ''}
-    </tr>`).join('');
-    container.innerHTML = `<div class="table-scroll"><table class="data-table admin-table">
-      <thead><tr><th>#</th><th>Name</th><th>Email</th><th>🌟 Success Days</th><th>Total Days</th>${admin ? '<th></th>' : ''}</tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>`;
-  } catch (e) {
-    container.innerHTML = `<span class="empty-inline" style="color:var(--red)">Error: ${e.message}</span>`;
-  }
-}
-
-async function removeDietLeaderboardEntry(uid) {
-  if (!isAdmin()) return;
-  if (!confirm('Remove this entry from the leaderboard?')) return;
-  await db.collection('diet_stats').doc(uid).delete();
-  showToast('Entry removed');
-  await loadDietLeaderboard();
-}
-
-async function updateDietStats() {
-  if (!state.user) return;
-  try {
-    const target = getCalorieTarget();
-    let y = 2026, m = 6;
-    const today = todayStr();
-    const [ey, em] = today.slice(0, 7).split('-').map(Number);
-    let successDays = 0, totalDays = 0;
-    while (y < ey || (y === ey && m <= em)) {
-      const month = `${y}-${String(m).padStart(2, '0')}`;
-      const mData = await getDietMonthData(month);
-      for (const [ds, day] of Object.entries(mData.days || {})) {
-        if (ds > today) continue;
-        const kcal = dietCalcTotals(day.foods || []).kcal;
-        if (kcal > 0) { totalDays++; if (kcal <= target) successDays++; }
-      }
-      m++; if (m > 12) { y++; m = 1; }
-    }
-    await db.collection('diet_stats').doc(state.user.uid).set({
-      uid: state.user.uid, email: state.user.email,
-      displayName: state.user.displayName || '',
-      successDays, totalDays,
-      lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-  } catch (e) { console.warn('updateDietStats:', e.message); }
 }
 
 // ══════════════════════════════════════════════════════════════════════════

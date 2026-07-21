@@ -1453,6 +1453,10 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 .macro-tile strong { display: block; font-size: 15px; font-weight: 700; margin-bottom: 3px; }
 .macro-tile small  { font-size: 10px; color: var(--muted); letter-spacing: 0.6px; font-weight: 600; }
+.macro-tile-highlight {
+  background: rgba(200,255,0,0.08); border-color: var(--lime);
+}
+.macro-tile-highlight strong { color: var(--lime); }
 
 /* Warning banner */
 .diet-warning {
@@ -1673,12 +1677,6 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 /* ══ Admin tab ════════════════════════════════════════════════════════════ */
 .admin-table th, .admin-table td { font-size: 13px; }
 .admin-table td:first-child { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lb-remove-btn {
-  background: none; border: 1px solid rgba(248,113,113,0.3); border-radius: 6px;
-  color: rgba(248,113,113,0.6); cursor: pointer; font-size: 11px; padding: 3px 8px;
-  white-space: nowrap;
-}
-.lb-remove-btn:hover { background: rgba(248,113,113,0.1); color: #f87171; border-color: #f87171; }
 .admin-avatar { width: 22px; height: 22px; border-radius: 50%; vertical-align: middle; margin-right: 6px; object-fit: cover; }
 .admin-btn { font-size: 12px; padding: 4px 10px; margin: 0 2px; height: 28px; }
 .admin-remove-btn {
