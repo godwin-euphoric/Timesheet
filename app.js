@@ -4889,12 +4889,12 @@ async function recalcRegSummary(force = false) {
   document.getElementById('reg-day-line')?.classList.remove('hidden');
   const modeLabel = day.mode === 'pro+' ? 'Pro+' : 'Pro';
   const lines = [
-    `Day ${dayNum} (${modeLabel})`,
-    'Protein Completed',
-    'No Junk Taken',
-    'Workout : ' + day.workouts.map(w => w.name).join(', '),
+    `Day ${dayNum} (${modeLabel}) 💪`,
+    'Protein ✅',
+    'No Junk ✅',
+    day.workouts.map(w => w.name).join(', ') + ' 🏃',
   ];
-  if (day.mode === 'pro+') lines.push(`Calorie target met (${target})`);
+  if (day.mode === 'pro+') lines.push(`Calorie target (${target}) ✅`);
 
   day.summary = lines.join('\n');
   await saveRegMonthData(month, mData);
