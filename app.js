@@ -4283,6 +4283,7 @@ Rules:
 - If unit is "piece/bowl/cup/serving": calories_per_unit = calories in that one item
 - Example: "200g paneer butter masala" → quantity=200, unit="g", calories_per_unit=1.5 (NOT 300)
 - Example: "2 chapathi" → quantity=2, unit="piece", calories_per_unit=90 (for 1 chapathi)
+- CRITICAL: when "quarter/half/full" describes a standard whole-chicken menu portion (e.g. "quarter tandoori chicken", "half chicken tandoori", "full chicken"), that is the food's NAME and serving size — set quantity=1, unit="piece", and calories_per_unit/protein_g_per_unit/etc. must reflect the ENTIRE quarter/half/full portion's realistic macros. Do NOT treat "quarter/half" as a 0.25/0.5 multiplier of some smaller generic "1 piece" reference — a quarter tandoori chicken is a large ~250-300g serving (roughly 400-500 kcal, 35-40g protein), not a quarter of a small piece.
 - Use realistic average values for Indian and common foods
 
 Food input: "${text}"
@@ -4389,7 +4390,7 @@ function dietCalcTotals(foods) {
 // Firestore (app_config/regimen) the first time it's read, then managed from the
 // Admin tab — edits there apply to every user, since it's a shared config doc.
 const REG_PROTEIN_SOURCES_SEED = [
-  'Egg', 'Egg white', 'Chicken breast', 'Chicken thigh', 'Seer fish', 'Rohu', 'Salmon',
+  'Egg', 'Egg white', 'Chicken', 'Chicken breast', 'Chicken thigh', 'Seer fish', 'Rohu', 'Salmon',
   'Tuna', 'Prawns', 'Chickpeas', 'Rajma', 'Moong dal', 'Masoor dal', 'Black chana',
   'Horse gram', 'Kollu', 'Roasted chana', 'Peanuts', 'Paneer', 'Greek yogurt',
   'Milk', 'Soya chunks', 'Tofu', 'Oats', 'Wheat bread', 'Whey protein', 'Whey isolate',
