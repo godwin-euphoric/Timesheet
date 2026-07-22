@@ -4283,7 +4283,7 @@ Rules:
 - If unit is "piece/bowl/cup/serving": calories_per_unit = calories in that one item
 - Example: "200g paneer butter masala" → quantity=200, unit="g", calories_per_unit=1.5 (NOT 300)
 - Example: "2 chapathi" → quantity=2, unit="piece", calories_per_unit=90 (for 1 chapathi)
-- CRITICAL: when "quarter/half/full" describes a standard whole-chicken menu portion (e.g. "quarter tandoori chicken", "half chicken tandoori", "full chicken"), that is the food's NAME and serving size — set quantity=1, unit="piece", and calories_per_unit/protein_g_per_unit/etc. must reflect the ENTIRE quarter/half/full portion's realistic macros. Do NOT treat "quarter/half" as a 0.25/0.5 multiplier of some smaller generic "1 piece" reference — a quarter tandoori chicken is a large ~250-300g serving (roughly 400-500 kcal, 35-40g protein), not a quarter of a small piece.
+- CRITICAL: when "quarter/half/full" describes a standard whole-chicken menu portion (e.g. "quarter tandoori chicken", "half chicken tandoori", "full chicken"), that is the food's NAME and serving size — set quantity=1, unit="piece". Do NOT treat "quarter/half" as a 0.25/0.5 multiplier of some smaller generic "1 piece" reference. Use these exact anchor values unless the input clearly implies a much smaller/larger cut: quarter chicken (tandoori/grilled) = 280g, 430 kcal, 38g protein, 16g carbs, 22g fat; half chicken = 560g, 860 kcal, 76g protein, 32g carbs, 44g fat; full chicken = 1100g, 1700 kcal, 150g protein, 60g carbs, 85g fat. Never go below 30g protein for a quarter chicken, 60g for a half chicken, or 120g for a full chicken.
 - Use realistic average values for Indian and common foods
 
 Food input: "${text}"
