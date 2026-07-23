@@ -4198,18 +4198,20 @@ async function loadDietSettings() {
   state.dietSettings = {
     geminiApiKey:  ud.dietGeminiKey     || '',
     calorieTarget: ud.dietCalorieTarget || 0,
+    proteinTarget: ud.dietProteinTarget || 0,
     regimenMode:   ud.regimenMode       || null,
   };
   return state.dietSettings;
 }
 
 async function saveDietSettings() {
-  const key     = document.getElementById('diet-gemini-key').value.trim();
-  const calGoal = parseInt(document.getElementById('diet-calorie-target').value, 10) || 0;
+  const key      = document.getElementById('diet-gemini-key').value.trim();
+  const calGoal  = parseInt(document.getElementById('diet-calorie-target').value, 10) || 0;
+  const pGoal    = parseInt(document.getElementById('diet-protein-target').value, 10) || 0;
   if (!key) { showToast('Enter a Gemini API key'); return; }
-  await saveUserData({ dietGeminiKey: key, dietCalorieTarget: calGoal });
+  await saveUserData({ dietGeminiKey: key, dietCalorieTarget: calGoal, dietProteinTarget: pGoal });
   if (!state.dietSettings) state.dietSettings = {};
-  Object.assign(state.dietSettings, { geminiApiKey: key, calorieTarget: calGoal });
+  Object.assign(state.dietSettings, { geminiApiKey: key, calorieTarget: calGoal, proteinTarget: pGoal });
   showToast('Diet settings saved');
 }
 
@@ -4224,8 +4226,10 @@ async function populateDietSettingsFields() {
   const ud   = await getUserData();
   const keyEl = document.getElementById('diet-gemini-key');
   const tgtEl = document.getElementById('diet-calorie-target');
+  const pTgtEl = document.getElementById('diet-protein-target');
   if (keyEl) keyEl.value = ud.dietGeminiKey     || '';
   if (tgtEl) tgtEl.value = ud.dietCalorieTarget || '';
+  if (pTgtEl) pTgtEl.value = ud.dietProteinTarget || '';
 
   const proEl     = document.getElementById('reg-mode-radio-pro');
   const proPlusEl = document.getElementById('reg-mode-radio-proplus');
@@ -4348,6 +4352,11 @@ async function copyDietError() {
 function getCalorieTarget() {
   const s = state.dietSettings;
   return (s?.calorieTarget > 0) ? s.calorieTarget : 2000;
+}
+
+function getProteinTarget() {
+  const s = state.dietSettings;
+  return (s?.proteinTarget > 0) ? s.proteinTarget : 40;
 }
 
 // ── Date label ─────────────────────────────────────────────────────────────
@@ -4859,6 +4868,7 @@ async function recalcRegSummary(force = false) {
   const mData   = await getRegMonthData(month);
   const day     = regDayState(mData, dateStr);
   const target  = getCalorieTarget();
+  const pTarget = getProteinTarget();
   const totals  = dietCalcTotals(day.foods);
 
   day.mode = state.dietSettings?.regimenMode || day.mode || 'pro+';
@@ -4866,7 +4876,7 @@ async function recalcRegSummary(force = false) {
 
   const junkOk    = day.junk === 'no';
   const workoutOk = day.workouts.length > 0;
-  const proteinOk = (state.regProteinSources || []).length > 0 && regCalcProteinFromSources(day.foods) > 0;
+  const proteinOk = (state.regProteinSources || []).length > 0 && regCalcProteinFromSources(day.foods) >= pTarget;
   const calorieOk = totals.kcal > 0 && totals.kcal <= target;
 
   const met = day.mode === 'pro+'
@@ -4905,7 +4915,8 @@ async function recalcRegSummary(force = false) {
 // surfaced here as the summary's "Day ___" line (the streak concept from the Diet tab's
 // day-count circle, which this tab intentionally omits as a visual element).
 async function calcRegSuccessDays() {
-  const target = getCalorieTarget();
+  const target  = getCalorieTarget();
+  const pTarget = getProteinTarget();
   let y = 2026, m = 6;
   const today = todayStr();
   const [ey, em] = today.slice(0, 7).split('-').map(Number);
@@ -4918,7 +4929,7 @@ async function calcRegSuccessDays() {
       const totals    = dietCalcTotals(d.foods || []);
       const junkOk    = d.junk === 'no';
       const workoutOk = (d.workouts || []).length > 0;
-      const proteinOk = (state.regProteinSources || []).length > 0 && regCalcProteinFromSources(d.foods || []) > 0;
+      const proteinOk = (state.regProteinSources || []).length > 0 && regCalcProteinFromSources(d.foods || []) >= pTarget;
       const calorieOk = totals.kcal > 0 && totals.kcal <= target;
       const met = (d.mode || 'pro+') === 'pro+'
         ? (junkOk && workoutOk && proteinOk && calorieOk)
