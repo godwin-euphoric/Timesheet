@@ -4894,7 +4894,7 @@ async function recalcRegSummary(force = false) {
     return;
   }
 
-  const dayNum = await calcRegSuccessDays();
+  const dayNum = await calcRegSuccessDays(dateStr);
   document.getElementById('reg-day-count-num').textContent = dayNum;
   document.getElementById('reg-day-line')?.classList.remove('hidden');
   const modeLabel = day.mode === 'pro+' ? 'Pro+' : 'Pro';
@@ -4911,21 +4911,22 @@ async function recalcRegSummary(force = false) {
   document.getElementById('reg-summary-text').value = day.summary;
 }
 
-// Counts days (up to today) whose tracked state met that day's own mode criteria —
-// surfaced here as the summary's "Day ___" line (the streak concept from the Diet tab's
-// day-count circle, which this tab intentionally omits as a visual element).
-async function calcRegSuccessDays() {
+// Counts days (up to upToDate, defaulting to today) whose tracked state met that
+// day's own mode criteria — surfaced here as the summary's "Day ___" line (the streak
+// concept from the Diet tab's day-count circle, which this tab intentionally omits as
+// a visual element).
+async function calcRegSuccessDays(upToDate) {
   const target  = getCalorieTarget();
   const pTarget = getProteinTarget();
   let y = 2026, m = 6;
-  const today = todayStr();
-  const [ey, em] = today.slice(0, 7).split('-').map(Number);
+  const limit = upToDate || todayStr();
+  const [ey, em] = limit.slice(0, 7).split('-').map(Number);
   let count = 0;
   while (y < ey || (y === ey && m <= em)) {
     const month = `${y}-${String(m).padStart(2, '0')}`;
     const mData = await getRegMonthData(month);
     for (const [ds, d] of Object.entries(mData.days || {})) {
-      if (ds > today) continue;
+      if (ds > limit) continue;
       const totals    = dietCalcTotals(d.foods || []);
       const junkOk    = d.junk === 'no';
       const workoutOk = (d.workouts || []).length > 0;
