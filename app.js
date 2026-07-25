@@ -2005,6 +2005,10 @@ function startEditHabit(td, index) {
 const CHALLENGE100_START = '2026-07-27'; // first Monday
 const CHALLENGE100_END   = '2026-11-30'; // last Monday (inclusive)
 
+// TEMP: scratch column for trying an upload before the real weeks start. Remove this
+// block (and the `columns` prepend below) once testing is done — search CHALLENGE100_TEST_KEY.
+const CHALLENGE100_TEST_KEY = '__test__';
+
 // Every Monday from CHALLENGE100_START to CHALLENGE100_END, inclusive
 function getChallenge100Mondays() {
   const mondays = [];
@@ -2015,6 +2019,11 @@ function getChallenge100Mondays() {
     d.setDate(d.getDate() + 7);
   }
   return mondays;
+}
+
+// Strips a leading serial-number prefix some pasted lists include, e.g. "1. Suresh" / "2)Mahesh" → "Suresh" / "Mahesh"
+function stripChallenge100Numbering(name) {
+  return name.replace(/^\d+\s*[.)\-]\s*/, '').trim();
 }
 
 function challenge100DateLabel(dateStr) {
@@ -2033,16 +2042,28 @@ function renderChallenge100Table(participants, progress) {
   const mondays = getChallenge100Mondays();
   const today = todayStr();
   const currentMonday = [...mondays].reverse().find(m => m <= today) || mondays[0];
+  // TEMP test column — prepended so you can try an upload before the real weeks start
+  const columns = [CHALLENGE100_TEST_KEY, ...mondays];
 
-  const headCells = mondays.map(m => `
-    <th class="c100-day-col${m === currentMonday ? ' col-current' : ''}">
-      <div class="c100-day-label">${challenge100DateLabel(m)}</div>
-      <button class="c100-upload-btn" onclick="challenge100TriggerUpload('${m}')" title="Upload WhatsApp export for this week">⬆ Upload</button>
-    </th>`).join('');
+  const headCells = columns.map(m => {
+    if (m === CHALLENGE100_TEST_KEY) {
+      return `
+        <th class="c100-day-col c100-day-col-test">
+          <div class="c100-day-label">🧪 TEST</div>
+          <button class="c100-upload-btn" onclick="challenge100TriggerUpload('${m}')" title="Upload a WhatsApp export to test parsing">⬆ Upload</button>
+        </th>`;
+    }
+    return `
+      <th class="c100-day-col${m === currentMonday ? ' col-current' : ''}">
+        <div class="c100-day-label">${challenge100DateLabel(m)}</div>
+        <button class="c100-upload-btn" onclick="challenge100TriggerUpload('${m}')" title="Upload WhatsApp export for this week">⬆ Upload</button>
+      </th>`;
+  }).join('');
 
   const thead = `
     <thead>
       <tr>
+        <th class="c100-sno-col">S.No</th>
         <th class="c100-name-col">Participant</th>
         ${headCells}
       </tr>
@@ -2050,13 +2071,15 @@ function renderChallenge100Table(participants, progress) {
 
   let bodyRows = '';
   participants.forEach((name, i) => {
-    const cells = mondays.map(m => {
+    const cells = columns.map(m => {
       const val = (progress[m] || {})[name];
       const shown = (val !== undefined && val !== null) ? val : '';
-      return `<td class="c100-cell${m === currentMonday ? ' cell-current' : ''}" onclick="challenge100EditCell(this,'${encodeURIComponent(name)}','${m}')">${shown}</td>`;
+      const cls = m === CHALLENGE100_TEST_KEY ? 'c100-cell c100-cell-test' : `c100-cell${m === currentMonday ? ' cell-current' : ''}`;
+      return `<td class="${cls}" onclick="challenge100EditCell(this,'${encodeURIComponent(name)}','${m}')">${shown}</td>`;
     }).join('');
     bodyRows += `
       <tr class="c100-row">
+        <td class="c100-sno-cell">${i + 1}</td>
         <td class="c100-name-cell">
           <span class="c100-name-text">${name}</span>
           <button class="btn-habit-del" onclick="event.stopPropagation();deleteChallenge100Participant(${i})" title="Remove participant">✕</button>
@@ -2066,7 +2089,7 @@ function renderChallenge100Table(participants, progress) {
   });
 
   if (!participants.length) {
-    bodyRows = `<tr><td colspan="${mondays.length + 1}" class="empty">No participants yet — add one above</td></tr>`;
+    bodyRows = `<tr><td colspan="${columns.length + 2}" class="empty">No participants yet — add one above</td></tr>`;
   }
 
   table.innerHTML = thead + `<tbody>${bodyRows}</tbody>`;
@@ -2074,7 +2097,7 @@ function renderChallenge100Table(participants, progress) {
 
 async function addChallenge100Participant() {
   const input = document.getElementById('new-c100-participant');
-  const name  = input.value.trim();
+  const name  = stripChallenge100Numbering(input.value.trim());
   if (!name) return;
   const userData = await getUserData();
   if (userData.challenge100Participants.some(p => p.toLowerCase() === name.toLowerCase())) {
@@ -2096,7 +2119,7 @@ function switchChallenge100AddMode(mode) {
 async function addChallenge100ParticipantsBulk() {
   const textarea = document.getElementById('new-c100-participants-bulk');
   const raw = textarea.value;
-  const names = raw.split(/[\n,]/).map(n => n.trim()).filter(Boolean);
+  const names = raw.split(/[\n,]/).map(n => stripChallenge100Numbering(n.trim())).filter(Boolean);
   if (!names.length) return;
 
   const userData = await getUserData();
@@ -5540,6 +5563,8 @@ async function requestAccess() {
 
 async function loadAdminTab() {
   if (!isAdmin()) return;
+  const emailEl = document.getElementById('admin-signed-in-email');
+  if (emailEl) emailEl.textContent = state.user?.email || '(no email on auth token)';
   await Promise.all([loadPendingRequests(), loadAllUsers(), loadRegProteinSourcesAdmin()]);
 }
 

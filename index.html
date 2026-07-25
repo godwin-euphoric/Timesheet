@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=88">
+  <link rel="stylesheet" href="style.css?v=89">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -530,7 +530,12 @@
     <div class="card">
       <div class="card-title">🏁 100 Days Challenge</div>
       <p class="hint">Every Monday, upload that week's WhatsApp export chat (Chat → ⋮ → More → Export chat → Without media) into the matching column. The highest "Day N" mentioned by each participant in that file is stored for that week — earlier weeks are never overwritten.</p>
-      <div class="c100-add-tabs">
+
+      <div class="table-scroll">
+        <table class="c100-table" id="challenge100-table"></table>
+      </div>
+
+      <div class="c100-add-tabs" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
         <button type="button" class="c100-add-tab-btn active" data-c100-add="single" onclick="switchChallenge100AddMode('single')">Add One</button>
         <button type="button" class="c100-add-tab-btn" data-c100-add="bulk" onclick="switchChallenge100AddMode('bulk')">Add Many</button>
       </div>
@@ -543,12 +548,8 @@
 
       <div class="c100-add-bulk hidden" id="c100-add-bulk">
         <textarea id="new-c100-participants-bulk" class="c100-bulk-textarea"
-          placeholder="Paste multiple names — one per line, or separated by commas, e.g.&#10;Suresh&#10;Kumar, Priya"></textarea>
+          placeholder="Paste multiple names — one per line, or separated by commas, e.g.&#10;1. Suresh&#10;2. Mahesh"></textarea>
         <button class="btn-secondary" onclick="addChallenge100ParticipantsBulk()">+ Add Names</button>
-      </div>
-
-      <div class="table-scroll" style="margin-top:14px">
-        <table class="c100-table" id="challenge100-table"></table>
       </div>
     </div>
 
@@ -725,6 +726,10 @@
   <!-- ══ ADMIN ═════════════════════════════════════════════════════════════ -->
   <div id="tab-admin" class="tab-content">
     <div class="card">
+      <div class="card-title">Signed in as</div>
+      <div id="admin-signed-in-email" style="font-family:monospace; font-size:14px;">—</div>
+    </div>
+    <div class="card">
       <div class="card-title">📬 Pending Access Requests</div>
       <div id="admin-requests-list"><span class="empty-inline">Loading…</span></div>
     </div>
@@ -836,7 +841,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=99"></script>
+<script src="app.js?v=100"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

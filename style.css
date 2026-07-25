@@ -708,12 +708,19 @@ input.habit-edit-input {
   background: #0D1628; border-bottom: 2px solid var(--border);
   text-align: center; vertical-align: middle;
 }
+.c100-sno-col {
+  min-width: 42px; width: 42px;
+  position: sticky; left: 0; z-index: 21; background: #0D1628;
+}
 .c100-name-col {
   text-align: left !important; min-width: 160px;
-  position: sticky; left: 0; z-index: 20; background: #0D1628;
+  position: sticky; left: 42px; z-index: 20; background: #0D1628;
 }
 .c100-day-col { min-width: 90px; }
 .c100-table th.col-current { color: var(--amber); border-bottom-color: var(--amber); }
+.c100-day-col-test { background: rgba(168,85,247,0.08); border-bottom: 2px dashed #A855F7 !important; }
+.c100-day-col-test .c100-day-label { color: #C084FC; font-weight: 700; }
+td.c100-cell-test { background: rgba(168,85,247,0.05); }
 .c100-day-label { margin-bottom: 6px; font-size: 12px; letter-spacing: normal; text-transform: none; }
 
 .c100-upload-btn {
@@ -726,10 +733,15 @@ input.habit-edit-input {
 .c100-row td { border-bottom: 1px solid var(--border); }
 .c100-row:hover td { background: var(--card2); }
 
+.c100-sno-cell {
+  text-align: center; color: var(--muted); font-weight: 600;
+  position: sticky; left: 0; z-index: 11; background: var(--card);
+}
+.c100-row:hover .c100-sno-cell { background: var(--card2); }
 .c100-name-cell {
   padding: 10px 12px;
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  position: sticky; left: 0; z-index: 10; background: var(--card);
+  position: sticky; left: 42px; z-index: 10; background: var(--card);
 }
 .c100-row:hover .c100-name-cell { background: var(--card2); }
 .c100-name-text { font-weight: 600; color: var(--text); }
