@@ -723,6 +723,12 @@ input.habit-edit-input {
 .c100-day-sublabel { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .c100-day-label { margin-bottom: 6px; font-size: 12px; letter-spacing: normal; text-transform: none; }
 
+.c100-entry-mode {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.c100-radio { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; }
+.c100-radio input { accent-color: var(--amber); cursor: pointer; }
+
 .c100-upload-bar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
@@ -732,6 +738,8 @@ input.habit-edit-input {
   background: var(--card2); border: 1px solid var(--border); color: var(--text);
   border-radius: 7px; padding: 7px 10px; font-size: 13px; font-family: inherit;
 }
+
+td.c100-cell-locked { cursor: not-allowed; opacity: 0.55; }
 
 .c100-review-week + .c100-review-week { margin-top: 16px; }
 .c100-review-week-label {

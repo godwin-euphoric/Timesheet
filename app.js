@@ -57,6 +57,7 @@ const state = {
   summaryMonth:     currentMonth(),
   // 100 Days Challenge tab
   challenge100UploadTarget: null,
+  challenge100EntryMode: 'upload', // 'upload' (default) or 'manual' — controls whether the current-week column is editable
 };
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2049,6 +2050,17 @@ async function loadChallenge100Tab() {
   renderChallenge100ReviewPanel();
 }
 
+// Toggles between "Upload chat" (Gemini handles the current week's column, so it's locked from
+// direct editing) and "Enter manually" (the current week's column becomes a normal editable cell,
+// same as past weeks, and the upload controls are hidden since they don't apply).
+async function challenge100SetEntryMode(mode) {
+  state.challenge100EntryMode = mode;
+  document.getElementById('c100-upload-controls')?.classList.toggle('hidden', mode === 'manual');
+  document.getElementById('c100-manual-hint')?.classList.toggle('hidden', mode !== 'manual');
+  const userData = await getUserData();
+  renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+}
+
 // Populates the single upload-target dropdown above the table. Only ever offers the current
 // week's Monday (uploads only make sense for the week that's actually in progress) — not the
 // full 19-week list.
@@ -2091,8 +2103,10 @@ function renderChallenge100Table(participants, progress) {
     const cells = columns.map(m => {
       const val = (progress[m] || {})[name];
       const shown = (val !== undefined && val !== null) ? val : (m === CHALLENGE100_BASELINE_KEY ? 0 : '');
-      const cls = `c100-cell${m === currentMonday ? ' cell-current' : ''}`;
-      return `<td class="${cls}" onclick="challenge100EditCell(this,'${encodeURIComponent(name)}','${m}')">${shown}</td>`;
+      const locked = m === currentMonday && state.challenge100EntryMode !== 'manual';
+      const cls = `c100-cell${m === currentMonday ? ' cell-current' : ''}${locked ? ' c100-cell-locked' : ''}`;
+      const click = locked ? '' : ` onclick="challenge100EditCell(this,'${encodeURIComponent(name)}','${m}')"`;
+      return `<td class="${cls}"${click}>${shown}</td>`;
     }).join('');
     bodyRows += `
       <tr class="c100-row">
@@ -2259,11 +2273,11 @@ async function challenge100FileSelected(input) {
   const mondayDate = state.challenge100UploadTarget;
   input.value = '';
   if (!file || !mondayDate) return;
-  if (typeof JSZip === 'undefined') { showToast('Refresh the page and try again (zip library not loaded)'); return; }
+  if (typeof JSZip === 'undefined') { showToast('Refresh the page and try again (zip library not loaded)', 0); return; }
 
   await loadDietSettings();
   if (!state.dietSettings?.geminiApiKey) {
-    showToast('Set your Gemini API key in Settings → Diet Settings first');
+    showToast('Set your Gemini API key in Settings → Diet Settings first', 0);
     return;
   }
 
@@ -2304,7 +2318,7 @@ async function challenge100FileSelected(input) {
 
     const userData  = await getUserData();
     const participants = userData.challenge100Participants;
-    if (!participants.length) { showToast('Add participants first'); return; }
+    if (!participants.length) { showToast('Add participants first', 0); return; }
 
     if (btn) btn.textContent = '⏳ Gemini is analyzing...';
     showToast('Analyzing chat with Gemini... this can take a moment — stay on this page', 6000);

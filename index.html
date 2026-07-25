@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=93">
+  <link rel="stylesheet" href="style.css?v=94">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -537,11 +537,17 @@
       <div class="card-title">🏁 100 Days Challenge</div>
       <p class="hint">Upload that week's WhatsApp export chat (Chat → ⋮ → More → Export chat → Without media). Gemini finds the highest "Day N" mentioned by each participant — review and approve the results before they're saved into that week's column.</p>
 
-      <div class="c100-upload-bar">
+      <div class="c100-entry-mode" id="c100-entry-mode">
+        <label class="c100-radio"><input type="radio" name="c100-entry-mode" value="upload" checked onchange="challenge100SetEntryMode('upload')"> Upload chat</label>
+        <label class="c100-radio"><input type="radio" name="c100-entry-mode" value="manual" onchange="challenge100SetEntryMode('manual')"> Enter manually</label>
+      </div>
+
+      <div class="c100-upload-bar" id="c100-upload-controls">
         <span class="c100-upload-label">Upload chat export for:</span>
         <select id="c100-upload-monday"></select>
         <button class="btn-secondary" id="c100-upload-btn" onclick="challenge100TriggerUploadFromSelect()">⬆ Upload Chat Export</button>
       </div>
+      <p class="hint hidden" id="c100-manual-hint">This week's column is editable below — tap a participant's cell to enter their day count directly.</p>
 
       <div class="table-scroll">
         <table class="c100-table" id="challenge100-table"></table>
@@ -854,7 +860,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=112"></script>
+<script src="app.js?v=113"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
