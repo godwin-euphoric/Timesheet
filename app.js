@@ -2112,7 +2112,7 @@ function renderChallenge100Table(participants, progress) {
       <tr class="c100-row">
         <td class="c100-sno-cell">${i + 1}</td>
         <td class="c100-name-cell">
-          <span class="c100-name-text">${name}</span>
+          <span class="c100-name-text" onclick="challenge100EditName(this,${i})" title="Tap to rename">${name}</span>
           <button class="btn-habit-del" onclick="event.stopPropagation();deleteChallenge100Participant(${i})" title="Remove participant">✕</button>
         </td>
         ${cells}
@@ -2181,6 +2181,66 @@ async function deleteChallenge100Participant(index) {
   userData.challenge100Participants.splice(index, 1);
   await saveUserData({ challenge100Participants: userData.challenge100Participants });
   renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+}
+
+// Click-to-edit a participant's name — renames them everywhere (progress history + any
+// pending Gemini review rows), since those are keyed by name.
+function challenge100EditName(span, index) {
+  if (span.querySelector('input')) return;
+  const oldName = span.textContent.trim();
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = oldName;
+  input.className = 'c100-name-edit-input';
+  span.textContent = '';
+  span.appendChild(input);
+  input.focus(); input.select();
+
+  let saved = false;
+  async function commit() {
+    if (saved) return;
+    saved = true;
+    const newName = input.value.trim();
+    const userData = await getUserData();
+    const currentName = userData.challenge100Participants[index];
+
+    if (!newName || newName === currentName) {
+      renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+      return;
+    }
+    if (userData.challenge100Participants.some((n, idx) => idx !== index && n.toLowerCase() === newName.toLowerCase())) {
+      showToast(`"${newName}" is already in the list`, 0);
+      renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+      return;
+    }
+
+    userData.challenge100Participants[index] = newName;
+    Object.values(userData.challenge100Progress).forEach(week => {
+      if (currentName in week) { week[newName] = week[currentName]; delete week[currentName]; }
+    });
+    Object.values(userData.challenge100PendingReview).forEach(week => {
+      if (currentName in week) { week[newName] = week[currentName]; delete week[currentName]; }
+    });
+
+    await saveUserData({
+      challenge100Participants:  userData.challenge100Participants,
+      challenge100Progress:      userData.challenge100Progress,
+      challenge100PendingReview: userData.challenge100PendingReview,
+    });
+    renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+    renderChallenge100ReviewPanel();
+    showToast(`Renamed to "${newName}"`);
+  }
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') {
+      saved = true;
+      getUserData().then(ud => renderChallenge100Table(ud.challenge100Participants, ud.challenge100Progress));
+    }
+  });
 }
 
 // Click-to-edit a cell for manual override (when a participant isn't found in a chat export)
