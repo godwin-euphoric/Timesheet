@@ -2202,14 +2202,19 @@ function challenge100TriggerUpload(mondayDate) {
 // { rawSenderName: highestDayNumberMentioned }, scanning across multi-line messages too.
 function extractChallenge100DaysBySender(text) {
   const HEADER_RE = /^\[?(\d{1,2}[/.]\d{1,2}[/.]\d{2,4}),?\s+(\d{1,2}[:.]\d{2}(?:[:.]\d{2})?(?:\s?[AaPp]\.?[Mm]\.?)?)\]?\s*[-–—]?\s*(.*)$/;
-  const DAY_RE    = /days?\s*[:\-]?\s*(\d{1,3})(?:\s*(?:-|to|–|—|through)\s*(?:days?\s*)?(\d{1,3}))?/gi;
+  // Range partner is either a tight hyphen with no surrounding space ("Days 15-18") or an
+  // explicit word/dash/ampersand connector ("Day 1 to Day 5", "Day 2 & 3"). A loose " - "
+  // is deliberately NOT treated as a range — real messages like "Day -1 -40 - walking" pair
+  // a day number with an unrelated trailing number (duration, steps, etc.) via a bare hyphen.
+  const DAY_RE = /days?\s*[:\-]?\s*(\d{1,3})(?:-(\d{1,3})|\s*(?:to|through|–|—|&)\s*(?:days?\s*)?(\d{1,3}))?/gi;
 
   function scanLine(sender, line, result) {
     if (!sender) return;
     let maxDay = null, m;
     DAY_RE.lastIndex = 0;
     while ((m = DAY_RE.exec(line)) !== null) {
-      const v = m[2] ? Math.max(parseInt(m[1], 10), parseInt(m[2], 10)) : parseInt(m[1], 10);
+      const partner = m[2] || m[3];
+      const v = partner ? Math.max(parseInt(m[1], 10), parseInt(partner, 10)) : parseInt(m[1], 10);
       if (maxDay === null || v > maxDay) maxDay = v;
     }
     if (maxDay === null) return;
@@ -2238,15 +2243,18 @@ function normalizeChallenge100Name(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-// Matches a registered participant name against parsed WhatsApp sender names (exact or first-name match)
+// Matches a registered participant name against parsed WhatsApp sender names. Requires an
+// exact match or the sender's name to start with the participant's full name plus a word
+// boundary — e.g. participant "Vignesh M" matches sender "Vignesh M (Pro+)" but NOT
+// "vignesh R (Pro)". A bare first-name-only fallback was removed because real rosters can
+// have two people sharing a first name (as this one does) — that fallback would silently
+// merge their day counts.
 function matchChallenge100Sender(participantName, senderMax) {
-  const target      = normalizeChallenge100Name(participantName);
-  const targetFirst = target.split(' ')[0];
+  const target = normalizeChallenge100Name(participantName);
   let best = null;
   Object.entries(senderMax).forEach(([sender, day]) => {
-    const norm      = normalizeChallenge100Name(sender);
-    const normFirst = norm.split(' ')[0];
-    const isMatch   = norm === target || normFirst === target || normFirst === targetFirst;
+    const norm    = normalizeChallenge100Name(sender);
+    const isMatch = norm === target || norm.startsWith(target + ' ');
     if (isMatch && (best === null || day > best)) best = day;
   });
   return best;
