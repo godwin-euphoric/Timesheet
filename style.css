@@ -718,9 +718,6 @@ input.habit-edit-input {
 }
 .c100-day-col { min-width: 90px; }
 .c100-table th.col-current { color: var(--amber); border-bottom-color: var(--amber); }
-.c100-day-col-test { background: rgba(168,85,247,0.08); border-bottom: 2px dashed #A855F7 !important; }
-.c100-day-col-test .c100-day-label { color: #C084FC; font-weight: 700; }
-td.c100-cell-test { background: rgba(168,85,247,0.05); }
 .c100-day-col-baseline { background: rgba(148,163,184,0.08); border-bottom: 2px solid var(--border) !important; }
 .c100-day-col-baseline .c100-day-label { color: var(--muted); font-weight: 700; }
 .c100-day-sublabel { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -938,6 +935,7 @@ textarea#fm-notes:focus {
   border-left: 3px solid #F59E0B;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
+.toast.sticky { pointer-events: auto; cursor: pointer; border-left-color: #EF4444; max-width: min(420px, calc(100vw - 56px)); }
 
 /* ══ Responsive ══════════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {

@@ -94,11 +94,18 @@ function daysInMonth(year, mon) {
   return new Date(year, mon, 0).getDate();
 }
 
+let toastToken = 0;
 function showToast(msg, ms = 2500) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
+  const myToken = ++toastToken;
+  const sticky = ms === 0;
+  t.textContent = sticky ? msg + ' (tap to dismiss)' : msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), ms);
+  t.classList.toggle('sticky', sticky);
+  t.onclick = () => { t.classList.remove('show', 'sticky'); };
+  if (!sticky) {
+    setTimeout(() => { if (myToken === toastToken) t.classList.remove('show'); }, ms);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2007,10 +2014,6 @@ function startEditHabit(td, index) {
 const CHALLENGE100_START = '2026-07-27'; // first Monday
 const CHALLENGE100_END   = '2026-11-30'; // last Monday (inclusive)
 
-// TEMP: scratch column for trying an upload before the real weeks start. Remove this
-// block (and the `columns` prepend below) once testing is done — search CHALLENGE100_TEST_KEY.
-const CHALLENGE100_TEST_KEY = '__test__';
-
 // Fixed "week 0" baseline column for the Monday before tracking starts (the challenge itself
 // kicked off the night of 20 Jul). Always shows 0 for every participant by default — counted
 // through Sunday 26 Jul, before real weekly tracking begins on CHALLENGE100_START — and isn't
@@ -2047,14 +2050,13 @@ async function loadChallenge100Tab() {
 }
 
 // Populates the single upload-target dropdown above the table. Only ever offers the current
-// week's Monday (uploads only make sense for the week that's actually in progress) plus the
-// scratch test column — not the full 19-week list.
+// week's Monday (uploads only make sense for the week that's actually in progress) — not the
+// full 19-week list.
 function renderChallenge100UploadBar(currentMonday) {
   const sel = document.getElementById('c100-upload-monday');
   if (!sel) return;
   sel.innerHTML = `
-    <option value="${currentMonday}">${challenge100DateLabel(currentMonday)} (this week)</option>
-    <option value="${CHALLENGE100_TEST_KEY}">🧪 Test</option>`;
+    <option value="${currentMonday}">${challenge100DateLabel(currentMonday)} (this week)</option>`;
 }
 
 function renderChallenge100Table(participants, progress) {
@@ -2062,18 +2064,14 @@ function renderChallenge100Table(participants, progress) {
   if (!table) return;
   const mondays = getChallenge100Mondays();
   const today = todayStr();
-  const currentMonday = [...mondays].reverse().find(m => m <= today) || mondays[0];
+  const currentMonday = [...mondays, CHALLENGE100_BASELINE_KEY].sort().reverse().find(m => m <= today) || mondays[0];
   renderChallenge100UploadBar(currentMonday);
-  // Baseline "week 0" column, then the TEMP test column — prepended so you can try an upload
-  // before the real weeks start
-  const columns = [CHALLENGE100_BASELINE_KEY, CHALLENGE100_TEST_KEY, ...mondays];
+  // Baseline "week 0" column, prepended before the real weekly columns
+  const columns = [CHALLENGE100_BASELINE_KEY, ...mondays];
 
   const headCells = columns.map(m => {
     if (m === CHALLENGE100_BASELINE_KEY) {
-      return `<th class="c100-day-col c100-day-col-baseline"><div class="c100-day-label">${challenge100DateLabel(m)}</div><div class="c100-day-sublabel">Start</div></th>`;
-    }
-    if (m === CHALLENGE100_TEST_KEY) {
-      return `<th class="c100-day-col c100-day-col-test"><div class="c100-day-label">🧪 TEST</div></th>`;
+      return `<th class="c100-day-col c100-day-col-baseline${m === currentMonday ? ' col-current' : ''}"><div class="c100-day-label">${challenge100DateLabel(m)}</div><div class="c100-day-sublabel">Start</div></th>`;
     }
     return `<th class="c100-day-col${m === currentMonday ? ' col-current' : ''}"><div class="c100-day-label">${challenge100DateLabel(m)}</div></th>`;
   }).join('');
@@ -2092,7 +2090,7 @@ function renderChallenge100Table(participants, progress) {
     const cells = columns.map(m => {
       const val = (progress[m] || {})[name];
       const shown = (val !== undefined && val !== null) ? val : (m === CHALLENGE100_BASELINE_KEY ? 0 : '');
-      const cls = m === CHALLENGE100_TEST_KEY ? 'c100-cell c100-cell-test' : `c100-cell${m === currentMonday ? ' cell-current' : ''}`;
+      const cls = `c100-cell${m === currentMonday ? ' cell-current' : ''}`;
       return `<td class="${cls}" onclick="challenge100EditCell(this,'${encodeURIComponent(name)}','${m}')">${shown}</td>`;
     }).join('');
     bodyRows += `
@@ -2273,16 +2271,35 @@ async function challenge100FileSelected(input) {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Reading file...'; }
 
   try {
-    const buf = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = e => resolve(e.target.result);
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
-    const zip = await JSZip.loadAsync(buf);
-    const chatFileName = Object.keys(zip.files).find(n => /\.txt$/i.test(n) && !zip.files[n].dir);
-    if (!chatFileName) { showToast('No chat .txt file found in the zip'); return; }
-    const text = await zip.files[chatFileName].async('string');
+    const isPlainText = /\.txt$/i.test(file.name);
+    let text;
+
+    if (isPlainText) {
+      // Some phones share the "Export chat → Without Media" result as a .txt directly
+      // instead of zipping it — read it as-is, no unzip needed.
+      text = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = e => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsText(file);
+      });
+    } else {
+      const buf = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = e => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      });
+      let zip;
+      try {
+        zip = await JSZip.loadAsync(buf);
+      } catch (zipErr) {
+        throw new Error(`"${file.name}" doesn't look like a valid zip file (${zipErr.message}). If your phone shared the chat as a .txt file instead of a .zip, that's fine too — just pick that file directly.`);
+      }
+      const chatFileName = Object.keys(zip.files).find(n => /\.txt$/i.test(n) && !zip.files[n].dir);
+      if (!chatFileName) throw new Error('No chat .txt file found inside the zip.');
+      text = await zip.files[chatFileName].async('string');
+    }
 
     const userData  = await getUserData();
     const participants = userData.challenge100Participants;
@@ -2307,7 +2324,7 @@ async function challenge100FileSelected(input) {
     showToast(`Gemini found updates for ${foundCount}/${participants.length} participants — review below before it's saved`, 6000);
   } catch (e) {
     console.error('100 Days Challenge import failed', e);
-    showToast('Could not process the zip file: ' + e.message);
+    showToast('Upload failed: ' + e.message, 0);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = btnOriginalText; }
   }
@@ -2335,7 +2352,7 @@ function renderChallenge100ReviewPanel() {
 
     card.classList.remove('hidden');
     list.innerHTML = mondaysWithPending.map(monday => {
-      const label = monday === CHALLENGE100_TEST_KEY ? '🧪 Test' : challenge100DateLabel(monday);
+      const label = challenge100DateLabel(monday);
       const rows = Object.entries(pending[monday]).map(([name, day]) => {
         const encName = encodeURIComponent(name);
         const key = challenge100ReviewKey(monday, encName);
