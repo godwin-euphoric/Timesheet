@@ -551,6 +551,10 @@
           placeholder="Paste multiple names — one per line, or separated by commas, e.g.&#10;1. Suresh&#10;2. Mahesh"></textarea>
         <button class="btn-secondary" onclick="addChallenge100ParticipantsBulk()">+ Add Names</button>
       </div>
+
+      <div style="margin-top:14px;text-align:right">
+        <button type="button" class="btn-danger" onclick="clearChallenge100Participants()">🗑 Clear All Participants</button>
+      </div>
     </div>
 
     <input type="file" id="challenge100-file-input" accept=".zip" style="display:none" onchange="challenge100FileSelected(this)">
@@ -841,7 +845,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=100"></script>
+<script src="app.js?v=101"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
