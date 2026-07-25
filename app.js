@@ -258,8 +258,10 @@ async function getUserData() {
   if (!data.fmLog)        data.fmLog        = [];
   if (!data.habits)       data.habits       = [];
   if (!data.habitLog)     data.habitLog     = {};
-  if (!data.challenge100Participants) data.challenge100Participants = [];
-  if (!data.challenge100Progress)     data.challenge100Progress     = {};
+  if (!data.challenge100Participants)   data.challenge100Participants   = [];
+  if (!data.challenge100Progress)       data.challenge100Progress       = {};
+  if (!data.challenge100PendingReview)  data.challenge100PendingReview  = {};
+  if (!data.challenge100CorrectionNotes) data.challenge100CorrectionNotes = [];
   state.userDataCache = data;
   return data;
 }
@@ -2034,6 +2036,18 @@ function challenge100DateLabel(dateStr) {
 async function loadChallenge100Tab() {
   const userData = await getUserData();
   renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+  renderChallenge100ReviewPanel();
+}
+
+// Populates the single upload-target dropdown above the table. Only ever offers the current
+// week's Monday (uploads only make sense for the week that's actually in progress) plus the
+// scratch test column — not the full 19-week list.
+function renderChallenge100UploadBar(currentMonday) {
+  const sel = document.getElementById('c100-upload-monday');
+  if (!sel) return;
+  sel.innerHTML = `
+    <option value="${currentMonday}">${challenge100DateLabel(currentMonday)} (this week)</option>
+    <option value="${CHALLENGE100_TEST_KEY}">🧪 Test</option>`;
 }
 
 function renderChallenge100Table(participants, progress) {
@@ -2042,22 +2056,15 @@ function renderChallenge100Table(participants, progress) {
   const mondays = getChallenge100Mondays();
   const today = todayStr();
   const currentMonday = [...mondays].reverse().find(m => m <= today) || mondays[0];
+  renderChallenge100UploadBar(currentMonday);
   // TEMP test column — prepended so you can try an upload before the real weeks start
   const columns = [CHALLENGE100_TEST_KEY, ...mondays];
 
   const headCells = columns.map(m => {
     if (m === CHALLENGE100_TEST_KEY) {
-      return `
-        <th class="c100-day-col c100-day-col-test">
-          <div class="c100-day-label">🧪 TEST</div>
-          <button class="c100-upload-btn" onclick="challenge100TriggerUpload('${m}')" title="Upload a WhatsApp export to test parsing">⬆ Upload</button>
-        </th>`;
+      return `<th class="c100-day-col c100-day-col-test"><div class="c100-day-label">🧪 TEST</div></th>`;
     }
-    return `
-      <th class="c100-day-col${m === currentMonday ? ' col-current' : ''}">
-        <div class="c100-day-label">${challenge100DateLabel(m)}</div>
-        <button class="c100-upload-btn" onclick="challenge100TriggerUpload('${m}')" title="Upload WhatsApp export for this week">⬆ Upload</button>
-      </th>`;
+    return `<th class="c100-day-col${m === currentMonday ? ' col-current' : ''}"><div class="c100-day-label">${challenge100DateLabel(m)}</div></th>`;
   }).join('');
 
   const thead = `
@@ -2198,15 +2205,25 @@ function challenge100TriggerUpload(mondayDate) {
   document.getElementById('challenge100-file-input').click();
 }
 
+function challenge100TriggerUploadFromSelect() {
+  const sel = document.getElementById('c100-upload-monday');
+  if (!sel || !sel.value) return;
+  challenge100TriggerUpload(sel.value);
+}
+
 // Sends the raw chat export + registered participant list to Gemini (same key/pipeline as
 // the Diet tab's callGemini) and asks it to find, per participant, the highest "Day N" they
 // mentioned anywhere in the export. Real exports use too many inconsistent formats/typos for
 // a fixed regex to keep up with, so this replaced the earlier hand-written parser.
-async function extractChallenge100DaysViaGemini(text, participants) {
+async function extractChallenge100DaysViaGemini(text, participants, correctionNotes) {
+  const notesBlock = (correctionNotes && correctionNotes.length)
+    ? `\nNotes from the admin's past corrections to earlier runs — apply these lessons (most recent last):\n${correctionNotes.slice(-15).map(n => `- ${n}`).join('\n')}\n`
+    : '';
+
   const prompt = `You are analyzing a WhatsApp group chat export (.txt) for a "100 Days Fitness Challenge". Each participant is expected to post daily updates mentioning a day number, but the phrasing varies a lot, e.g.: "Day 1 completed", "Day 1, Day 2, Day 3", "Day 1 to Day 5 completed", "Days 15-18 done", "Day 12 ✅", "Day2 : Slow walking", "Day-1 (1 hour walking)", "Day 2 & 3: workout", or with stray punctuation/typos like "Day -1 -40 - walking" (this means Day 1 — the "-40" is an unrelated number, not a second day). A single message can report multiple days at once (catch-up posts) or just one.
 
 WhatsApp sender names may include a participation-tier suffix like "(Pro)" or "(Pro+)" — match senders to the registered participants below even if spelling/spacing differs slightly (e.g. sender "vignesh R (Pro)" matches participant "Vignesh R"). Be careful: two different senders can share a first name (e.g. "Vignesh M" and "Vignesh R" are different people in this chat) — never merge their day counts.
-
+${notesBlock}
 Registered participants:
 ${participants.map(p => `- ${p}`).join('\n')}
 
@@ -2258,31 +2275,125 @@ async function challenge100FileSelected(input) {
     if (!participants.length) { showToast('Add participants first'); return; }
 
     showToast('Analyzing chat with Gemini... this can take a moment');
-    const dayByName = await extractChallenge100DaysViaGemini(text, participants);
+    const dayByName = await extractChallenge100DaysViaGemini(text, participants, userData.challenge100CorrectionNotes);
 
-    if (!userData.challenge100Progress[mondayDate]) userData.challenge100Progress[mondayDate] = {};
-    const matched = [], unmatched = [];
+    // Gemini's results are staged for review, not written to the table directly — see
+    // renderChallenge100ReviewPanel / challenge100ApproveReview / challenge100SaveReviewEdit.
+    const pendingForWeek = {};
     participants.forEach(name => {
       const day = dayByName[name];
-      if (day !== null && day !== undefined) {
-        userData.challenge100Progress[mondayDate][name] = day;
-        matched.push(`${name} (${day})`);
-      } else {
-        unmatched.push(name);
-      }
+      pendingForWeek[name] = (day === null || day === undefined) ? null : day;
     });
-    if (!Object.keys(userData.challenge100Progress[mondayDate]).length) delete userData.challenge100Progress[mondayDate];
+    userData.challenge100PendingReview[mondayDate] = pendingForWeek;
+    await saveUserData({ challenge100PendingReview: userData.challenge100PendingReview });
+    renderChallenge100ReviewPanel();
 
-    await saveUserData({ challenge100Progress: userData.challenge100Progress });
-    renderChallenge100Table(participants, userData.challenge100Progress);
-
-    let msg = matched.length ? `Updated: ${matched.join(', ')}` : 'No registered participants found in this chat';
-    if (unmatched.length) msg += ` — Not found: ${unmatched.join(', ')}`;
-    showToast(msg, 6000);
+    const foundCount = Object.values(pendingForWeek).filter(v => v !== null).length;
+    showToast(`Gemini found updates for ${foundCount}/${participants.length} participants — review below before it's saved`, 6000);
   } catch (e) {
     console.error('100 Days Challenge import failed', e);
     showToast('Could not process the zip file: ' + e.message);
   }
+}
+
+// ── Review / approve Gemini results ──────────────────────────────────────────
+
+function challenge100ReviewKey(mondayDate, encodedName) {
+  return `${mondayDate}__${encodedName}`;
+}
+
+function renderChallenge100ReviewPanel() {
+  getUserData().then(userData => {
+    const card = document.getElementById('c100-review-card');
+    const list = document.getElementById('c100-review-list');
+    if (!card || !list) return;
+    const pending = userData.challenge100PendingReview || {};
+    const mondaysWithPending = Object.keys(pending).filter(m => Object.keys(pending[m] || {}).length);
+
+    if (!mondaysWithPending.length) {
+      card.classList.add('hidden');
+      list.innerHTML = '';
+      return;
+    }
+
+    card.classList.remove('hidden');
+    list.innerHTML = mondaysWithPending.map(monday => {
+      const label = monday === CHALLENGE100_TEST_KEY ? '🧪 Test' : challenge100DateLabel(monday);
+      const rows = Object.entries(pending[monday]).map(([name, day]) => {
+        const encName = encodeURIComponent(name);
+        const key = challenge100ReviewKey(monday, encName);
+        const shown = (day === null || day === undefined) ? '<span class="c100-review-notfound">Not found</span>' : day;
+        return `
+          <div class="c100-review-row">
+            <span class="c100-review-name">${name}</span>
+            <span class="c100-review-day">${shown}</span>
+            <div class="c100-review-actions">
+              <button class="btn-secondary" ${day === null || day === undefined ? 'disabled' : ''} onclick="challenge100ApproveReview('${monday}','${encName}')">✓ Approve</button>
+              <button class="btn-secondary" onclick="challenge100ToggleReviewEdit('${key}')">✎ Edit</button>
+            </div>
+            <div class="c100-review-edit hidden" id="c100-review-edit-${key}">
+              <input type="number" min="0" max="150" id="c100-review-input-${key}" value="${(day === null || day === undefined) ? '' : day}" placeholder="Day #">
+              <input type="text" id="c100-review-reason-${key}" placeholder="Edit reason (optional) — helps tune future parsing">
+              <button class="btn-secondary" onclick="challenge100SaveReviewEdit('${monday}','${encName}')">Save &amp; Approve</button>
+            </div>
+          </div>`;
+      }).join('');
+      return `<div class="c100-review-week"><div class="c100-review-week-label">${label}</div>${rows}</div>`;
+    }).join('');
+  });
+}
+
+function challenge100ToggleReviewEdit(key) {
+  document.getElementById(`c100-review-edit-${key}`)?.classList.toggle('hidden');
+}
+
+async function challenge100RemoveFromPending(userData, monday, name) {
+  if (!userData.challenge100PendingReview[monday]) return;
+  delete userData.challenge100PendingReview[monday][name];
+  if (!Object.keys(userData.challenge100PendingReview[monday]).length) delete userData.challenge100PendingReview[monday];
+}
+
+async function challenge100ApproveReview(monday, encName) {
+  const name = decodeURIComponent(encName);
+  const userData = await getUserData();
+  const day = userData.challenge100PendingReview?.[monday]?.[name];
+  if (day === null || day === undefined) { showToast('Nothing to approve — use Edit to set a value'); return; }
+
+  if (!userData.challenge100Progress[monday]) userData.challenge100Progress[monday] = {};
+  userData.challenge100Progress[monday][name] = day;
+  await challenge100RemoveFromPending(userData, monday, name);
+
+  await saveUserData({ challenge100Progress: userData.challenge100Progress, challenge100PendingReview: userData.challenge100PendingReview });
+  renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+  renderChallenge100ReviewPanel();
+  showToast(`Approved ${name}: Day ${day}`);
+}
+
+async function challenge100SaveReviewEdit(monday, encName) {
+  const name = decodeURIComponent(encName);
+  const key = challenge100ReviewKey(monday, encName);
+  const input  = document.getElementById(`c100-review-input-${key}`);
+  const reasonInput = document.getElementById(`c100-review-reason-${key}`);
+  const newDay = parseInt(input.value, 10);
+  if (isNaN(newDay) || newDay < 0) { showToast('Enter a valid day number'); return; }
+  const reason = reasonInput.value.trim();
+
+  const userData = await getUserData();
+  if (!userData.challenge100Progress[monday]) userData.challenge100Progress[monday] = {};
+  userData.challenge100Progress[monday][name] = newDay;
+  await challenge100RemoveFromPending(userData, monday, name);
+
+  const patch = { challenge100Progress: userData.challenge100Progress, challenge100PendingReview: userData.challenge100PendingReview };
+  if (reason) {
+    userData.challenge100CorrectionNotes.push(reason);
+    if (userData.challenge100CorrectionNotes.length > 30) userData.challenge100CorrectionNotes = userData.challenge100CorrectionNotes.slice(-30);
+    patch.challenge100CorrectionNotes = userData.challenge100CorrectionNotes;
+  }
+
+  await saveUserData(patch);
+  renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+  renderChallenge100ReviewPanel();
+  showToast(`Saved ${name}: Day ${newDay}`);
 }
 
 // ══════════════════════════════════════════════════════════════════════════

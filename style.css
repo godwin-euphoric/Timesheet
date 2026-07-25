@@ -723,12 +723,42 @@ input.habit-edit-input {
 td.c100-cell-test { background: rgba(168,85,247,0.05); }
 .c100-day-label { margin-bottom: 6px; font-size: 12px; letter-spacing: normal; text-transform: none; }
 
-.c100-upload-btn {
-  border: 1px solid var(--border); background: var(--card2); color: var(--text);
-  border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;
-  transition: all 0.15s;
+.c100-upload-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
 }
-.c100-upload-btn:hover { border-color: var(--primary); color: var(--primary-h); }
+.c100-upload-label { color: var(--muted); font-size: 13px; }
+.c100-upload-bar select {
+  background: var(--card2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 7px; padding: 7px 10px; font-size: 13px; font-family: inherit;
+}
+
+.c100-review-week + .c100-review-week { margin-top: 16px; }
+.c100-review-week-label {
+  font-weight: 700; color: var(--muted); font-size: 12px;
+  text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px;
+}
+.c100-review-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.c100-review-row:last-child { border-bottom: none; }
+.c100-review-name { font-weight: 600; color: var(--text); min-width: 140px; }
+.c100-review-day { font-weight: 700; min-width: 30px; }
+.c100-review-notfound { color: var(--muted); font-weight: 400; font-style: italic; }
+.c100-review-actions { display: flex; gap: 8px; margin-left: auto; }
+.c100-review-edit {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  width: 100%; margin-top: 6px; padding: 10px; background: var(--card2); border-radius: 8px;
+}
+.c100-review-edit input[type="number"] {
+  width: 70px; background: var(--card); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 8px; text-align: center;
+}
+.c100-review-edit input[type="text"] {
+  flex: 1; min-width: 180px; background: var(--card); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 10px;
+}
 
 .c100-row td { border-bottom: 1px solid var(--border); }
 .c100-row:hover td { background: var(--card2); }
@@ -765,7 +795,7 @@ input.c100-edit-input {
   .c100-name-col  { min-width: 120px; max-width: 120px; }
   .c100-day-col   { min-width: 74px; }
   .c100-table th  { padding: 6px 4px; font-size: 10px; }
-  .c100-upload-btn { padding: 3px 6px; font-size: 10px; }
+  .c100-review-actions { margin-left: 0; }
 }
 
 /* ══ FM count badge ══════════════════════════════════════════════════════════ */
