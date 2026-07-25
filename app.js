@@ -2143,13 +2143,6 @@ async function addChallenge100ParticipantsBulk() {
   showToast(msg);
 }
 
-async function clearChallenge100Participants() {
-  if (!confirm('Remove ALL participants and their progress from the 100 Days Challenge? This cannot be undone.')) return;
-  await saveUserData({ challenge100Participants: [], challenge100Progress: {} });
-  renderChallenge100Table([], {});
-  showToast('Cleared all participants');
-}
-
 async function deleteChallenge100Participant(index) {
   const userData = await getUserData();
   const name = userData.challenge100Participants[index];
