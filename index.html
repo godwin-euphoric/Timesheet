@@ -703,10 +703,15 @@
     <div class="card">
       <div class="card-title">🥩 Protein Sources</div>
       <div class="admin-protein-add-row">
-        <input type="text" id="admin-protein-input" placeholder="Add a protein source…">
-        <button class="btn-primary admin-btn" onclick="addRegProteinSource()">Add</button>
+        <input type="text" id="admin-protein-input" placeholder="Add a protein source…"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addRegProteinSource();}">
+        <button class="btn-secondary admin-btn" onclick="addRegProteinSource()">Add</button>
       </div>
       <div id="admin-protein-list"><span class="empty-inline">Loading…</span></div>
+      <div class="admin-protein-save-row">
+        <button class="btn-primary admin-btn" id="admin-protein-save-btn" onclick="saveRegProteinSourcesFromAdmin()" disabled>Save</button>
+        <span id="admin-protein-save-status" class="admin-protein-save-status"></span>
+      </div>
     </div>
   </div>
 

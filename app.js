@@ -4560,9 +4560,15 @@ function renderRegWarning(pct, kcal, target) {
 
 // Placeholder: sums protein only from foods whose name matches REG_PROTEIN_SOURCES.
 // Returns 0 (UI shows "—") until that list is supplied.
+// Singular/plural mismatches (food "Prawn" vs source "Prawns") would otherwise miss —
+// strip a trailing 's' from both sides before comparing.
+function regNormalizeProteinTerm(s) {
+  return (s || '').toLowerCase().trim().replace(/s$/, '');
+}
+
 function regIsProteinSource(food) {
-  const name = (food.name || '').toLowerCase();
-  return (state.regProteinSources || []).some(src => name.includes(src.toLowerCase()));
+  const name = regNormalizeProteinTerm(food.name || '');
+  return (state.regProteinSources || []).some(src => name.includes(regNormalizeProteinTerm(src)));
 }
 
 function regFoodProteinPP(food) {
@@ -5260,6 +5266,7 @@ async function loadRegProteinSourcesAdmin() {
     state.regProteinSources = null; // force a fresh read from Firestore
     await getRegProteinSources();
     renderRegProteinSourcesAdmin();
+    setRegProteinSourcesDirty(false);
   } catch (e) {
     container.innerHTML = `<span class="empty-inline" style="color:var(--red)">Error: ${e.message}</span>`;
   }
@@ -5276,26 +5283,49 @@ function renderRegProteinSourcesAdmin() {
     </span>`).join('')}</div>`;
 }
 
-async function addRegProteinSource() {
+// Add/remove only touch the in-memory list + render — nothing is written to
+// Firestore until "Save" is clicked, so a bad add doesn't silently fail on a
+// network/permission error with no feedback.
+function setRegProteinSourcesDirty(dirty) {
+  const btn = document.getElementById('admin-protein-save-btn');
+  if (btn) btn.disabled = !dirty;
+  const status = document.getElementById('admin-protein-save-status');
+  if (status) status.textContent = dirty ? 'Unsaved changes' : '';
+}
+
+function addRegProteinSource() {
   const input = document.getElementById('admin-protein-input');
   const value = (input?.value || '').trim();
   if (!value) return;
-  await getRegProteinSources();
   const list = state.regProteinSources || [];
   if (list.some(x => x.toLowerCase() === value.toLowerCase())) { showToast('Already in the list'); return; }
-  const updated = [...list, value];
-  await saveRegProteinSources(updated);
+  state.regProteinSources = [...list, value];
   input.value = '';
+  input.focus();
   renderRegProteinSourcesAdmin();
-  showToast(`✓ Added ${value}`);
+  setRegProteinSourcesDirty(true);
 }
 
-async function removeRegProteinSource(item) {
-  await getRegProteinSources();
-  const updated = (state.regProteinSources || []).filter(x => x !== item);
-  await saveRegProteinSources(updated);
+function removeRegProteinSource(item) {
+  state.regProteinSources = (state.regProteinSources || []).filter(x => x !== item);
   renderRegProteinSourcesAdmin();
-  showToast(`Removed ${item}`);
+  setRegProteinSourcesDirty(true);
+}
+
+async function saveRegProteinSourcesFromAdmin() {
+  const btn = document.getElementById('admin-protein-save-btn');
+  const status = document.getElementById('admin-protein-save-status');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Saving…';
+  try {
+    await saveRegProteinSources(state.regProteinSources || []);
+    setRegProteinSourcesDirty(false);
+    showToast('✓ Protein sources saved');
+  } catch (e) {
+    setRegProteinSourcesDirty(true);
+    if (status) status.textContent = 'Save failed';
+    showToast('Save failed: ' + e.message);
+  }
 }
 
 async function loadPendingRequests() {
