@@ -2198,66 +2198,33 @@ function challenge100TriggerUpload(mondayDate) {
   document.getElementById('challenge100-file-input').click();
 }
 
-// Reads every line of an exported WhatsApp chat .txt file and returns
-// { rawSenderName: highestDayNumberMentioned }, scanning across multi-line messages too.
-function extractChallenge100DaysBySender(text) {
-  const HEADER_RE = /^\[?(\d{1,2}[/.]\d{1,2}[/.]\d{2,4}),?\s+(\d{1,2}[:.]\d{2}(?:[:.]\d{2})?(?:\s?[AaPp]\.?[Mm]\.?)?)\]?\s*[-–—]?\s*(.*)$/;
-  // Range partner is either a tight hyphen with no surrounding space ("Days 15-18") or an
-  // explicit word/dash/ampersand connector ("Day 1 to Day 5", "Day 2 & 3"). A loose " - "
-  // is deliberately NOT treated as a range — real messages like "Day -1 -40 - walking" pair
-  // a day number with an unrelated trailing number (duration, steps, etc.) via a bare hyphen.
-  const DAY_RE = /days?\s*[:\-]?\s*(\d{1,3})(?:-(\d{1,3})|\s*(?:to|through|–|—|&)\s*(?:days?\s*)?(\d{1,3}))?/gi;
+// Sends the raw chat export + registered participant list to Gemini (same key/pipeline as
+// the Diet tab's callGemini) and asks it to find, per participant, the highest "Day N" they
+// mentioned anywhere in the export. Real exports use too many inconsistent formats/typos for
+// a fixed regex to keep up with, so this replaced the earlier hand-written parser.
+async function extractChallenge100DaysViaGemini(text, participants) {
+  const prompt = `You are analyzing a WhatsApp group chat export (.txt) for a "100 Days Fitness Challenge". Each participant is expected to post daily updates mentioning a day number, but the phrasing varies a lot, e.g.: "Day 1 completed", "Day 1, Day 2, Day 3", "Day 1 to Day 5 completed", "Days 15-18 done", "Day 12 ✅", "Day2 : Slow walking", "Day-1 (1 hour walking)", "Day 2 & 3: workout", or with stray punctuation/typos like "Day -1 -40 - walking" (this means Day 1 — the "-40" is an unrelated number, not a second day). A single message can report multiple days at once (catch-up posts) or just one.
 
-  function scanLine(sender, line, result) {
-    if (!sender) return;
-    let maxDay = null, m;
-    DAY_RE.lastIndex = 0;
-    while ((m = DAY_RE.exec(line)) !== null) {
-      const partner = m[2] || m[3];
-      const v = partner ? Math.max(parseInt(m[1], 10), parseInt(partner, 10)) : parseInt(m[1], 10);
-      if (maxDay === null || v > maxDay) maxDay = v;
-    }
-    if (maxDay === null) return;
-    if (result[sender] === undefined || maxDay > result[sender]) result[sender] = maxDay;
-  }
+WhatsApp sender names may include a participation-tier suffix like "(Pro)" or "(Pro+)" — match senders to the registered participants below even if spelling/spacing differs slightly (e.g. sender "vignesh R (Pro)" matches participant "Vignesh R"). Be careful: two different senders can share a first name (e.g. "Vignesh M" and "Vignesh R" are different people in this chat) — never merge their day counts.
 
-  const result = {};
-  let currentSender = null;
-  text.split(/\r?\n/).forEach(rawLine => {
-    const line = rawLine.replace(/[‎‏]/g, '').trim();
-    const headerMatch = line.match(HEADER_RE);
-    if (headerMatch) {
-      const rest = headerMatch[3];
-      const sepIdx = rest.indexOf(': ');
-      if (sepIdx === -1) return; // system message — no sender, leave currentSender untouched
-      currentSender = rest.slice(0, sepIdx).trim();
-      scanLine(currentSender, rest.slice(sepIdx + 2), result);
-    } else {
-      scanLine(currentSender, line, result); // continuation of a multi-line message
-    }
-  });
-  return result;
-}
+Registered participants:
+${participants.map(p => `- ${p}`).join('\n')}
 
-function normalizeChallenge100Name(s) {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
+For EACH registered participant above, find the HIGHEST day number they personally mentioned anywhere in the chat export below (across all their messages). If a participant sent no messages, or none of their messages mention a day number, use null for them.
 
-// Matches a registered participant name against parsed WhatsApp sender names. Requires an
-// exact match or the sender's name to start with the participant's full name plus a word
-// boundary — e.g. participant "Vignesh M" matches sender "Vignesh M (Pro+)" but NOT
-// "vignesh R (Pro)". A bare first-name-only fallback was removed because real rosters can
-// have two people sharing a first name (as this one does) — that fallback would silently
-// merge their day counts.
-function matchChallenge100Sender(participantName, senderMax) {
-  const target = normalizeChallenge100Name(participantName);
-  let best = null;
-  Object.entries(senderMax).forEach(([sender, day]) => {
-    const norm    = normalizeChallenge100Name(sender);
-    const isMatch = norm === target || norm.startsWith(target + ' ');
-    if (isMatch && (best === null || day > best)) best = day;
-  });
-  return best;
+Return ONLY a JSON object with EXACTLY these participant names as keys (verbatim, same spelling/casing as listed above), each mapped to a number or null. No markdown, no explanation, no extra keys.
+
+Chat export:
+"""
+${text}
+"""`;
+
+  const raw = await callGemini(prompt);
+  const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+  try { return JSON.parse(cleaned); } catch {}
+  const objMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (objMatch) { try { return JSON.parse(objMatch[0]); } catch {} }
+  throw new Error('Gemini returned an unparseable response: ' + cleaned.slice(0, 200));
 }
 
 async function challenge100FileSelected(input) {
@@ -2266,6 +2233,12 @@ async function challenge100FileSelected(input) {
   input.value = '';
   if (!file || !mondayDate) return;
   if (typeof JSZip === 'undefined') { showToast('Refresh the page and try again (zip library not loaded)'); return; }
+
+  await loadDietSettings();
+  if (!state.dietSettings?.geminiApiKey) {
+    showToast('Set your Gemini API key in Settings → Diet Settings first');
+    return;
+  }
 
   showToast('Reading chat export...');
   try {
@@ -2280,16 +2253,18 @@ async function challenge100FileSelected(input) {
     if (!chatFileName) { showToast('No chat .txt file found in the zip'); return; }
     const text = await zip.files[chatFileName].async('string');
 
-    const senderMax = extractChallenge100DaysBySender(text);
     const userData  = await getUserData();
     const participants = userData.challenge100Participants;
     if (!participants.length) { showToast('Add participants first'); return; }
 
+    showToast('Analyzing chat with Gemini... this can take a moment');
+    const dayByName = await extractChallenge100DaysViaGemini(text, participants);
+
     if (!userData.challenge100Progress[mondayDate]) userData.challenge100Progress[mondayDate] = {};
     const matched = [], unmatched = [];
     participants.forEach(name => {
-      const day = matchChallenge100Sender(name, senderMax);
-      if (day !== null) {
+      const day = dayByName[name];
+      if (day !== null && day !== undefined) {
         userData.challenge100Progress[mondayDate][name] = day;
         matched.push(`${name} (${day})`);
       } else {
