@@ -817,9 +817,11 @@ input.c100-name-edit-input {
 .c100-frozen-tag:hover { background: rgba(148,163,184,0.22); color: var(--text); }
 
 .c100-summary-card { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.c100-summary-header h3 { margin: 0; font-size: 16px; color: var(--text); }
 .c100-summary-section {
   background: var(--card2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
 }
+.c100-summary-note { font-size: 13px; font-weight: 600; color: var(--text); margin: 10px 0 0; }
 .c100-summary-section h4 { margin: 0 0 4px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
 .c100-summary-count {
   background: rgba(148,163,184,0.15); color: var(--text); border-radius: 20px;

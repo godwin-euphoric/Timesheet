@@ -2360,33 +2360,59 @@ function renderChallenge100Summary(participants, progress, frozen) {
   const active  = rows.filter(r => !r.isFrozen);
   const removal = active.filter(r => r.matchesLast2);
   const warning = active.filter(r => r.matchesLast1 && !r.matchesLast2);
+  const frozenNames = participants.filter(p => frozen.includes(p));
 
-  const removalHtml = removal.length ? `
-    <div class="c100-summary-section c100-summary-removal">
-      <h4>🚫 Removal Candidates <span class="c100-summary-count">${removal.length}</span></h4>
-      <p class="hint">No new progress for the last two weeks.</p>
-      <div class="c100-summary-list">
-        ${removal.map(r => `
-          <div class="c100-summary-row">
-            <span>${r.name}</span>
-            <button class="btn-secondary" onclick="challenge100ToggleFreeze('${encodeURIComponent(r.name)}')">❄ Freeze</button>
-          </div>`).join('')}
-      </div>
+  const weekNum = currentIdx;
+  const sunday  = challenge100AddDays(currentMonday, -1);
+
+  // Session 1 — page-level header, shared across all sections below.
+  const headerHtml = `
+    <div class="c100-summary-header">
+      <h3>Week ${weekNum} Summary — Till Sunday ${challenge100DateLabel(sunday)}</h3>
+    </div>`;
+
+  // Session 2 — Removal section: new candidates (freeze) plus already-frozen members (unfreeze).
+  // Empty entirely when there's nothing to show in either list.
+  const candidatesHtml = removal.length ? `
+    <div class="c100-summary-list">
+      ${removal.map(r => `
+        <div class="c100-summary-row">
+          <span>${r.name}</span>
+          <button class="btn-secondary" onclick="challenge100ToggleFreeze('${encodeURIComponent(r.name)}')">❄ Freeze</button>
+        </div>`).join('')}
     </div>` : '';
 
+  const frozenAnnounceHtml = frozenNames.length ? `
+    <p class="c100-summary-note">Let's start the weekly summary with Removal Process</p>
+    <div class="c100-summary-list">
+      ${frozenNames.map(name => `
+        <div class="c100-summary-row">
+          <span>${name}</span>
+          <button class="btn-secondary" onclick="challenge100ToggleFreeze('${encodeURIComponent(name)}')">Unfreeze</button>
+        </div>`).join('')}
+    </div>` : '';
+
+  const removalHtml = (removal.length || frozenNames.length) ? `
+    <div class="c100-summary-section c100-summary-removal">
+      <h4>🚫 Removal Section</h4>
+      ${candidatesHtml}
+      ${frozenAnnounceHtml}
+    </div>` : '';
+
+  // Session 3 — Warning section, unchanged.
   const warningHtml = warning.length ? `
     <div class="c100-summary-section c100-summary-warning">
       <h4>⚠ Warning <span class="c100-summary-count">${warning.length}</span></h4>
-      <p class="hint">No new progress last week — another stagnant week will flag them for removal.</p>
+      <p class="hint">These members haven't logged progress this past week. A gentle nudge might help — if next week is also quiet, they'll move to the removal list.</p>
       <div class="c100-summary-names">${warning.map(r => r.name).join(', ')}</div>
     </div>` : '';
 
-  const weekNum = currentIdx;
-  const sunday  = challenge100AddDays(currentMonday, 6);
+  // Session 4 — Dashboard: overall status.
   const green   = active.filter(r => r.diff >= 6).length;
   const yellow  = active.filter(r => r.diff === 5).length;
   const red     = active.filter(r => r.diff < 5).length;
 
+  // Session 5 — rank table: indicator dot lives inside the diff cell, no separate column.
   const sorted = [...active].sort((a, b) => b.cur - a.cur);
   let rank = 0, lastCount = null;
   const rankRows = sorted.map((r, i) => {
@@ -2397,14 +2423,13 @@ function renderChallenge100Summary(participants, progress, frozen) {
         <td>${rank}</td>
         <td>${r.name}</td>
         <td>${r.cur}</td>
-        <td>${r.diff >= 0 ? '+' : ''}${r.diff}</td>
-        <td><span class="c100-dot c100-dot-${dot}"></span></td>
+        <td><span class="c100-dot c100-dot-${dot}"></span>${r.diff >= 0 ? '+' : ''}${r.diff}</td>
       </tr>`;
   }).join('');
 
   const dashboardHtml = `
     <div class="c100-summary-section c100-summary-dashboard">
-      <h4>100 Days Week ${weekNum} Summary — Till Sunday ${challenge100DateLabel(sunday)}</h4>
+      <h4>📊 Overall Status</h4>
       <div class="c100-dash-stats">
         <span>Total active: <strong>${active.length}</strong></span>
         <span><span class="c100-dot c100-dot-green"></span> ${green}</span>
@@ -2413,13 +2438,13 @@ function renderChallenge100Summary(participants, progress, frozen) {
       </div>
       <div class="table-scroll">
         <table class="c100-rank-table">
-          <thead><tr><th>Rank</th><th>Name</th><th>Count</th><th>Δ vs last week</th><th></th></tr></thead>
-          <tbody>${rankRows || '<tr><td colspan="5" class="empty">No active participants</td></tr>'}</tbody>
+          <thead><tr><th>Rank</th><th>Name</th><th>Count</th><th>Δ vs last week</th></tr></thead>
+          <tbody>${rankRows || '<tr><td colspan="4" class="empty">No active participants</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
 
-  container.innerHTML = removalHtml + warningHtml + dashboardHtml;
+  container.innerHTML = headerHtml + removalHtml + warningHtml + dashboardHtml;
 }
 
 // ── WhatsApp export parsing ──────────────────────────────────────────────────
