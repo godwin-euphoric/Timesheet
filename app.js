@@ -2011,6 +2011,13 @@ const CHALLENGE100_END   = '2026-11-30'; // last Monday (inclusive)
 // block (and the `columns` prepend below) once testing is done — search CHALLENGE100_TEST_KEY.
 const CHALLENGE100_TEST_KEY = '__test__';
 
+// Fixed "week 0" baseline column for the Monday before tracking starts (the challenge itself
+// kicked off the night of 20 Jul). Always shows 0 for every participant by default — counted
+// through Sunday 26 Jul, before real weekly tracking begins on CHALLENGE100_START — and isn't
+// an upload target, just a starting reference point. A cell can still be manually edited if
+// ever needed, same as any other column.
+const CHALLENGE100_BASELINE_KEY = '2026-07-20';
+
 // Every Monday from CHALLENGE100_START to CHALLENGE100_END, inclusive
 function getChallenge100Mondays() {
   const mondays = [];
@@ -2057,10 +2064,14 @@ function renderChallenge100Table(participants, progress) {
   const today = todayStr();
   const currentMonday = [...mondays].reverse().find(m => m <= today) || mondays[0];
   renderChallenge100UploadBar(currentMonday);
-  // TEMP test column — prepended so you can try an upload before the real weeks start
-  const columns = [CHALLENGE100_TEST_KEY, ...mondays];
+  // Baseline "week 0" column, then the TEMP test column — prepended so you can try an upload
+  // before the real weeks start
+  const columns = [CHALLENGE100_BASELINE_KEY, CHALLENGE100_TEST_KEY, ...mondays];
 
   const headCells = columns.map(m => {
+    if (m === CHALLENGE100_BASELINE_KEY) {
+      return `<th class="c100-day-col c100-day-col-baseline"><div class="c100-day-label">${challenge100DateLabel(m)}</div><div class="c100-day-sublabel">Start</div></th>`;
+    }
     if (m === CHALLENGE100_TEST_KEY) {
       return `<th class="c100-day-col c100-day-col-test"><div class="c100-day-label">🧪 TEST</div></th>`;
     }
@@ -2080,7 +2091,7 @@ function renderChallenge100Table(participants, progress) {
   participants.forEach((name, i) => {
     const cells = columns.map(m => {
       const val = (progress[m] || {})[name];
-      const shown = (val !== undefined && val !== null) ? val : '';
+      const shown = (val !== undefined && val !== null) ? val : (m === CHALLENGE100_BASELINE_KEY ? 0 : '');
       const cls = m === CHALLENGE100_TEST_KEY ? 'c100-cell c100-cell-test' : `c100-cell${m === currentMonday ? ' cell-current' : ''}`;
       return `<td class="${cls}" onclick="challenge100EditCell(this,'${encodeURIComponent(name)}','${m}')">${shown}</td>`;
     }).join('');
@@ -2257,7 +2268,10 @@ async function challenge100FileSelected(input) {
     return;
   }
 
-  showToast('Reading chat export...');
+  const btn = document.getElementById('c100-upload-btn');
+  const btnOriginalText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Reading file...'; }
+
   try {
     const buf = await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -2274,7 +2288,8 @@ async function challenge100FileSelected(input) {
     const participants = userData.challenge100Participants;
     if (!participants.length) { showToast('Add participants first'); return; }
 
-    showToast('Analyzing chat with Gemini... this can take a moment');
+    if (btn) btn.textContent = '⏳ Gemini is analyzing...';
+    showToast('Analyzing chat with Gemini... this can take a moment — stay on this page', 6000);
     const dayByName = await extractChallenge100DaysViaGemini(text, participants, userData.challenge100CorrectionNotes);
 
     // Gemini's results are staged for review, not written to the table directly — see
@@ -2293,6 +2308,8 @@ async function challenge100FileSelected(input) {
   } catch (e) {
     console.error('100 Days Challenge import failed', e);
     showToast('Could not process the zip file: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = btnOriginalText; }
   }
 }
 
