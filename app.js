@@ -2338,13 +2338,12 @@ async function challenge100GenerateSummary() {
   renderChallenge100Summary(userData.challenge100Participants, userData.challenge100Progress, userData.challenge100Frozen || []);
 }
 
-// Builds the Removal / Warning / Dashboard sections from the current table state. Removal and
-// Warning both key off "stagnant" cumulative counts — a blank week carries the previous count
-// forward via challenge100CarryForward, so two equal counts in a row means nothing new landed
-// in that week, not that progress reset to zero.
-function renderChallenge100Summary(participants, progress, frozen) {
-  const container = document.getElementById('c100-summary-content');
-  if (!container) return;
+// Computes everything the summary needs from the current table state. Removal and Warning both
+// key off "stagnant" cumulative counts — a blank week carries the previous count forward via
+// challenge100CarryForward, so two equal counts in a row means nothing new landed in that week,
+// not that progress reset to zero. Shared by the on-screen render and the WhatsApp share text so
+// the two can never disagree.
+function challenge100ComputeSummary(participants, progress, frozen) {
   const { extended, currentMonday, currentIdx } = challenge100WeekContext();
 
   const rows = participants.map(name => {
@@ -2362,37 +2361,58 @@ function renderChallenge100Summary(participants, progress, frozen) {
   const warning = active.filter(r => r.matchesLast1 && !r.matchesLast2);
   const frozenNames = participants.filter(p => frozen.includes(p));
 
-  const weekNum = currentIdx;
-  const sunday  = challenge100AddDays(currentMonday, -1);
+  const green  = active.filter(r => r.diff >= 6).length;
+  const yellow = active.filter(r => r.diff === 5).length;
+  const red    = active.filter(r => r.diff < 5).length;
+
+  const sorted = [...active].sort((a, b) => b.cur - a.cur);
+  let rank = 0, lastCount = null;
+  const ranked = sorted.map((r, i) => {
+    if (r.cur !== lastCount) { rank = i + 1; lastCount = r.cur; }
+    return { ...r, rank };
+  });
+
+  return {
+    weekNum: currentIdx,
+    sunday: challenge100AddDays(currentMonday, -1),
+    active, removal, warning, frozenNames, green, yellow, red, ranked,
+  };
+}
+
+function renderChallenge100Summary(participants, progress, frozen) {
+  const container = document.getElementById('c100-summary-content');
+  if (!container) return;
+  const s = challenge100ComputeSummary(participants, progress, frozen);
 
   // Session 1 — page-level header, shared across all sections below.
   const headerHtml = `
     <div class="c100-summary-header">
-      <h3>🏆 Week ${weekNum} Summary — 🗓 Till Sunday ${challenge100DateLabel(sunday)}</h3>
+      <h3>🏆 Week ${s.weekNum} Summary — 🗓 Till Sunday ${challenge100DateLabel(s.sunday)}</h3>
+      <button class="btn-secondary c100-share-btn" onclick="challenge100ShareSummary()">📤 Share to WhatsApp</button>
     </div>`;
 
   // Session 2 — Removal section: new candidates (freeze) plus already-frozen members (unfreeze).
   // Empty entirely when there's nothing to show in either list.
-  const candidatesHtml = removal.length ? `
+  const candidatesHtml = s.removal.length ? `
     <div class="c100-summary-list">
-      ${removal.map(r => `
+      ${s.removal.map(r => `
         <div class="c100-summary-row">
           <span>${r.name}</span>
           <button class="btn-secondary" onclick="challenge100ToggleFreeze('${encodeURIComponent(r.name)}')">❄ Freeze</button>
         </div>`).join('')}
     </div>` : '';
 
-  const frozenAnnounceHtml = frozenNames.length ? `
+  const frozenAnnounceHtml = s.frozenNames.length ? `
     <p class="c100-summary-note">Let's start the weekly summary with Removal Process</p>
     <div class="c100-summary-list">
-      ${frozenNames.map(name => `
+      ${s.frozenNames.map(name => `
         <div class="c100-summary-row">
           <span>${name}</span>
           <button class="btn-secondary" onclick="challenge100ToggleFreeze('${encodeURIComponent(name)}')">Unfreeze</button>
         </div>`).join('')}
     </div>` : '';
 
-  const removalHtml = (removal.length || frozenNames.length) ? `
+  const removalHtml = (s.removal.length || s.frozenNames.length) ? `
     <div class="c100-summary-section c100-summary-removal">
       <h4>🚫 Removal Section</h4>
       ${candidatesHtml}
@@ -2400,45 +2420,38 @@ function renderChallenge100Summary(participants, progress, frozen) {
     </div>` : '';
 
   // Session 3 — Warning section, unchanged.
-  const warningHtml = warning.length ? `
+  const warningHtml = s.warning.length ? `
     <div class="c100-summary-section c100-summary-warning">
       <h4>⚠⚠⚠ Warning ⚠⚠⚠</h4>
       <p class="hint">These members haven't logged progress this past week. A gentle nudge might help — if next week is also quiet, they'll move to the removal list.</p>
-      <div class="c100-summary-names">${warning.map(r => r.name).join(', ')}</div>
+      <div class="c100-summary-names">${s.warning.map(r => r.name).join(', ')}</div>
     </div>` : '';
 
   // Session 4 — Dashboard: overall status.
-  const green   = active.filter(r => r.diff >= 6).length;
-  const yellow  = active.filter(r => r.diff === 5).length;
-  const red     = active.filter(r => r.diff < 5).length;
+  const overviewHtml = `
+    <div class="c100-summary-section c100-summary-overview">
+      <h4>📊 Overall Status</h4>
+      <p class="c100-dash-total">Total active: <strong>${s.active.length}</strong></p>
+      <table class="c100-status-table">
+        <tbody>
+          <tr class="c100-status-row-green"><td>🟢 Green</td><td>${s.green}</td></tr>
+          <tr class="c100-status-row-yellow"><td>🟡 Yellow</td><td>${s.yellow}</td></tr>
+          <tr class="c100-status-row-red"><td>🔴 Red</td><td>${s.red}</td></tr>
+        </tbody>
+      </table>
+    </div>`;
 
   // Session 5 — rank table: indicator dot lives inside the diff cell, no separate column.
-  const sorted = [...active].sort((a, b) => b.cur - a.cur);
-  let rank = 0, lastCount = null;
-  const rankRows = sorted.map((r, i) => {
-    if (r.cur !== lastCount) { rank = i + 1; lastCount = r.cur; }
+  const rankRows = s.ranked.map(r => {
     const dot = r.diff >= 6 ? 'green' : r.diff === 5 ? 'yellow' : 'red';
     return `
       <tr>
-        <td>${rank}</td>
+        <td>${r.rank}</td>
         <td>${r.name}</td>
         <td>${r.cur}</td>
         <td><span class="c100-dot c100-dot-${dot}"></span>${r.diff >= 0 ? '+' : ''}${r.diff}</td>
       </tr>`;
   }).join('');
-
-  const overviewHtml = `
-    <div class="c100-summary-section c100-summary-overview">
-      <h4>📊 Overall Status</h4>
-      <p class="c100-dash-total">Total active: <strong>${active.length}</strong></p>
-      <table class="c100-status-table">
-        <tbody>
-          <tr class="c100-status-row-green"><td>🟢 Green</td><td>${green}</td></tr>
-          <tr class="c100-status-row-yellow"><td>🟡 Yellow</td><td>${yellow}</td></tr>
-          <tr class="c100-status-row-red"><td>🔴 Red</td><td>${red}</td></tr>
-        </tbody>
-      </table>
-    </div>`;
 
   const rankHtml = `
     <div class="c100-summary-section c100-summary-dashboard">
@@ -2452,6 +2465,54 @@ function renderChallenge100Summary(participants, progress, frozen) {
     </div>`;
 
   container.innerHTML = headerHtml + removalHtml + warningHtml + overviewHtml + rankHtml;
+}
+
+// Plain-text rendering of the same summary for WhatsApp. WhatsApp text messages ignore HTML, and
+// copy-pasting the on-screen table produces uneven spacing because proportional fonts don't align
+// columns — wrapping the number blocks in ``` fences forces WhatsApp's monospace font instead, and
+// padEnd keeps the labels/columns lined up inside those blocks.
+function challenge100BuildShareText(s) {
+  const lines = [`🏆 Week ${s.weekNum} Summary — 🗓 Till Sunday ${challenge100DateLabel(s.sunday)}`, ''];
+
+  if (s.warning.length) {
+    lines.push('⚠⚠⚠ Warning ⚠⚠⚠', s.warning.map(r => r.name).join(', '), '');
+  }
+
+  if (s.removal.length || s.frozenNames.length) {
+    lines.push('🚫 Removal Section');
+    if (s.removal.length) lines.push(s.removal.map(r => r.name).join(', '));
+    if (s.frozenNames.length) lines.push("Let's start the weekly summary with Removal Process", s.frozenNames.join(', '));
+    lines.push('');
+  }
+
+  lines.push(
+    '📊 Overall Status', '',
+    `Total active: ${s.active.length}`,
+    '```',
+    `🟢 ${'Green'.padEnd(8)}: ${s.green}`,
+    `🟡 ${'Yellow'.padEnd(8)}: ${s.yellow}`,
+    `🔴 ${'Red'.padEnd(8)}: ${s.red}`,
+    '```', '',
+  );
+
+  lines.push('📋 Detailed Status', '```');
+  s.ranked.forEach(r => {
+    const sign = r.diff >= 0 ? '+' : '';
+    lines.push(`${String(r.rank).padEnd(3)}${r.name.padEnd(20)}${String(r.cur).padEnd(6)}${sign}${r.diff}`);
+  });
+  lines.push('```');
+
+  return lines.join('\n');
+}
+
+async function challenge100ShareSummary() {
+  const userData = await getUserData();
+  const s = challenge100ComputeSummary(userData.challenge100Participants, userData.challenge100Progress, userData.challenge100Frozen || []);
+  const text = challenge100BuildShareText(s);
+  if (navigator.share) {
+    try { await navigator.share({ text }); return; } catch (e) { /* cancelled or unsupported — fall through to wa.me */ }
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
 // ── WhatsApp export parsing ──────────────────────────────────────────────────

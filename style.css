@@ -817,7 +817,12 @@ input.c100-name-edit-input {
 .c100-frozen-tag:hover { background: rgba(148,163,184,0.22); color: var(--text); }
 
 .c100-summary-card { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.c100-summary-header {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+}
 .c100-summary-header h3 { margin: 0; font-size: 16px; color: var(--text); }
+.c100-share-btn { background: #25D366 !important; color: #06210F !important; border-color: #25D366 !important; font-weight: 700; white-space: nowrap; }
+.c100-share-btn:hover { filter: brightness(1.08); }
 .c100-summary-section {
   background: var(--card2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
 }
