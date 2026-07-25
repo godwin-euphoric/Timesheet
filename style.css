@@ -678,6 +678,84 @@ input.habit-edit-input {
   border-radius: 8px !important; color: var(--text) !important; font-size: 13px;
 }
 
+/* ══ 100 Days Challenge ══════════════════════════════════════════════════════ */
+#tab-challenge100 { overflow-x: clip; }
+.c100-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 13px; }
+
+.c100-add-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.c100-add-tab-btn {
+  border: 1px solid var(--border); background: var(--card2); color: var(--muted);
+  border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s;
+}
+.c100-add-tab-btn:hover { color: var(--text); }
+.c100-add-tab-btn.active { background: var(--primary-l); color: var(--primary-h); border-color: var(--primary); }
+
+.c100-add-bulk { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.c100-bulk-textarea {
+  width: 100%; min-height: 90px; resize: vertical;
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 14px;
+  line-height: 1.6; padding: 12px 14px; font-family: inherit;
+  transition: border-color 0.15s;
+}
+.c100-bulk-textarea:focus { outline: none; border-color: var(--primary); }
+.c100-bulk-textarea::placeholder { color: var(--muted); }
+
+.c100-table th {
+  padding: 8px 12px; font-size: 11px; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px;
+  background: #0D1628; border-bottom: 2px solid var(--border);
+  text-align: center; vertical-align: middle;
+}
+.c100-name-col {
+  text-align: left !important; min-width: 160px;
+  position: sticky; left: 0; z-index: 20; background: #0D1628;
+}
+.c100-day-col { min-width: 90px; }
+.c100-table th.col-current { color: var(--amber); border-bottom-color: var(--amber); }
+.c100-day-label { margin-bottom: 6px; font-size: 12px; letter-spacing: normal; text-transform: none; }
+
+.c100-upload-btn {
+  border: 1px solid var(--border); background: var(--card2); color: var(--text);
+  border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;
+  transition: all 0.15s;
+}
+.c100-upload-btn:hover { border-color: var(--primary); color: var(--primary-h); }
+
+.c100-row td { border-bottom: 1px solid var(--border); }
+.c100-row:hover td { background: var(--card2); }
+
+.c100-name-cell {
+  padding: 10px 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  position: sticky; left: 0; z-index: 10; background: var(--card);
+}
+.c100-row:hover .c100-name-cell { background: var(--card2); }
+.c100-name-text { font-weight: 600; color: var(--text); }
+.c100-row:hover .btn-habit-del { opacity: 1; }
+
+.c100-cell { text-align: center; padding: 10px 8px; cursor: pointer; font-weight: 600; }
+.c100-cell:hover { background: var(--primary-l); }
+.c100-cell.cell-current { background: rgba(252,211,77,0.05); }
+
+input.c100-edit-input {
+  width: 54px; height: 28px !important; padding: 0 6px !important; text-align: center;
+  background: var(--card2) !important; color: var(--text) !important;
+  border: 2px solid var(--primary) !important; border-radius: 6px !important;
+  font-size: 13px; font-weight: 600;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.18) !important;
+  outline: none;
+}
+
+@media (max-width: 768px) {
+  .c100-table { width: max-content; min-width: 100%; }
+  .c100-name-col  { min-width: 120px; max-width: 120px; }
+  .c100-day-col   { min-width: 74px; }
+  .c100-table th  { padding: 6px 4px; font-size: 10px; }
+  .c100-upload-btn { padding: 3px 6px; font-size: 10px; }
+}
+
 /* ══ FM count badge ══════════════════════════════════════════════════════════ */
 .fm-count-badge {
   background: var(--amber-bg); color: var(--amber);

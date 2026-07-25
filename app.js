@@ -55,6 +55,8 @@ const state = {
   // Summary tab
   weightEntries:    null,
   summaryMonth:     currentMonth(),
+  // 100 Days Challenge tab
+  challenge100UploadTarget: null,
 };
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -256,6 +258,8 @@ async function getUserData() {
   if (!data.fmLog)        data.fmLog        = [];
   if (!data.habits)       data.habits       = [];
   if (!data.habitLog)     data.habitLog     = {};
+  if (!data.challenge100Participants) data.challenge100Participants = [];
+  if (!data.challenge100Progress)     data.challenge100Progress     = {};
   state.userDataCache = data;
   return data;
 }
@@ -289,7 +293,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -1992,6 +1996,287 @@ function startEditHabit(td, index) {
     if (e.key === 'Enter')  input.blur();
     if (e.key === 'Escape') { saved = true; renderHabitsTable; input.blur(); }
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  100 DAYS CHALLENGE TAB
+// ══════════════════════════════════════════════════════════════════════════
+
+const CHALLENGE100_START = '2026-07-27'; // first Monday
+const CHALLENGE100_END   = '2026-11-30'; // last Monday (inclusive)
+
+// Every Monday from CHALLENGE100_START to CHALLENGE100_END, inclusive
+function getChallenge100Mondays() {
+  const mondays = [];
+  const d   = new Date(CHALLENGE100_START + 'T00:00:00');
+  const end = new Date(CHALLENGE100_END   + 'T00:00:00');
+  while (d <= end) {
+    mondays.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    d.setDate(d.getDate() + 7);
+  }
+  return mondays;
+}
+
+function challenge100DateLabel(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
+async function loadChallenge100Tab() {
+  const userData = await getUserData();
+  renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+}
+
+function renderChallenge100Table(participants, progress) {
+  const table = document.getElementById('challenge100-table');
+  if (!table) return;
+  const mondays = getChallenge100Mondays();
+  const today = todayStr();
+  const currentMonday = [...mondays].reverse().find(m => m <= today) || mondays[0];
+
+  const headCells = mondays.map(m => `
+    <th class="c100-day-col${m === currentMonday ? ' col-current' : ''}">
+      <div class="c100-day-label">${challenge100DateLabel(m)}</div>
+      <button class="c100-upload-btn" onclick="challenge100TriggerUpload('${m}')" title="Upload WhatsApp export for this week">⬆ Upload</button>
+    </th>`).join('');
+
+  const thead = `
+    <thead>
+      <tr>
+        <th class="c100-name-col">Participant</th>
+        ${headCells}
+      </tr>
+    </thead>`;
+
+  let bodyRows = '';
+  participants.forEach((name, i) => {
+    const cells = mondays.map(m => {
+      const val = (progress[m] || {})[name];
+      const shown = (val !== undefined && val !== null) ? val : '';
+      return `<td class="c100-cell${m === currentMonday ? ' cell-current' : ''}" onclick="challenge100EditCell(this,'${encodeURIComponent(name)}','${m}')">${shown}</td>`;
+    }).join('');
+    bodyRows += `
+      <tr class="c100-row">
+        <td class="c100-name-cell">
+          <span class="c100-name-text">${name}</span>
+          <button class="btn-habit-del" onclick="event.stopPropagation();deleteChallenge100Participant(${i})" title="Remove participant">✕</button>
+        </td>
+        ${cells}
+      </tr>`;
+  });
+
+  if (!participants.length) {
+    bodyRows = `<tr><td colspan="${mondays.length + 1}" class="empty">No participants yet — add one above</td></tr>`;
+  }
+
+  table.innerHTML = thead + `<tbody>${bodyRows}</tbody>`;
+}
+
+async function addChallenge100Participant() {
+  const input = document.getElementById('new-c100-participant');
+  const name  = input.value.trim();
+  if (!name) return;
+  const userData = await getUserData();
+  if (userData.challenge100Participants.some(p => p.toLowerCase() === name.toLowerCase())) {
+    showToast('Already added'); return;
+  }
+  userData.challenge100Participants.push(name);
+  await saveUserData({ challenge100Participants: userData.challenge100Participants });
+  input.value = '';
+  renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+}
+
+function switchChallenge100AddMode(mode) {
+  document.querySelectorAll('.c100-add-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.c100Add === mode));
+  document.getElementById('c100-add-single').classList.toggle('hidden', mode !== 'single');
+  document.getElementById('c100-add-bulk').classList.toggle('hidden', mode !== 'bulk');
+}
+
+// Accepts names separated by newlines and/or commas, e.g. pasted from a WhatsApp group member list
+async function addChallenge100ParticipantsBulk() {
+  const textarea = document.getElementById('new-c100-participants-bulk');
+  const raw = textarea.value;
+  const names = raw.split(/[\n,]/).map(n => n.trim()).filter(Boolean);
+  if (!names.length) return;
+
+  const userData = await getUserData();
+  const existingLower = new Set(userData.challenge100Participants.map(p => p.toLowerCase()));
+  const added = [], skipped = [];
+  names.forEach(name => {
+    const lower = name.toLowerCase();
+    if (existingLower.has(lower)) { skipped.push(name); return; }
+    existingLower.add(lower);
+    userData.challenge100Participants.push(name);
+    added.push(name);
+  });
+
+  if (added.length) {
+    await saveUserData({ challenge100Participants: userData.challenge100Participants });
+    renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+  }
+  textarea.value = '';
+  let msg = added.length ? `Added ${added.length} participant${added.length === 1 ? '' : 's'}` : 'No new participants added';
+  if (skipped.length) msg += ` — skipped ${skipped.length} duplicate${skipped.length === 1 ? '' : 's'}`;
+  showToast(msg);
+}
+
+async function deleteChallenge100Participant(index) {
+  const userData = await getUserData();
+  const name = userData.challenge100Participants[index];
+  if (!confirm(`Remove "${name}" from the challenge?`)) return;
+  userData.challenge100Participants.splice(index, 1);
+  await saveUserData({ challenge100Participants: userData.challenge100Participants });
+  renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+}
+
+// Click-to-edit a cell for manual override (when a participant isn't found in a chat export)
+function challenge100EditCell(td, encodedName, mondayDate) {
+  if (td.querySelector('input')) return;
+  const name   = decodeURIComponent(encodedName);
+  const oldVal = td.textContent.trim();
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0'; input.max = '100'; input.step = '1';
+  input.value = oldVal;
+  input.className = 'c100-edit-input';
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus(); input.select();
+
+  let saved = false;
+  async function commit() {
+    if (saved) return;
+    saved = true;
+    const raw = input.value.trim();
+    const userData = await getUserData();
+    if (!userData.challenge100Progress[mondayDate]) userData.challenge100Progress[mondayDate] = {};
+    if (raw === '') delete userData.challenge100Progress[mondayDate][name];
+    else userData.challenge100Progress[mondayDate][name] = Math.max(0, Math.round(parseFloat(raw)));
+    if (!Object.keys(userData.challenge100Progress[mondayDate]).length) delete userData.challenge100Progress[mondayDate];
+    await saveUserData({ challenge100Progress: userData.challenge100Progress });
+    renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+  }
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') {
+      saved = true;
+      getUserData().then(ud => renderChallenge100Table(ud.challenge100Participants, ud.challenge100Progress));
+    }
+  });
+}
+
+// ── WhatsApp export parsing ──────────────────────────────────────────────────
+
+function challenge100TriggerUpload(mondayDate) {
+  state.challenge100UploadTarget = mondayDate;
+  document.getElementById('challenge100-file-input').click();
+}
+
+// Reads every line of an exported WhatsApp chat .txt file and returns
+// { rawSenderName: highestDayNumberMentioned }, scanning across multi-line messages too.
+function extractChallenge100DaysBySender(text) {
+  const HEADER_RE = /^\[?(\d{1,2}[/.]\d{1,2}[/.]\d{2,4}),?\s+(\d{1,2}[:.]\d{2}(?:[:.]\d{2})?(?:\s?[AaPp]\.?[Mm]\.?)?)\]?\s*[-–—]?\s*(.*)$/;
+  const DAY_RE    = /days?\s*[:\-]?\s*(\d{1,3})(?:\s*(?:-|to|–|—|through)\s*(?:days?\s*)?(\d{1,3}))?/gi;
+
+  function scanLine(sender, line, result) {
+    if (!sender) return;
+    let maxDay = null, m;
+    DAY_RE.lastIndex = 0;
+    while ((m = DAY_RE.exec(line)) !== null) {
+      const v = m[2] ? Math.max(parseInt(m[1], 10), parseInt(m[2], 10)) : parseInt(m[1], 10);
+      if (maxDay === null || v > maxDay) maxDay = v;
+    }
+    if (maxDay === null) return;
+    if (result[sender] === undefined || maxDay > result[sender]) result[sender] = maxDay;
+  }
+
+  const result = {};
+  let currentSender = null;
+  text.split(/\r?\n/).forEach(rawLine => {
+    const line = rawLine.replace(/[‎‏]/g, '').trim();
+    const headerMatch = line.match(HEADER_RE);
+    if (headerMatch) {
+      const rest = headerMatch[3];
+      const sepIdx = rest.indexOf(': ');
+      if (sepIdx === -1) return; // system message — no sender, leave currentSender untouched
+      currentSender = rest.slice(0, sepIdx).trim();
+      scanLine(currentSender, rest.slice(sepIdx + 2), result);
+    } else {
+      scanLine(currentSender, line, result); // continuation of a multi-line message
+    }
+  });
+  return result;
+}
+
+function normalizeChallenge100Name(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+// Matches a registered participant name against parsed WhatsApp sender names (exact or first-name match)
+function matchChallenge100Sender(participantName, senderMax) {
+  const target      = normalizeChallenge100Name(participantName);
+  const targetFirst = target.split(' ')[0];
+  let best = null;
+  Object.entries(senderMax).forEach(([sender, day]) => {
+    const norm      = normalizeChallenge100Name(sender);
+    const normFirst = norm.split(' ')[0];
+    const isMatch   = norm === target || normFirst === target || normFirst === targetFirst;
+    if (isMatch && (best === null || day > best)) best = day;
+  });
+  return best;
+}
+
+async function challenge100FileSelected(input) {
+  const file = input.files[0];
+  const mondayDate = state.challenge100UploadTarget;
+  input.value = '';
+  if (!file || !mondayDate) return;
+  if (typeof JSZip === 'undefined') { showToast('Refresh the page and try again (zip library not loaded)'); return; }
+
+  showToast('Reading chat export...');
+  try {
+    const buf = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+    const zip = await JSZip.loadAsync(buf);
+    const chatFileName = Object.keys(zip.files).find(n => /\.txt$/i.test(n) && !zip.files[n].dir);
+    if (!chatFileName) { showToast('No chat .txt file found in the zip'); return; }
+    const text = await zip.files[chatFileName].async('string');
+
+    const senderMax = extractChallenge100DaysBySender(text);
+    const userData  = await getUserData();
+    const participants = userData.challenge100Participants;
+    if (!participants.length) { showToast('Add participants first'); return; }
+
+    if (!userData.challenge100Progress[mondayDate]) userData.challenge100Progress[mondayDate] = {};
+    const matched = [], unmatched = [];
+    participants.forEach(name => {
+      const day = matchChallenge100Sender(name, senderMax);
+      if (day !== null) {
+        userData.challenge100Progress[mondayDate][name] = day;
+        matched.push(`${name} (${day})`);
+      } else {
+        unmatched.push(name);
+      }
+    });
+    if (!Object.keys(userData.challenge100Progress[mondayDate]).length) delete userData.challenge100Progress[mondayDate];
+
+    await saveUserData({ challenge100Progress: userData.challenge100Progress });
+    renderChallenge100Table(participants, userData.challenge100Progress);
+
+    let msg = matched.length ? `Updated: ${matched.join(', ')}` : 'No registered participants found in this chat';
+    if (unmatched.length) msg += ` — Not found: ${unmatched.join(', ')}`;
+    showToast(msg, 6000);
+  } catch (e) {
+    console.error('100 Days Challenge import failed', e);
+    showToast('Could not process the zip file: ' + e.message);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
