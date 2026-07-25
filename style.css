@@ -808,6 +808,47 @@ input.c100-name-edit-input {
   outline: none;
 }
 
+.c100-row-frozen td { opacity: 0.55; }
+.c100-frozen-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 7px;
+  background: rgba(148,163,184,0.12); color: var(--muted);
+  border-radius: 20px; font-size: 10px; font-weight: 600; cursor: pointer;
+}
+.c100-frozen-tag:hover { background: rgba(148,163,184,0.22); color: var(--text); }
+
+.c100-summary-card { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.c100-summary-section {
+  background: var(--card2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
+}
+.c100-summary-section h4 { margin: 0 0 4px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.c100-summary-count {
+  background: rgba(148,163,184,0.15); color: var(--text); border-radius: 20px;
+  font-size: 11px; font-weight: 700; padding: 1px 8px;
+}
+.c100-summary-removal { border-color: #5C2020; }
+.c100-summary-removal h4 { color: var(--red); }
+.c100-summary-warning { border-color: #4A3000; }
+.c100-summary-warning h4 { color: var(--amber); }
+.c100-summary-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.c100-summary-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; background: var(--card); border-radius: 8px; font-size: 13px; font-weight: 600;
+}
+.c100-summary-names { font-size: 13px; color: var(--text); margin-top: 6px; }
+
+.c100-summary-dashboard h4 { color: var(--text); font-size: 15px; }
+.c100-dash-stats { display: flex; gap: 16px; flex-wrap: wrap; margin: 10px 0 14px; font-size: 13px; color: var(--muted); }
+.c100-dash-stats strong { color: var(--text); }
+
+.c100-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.c100-dot-green  { background: var(--green); }
+.c100-dot-yellow { background: var(--amber); }
+.c100-dot-red    { background: var(--red); }
+
+.c100-rank-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.c100-rank-table th { text-align: left; padding: 8px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+.c100-rank-table td { padding: 8px; border-bottom: 1px solid var(--border); }
+
 @media (max-width: 768px) {
   .c100-table { width: max-content; min-width: 100%; }
   .c100-name-col  { min-width: 120px; max-width: 120px; }

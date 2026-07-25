@@ -270,6 +270,7 @@ async function getUserData() {
   if (!data.challenge100Progress)       data.challenge100Progress       = {};
   if (!data.challenge100PendingReview)  data.challenge100PendingReview  = {};
   if (!data.challenge100CorrectionNotes) data.challenge100CorrectionNotes = [];
+  if (!data.challenge100Frozen)          data.challenge100Frozen          = [];
   state.userDataCache = data;
   return data;
 }
@@ -2034,6 +2035,30 @@ function getChallenge100Mondays() {
   return mondays;
 }
 
+// Single source of truth for "which Monday column is current" — used by both the table render
+// and the summary generator so they never disagree. `extended` includes the baseline column
+// first (it doubles as "week 0" for diffing the very first real week against).
+function challenge100WeekContext() {
+  const mondays = getChallenge100Mondays();
+  const extended = [CHALLENGE100_BASELINE_KEY, ...mondays];
+  // TEMP override for testing the 27-Jul upload flow early — revert to todayStr() once confirmed.
+  const today = '2026-07-27';
+  const currentMonday = [...extended].sort().reverse().find(m => m <= today) || mondays[0];
+  const currentIdx = extended.indexOf(currentMonday);
+  return { mondays, extended, currentMonday, currentIdx };
+}
+
+// Walks backward from `idx` through `extended` looking for the first defined value for `name`,
+// i.e. carries a participant's last known cumulative day-count forward through blank weeks
+// (a blank week just means nothing new was reported, not that progress reset to zero).
+function challenge100CarryForward(progress, name, extended, idx) {
+  for (let i = idx; i >= 0; i--) {
+    const val = (progress[extended[i]] || {})[name];
+    if (val !== undefined && val !== null) return val;
+  }
+  return 0;
+}
+
 // Strips a leading serial-number prefix some pasted lists include, e.g. "1. Suresh" / "2)Mahesh" → "Suresh" / "Mahesh"
 function stripChallenge100Numbering(name) {
   return name.replace(/^\d+\s*[.)\-]\s*/, '').trim();
@@ -2074,10 +2099,7 @@ function renderChallenge100UploadBar(currentMonday) {
 function renderChallenge100Table(participants, progress) {
   const table = document.getElementById('challenge100-table');
   if (!table) return;
-  const mondays = getChallenge100Mondays();
-  // TEMP override for testing the 27-Jul upload flow early — revert to todayStr() once confirmed.
-  const today = '2026-07-27';
-  const currentMonday = [...mondays, CHALLENGE100_BASELINE_KEY].sort().reverse().find(m => m <= today) || mondays[0];
+  const { mondays, currentMonday } = challenge100WeekContext();
   renderChallenge100UploadBar(currentMonday);
   // Baseline "week 0" column, prepended before the real weekly columns
   const columns = [CHALLENGE100_BASELINE_KEY, ...mondays];
@@ -2098,21 +2120,25 @@ function renderChallenge100Table(participants, progress) {
       </tr>
     </thead>`;
 
+  const frozen = state.userDataCache?.challenge100Frozen || [];
+
   let bodyRows = '';
   participants.forEach((name, i) => {
+    const isFrozen = frozen.includes(name);
     const cells = columns.map(m => {
       const val = (progress[m] || {})[name];
       const shown = (val !== undefined && val !== null) ? val : (m === CHALLENGE100_BASELINE_KEY ? 0 : '');
-      const locked = m === currentMonday && state.challenge100EntryMode !== 'manual';
+      const locked = (m === currentMonday && state.challenge100EntryMode !== 'manual') || isFrozen;
       const cls = `c100-cell${m === currentMonday ? ' cell-current' : ''}${locked ? ' c100-cell-locked' : ''}`;
       const click = locked ? '' : ` onclick="challenge100EditCell(this,'${encodeURIComponent(name)}','${m}')"`;
       return `<td class="${cls}"${click}>${shown}</td>`;
     }).join('');
     bodyRows += `
-      <tr class="c100-row">
+      <tr class="c100-row${isFrozen ? ' c100-row-frozen' : ''}">
         <td class="c100-sno-cell">${i + 1}</td>
         <td class="c100-name-cell">
           <span class="c100-name-text" onclick="challenge100EditName(this,${i})" title="Tap to rename">${name}</span>
+          ${isFrozen ? `<span class="c100-frozen-tag" onclick="event.stopPropagation();challenge100ToggleFreeze('${encodeURIComponent(name)}')" title="Frozen — tap to unfreeze">❄ Frozen</span>` : ''}
           <button class="btn-habit-del" onclick="event.stopPropagation();deleteChallenge100Participant(${i})" title="Remove participant">✕</button>
         </td>
         ${cells}
@@ -2181,6 +2207,21 @@ async function deleteChallenge100Participant(index) {
   userData.challenge100Participants.splice(index, 1);
   await saveUserData({ challenge100Participants: userData.challenge100Participants });
   renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+}
+
+// Freezing stops a stagnant participant from being picked up in future chat uploads while
+// keeping them (and their history) visible in the table — flip side of the Removal Section's
+// per-person freeze button, also reachable by tapping the "❄ Frozen" tag to undo.
+async function challenge100ToggleFreeze(encodedName) {
+  const name = decodeURIComponent(encodedName);
+  const userData = await getUserData();
+  const idx = userData.challenge100Frozen.indexOf(name);
+  if (idx === -1) userData.challenge100Frozen.push(name);
+  else userData.challenge100Frozen.splice(idx, 1);
+  await saveUserData({ challenge100Frozen: userData.challenge100Frozen });
+  renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+  showToast(idx === -1 ? `Froze ${name}` : `Unfroze ${name}`);
+  renderChallenge100Summary();
 }
 
 // Click-to-edit a participant's name — renames them everywhere (progress history + any
@@ -2282,6 +2323,105 @@ function challenge100EditCell(td, encodedName, mondayDate) {
   });
 }
 
+// ── Weekly summary (Removal / Warning / Dashboard) ───────────────────────────
+
+function challenge100AddDays(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+async function challenge100GenerateSummary() {
+  const userData = await getUserData();
+  document.getElementById('c100-summary-card')?.classList.remove('hidden');
+  renderChallenge100Summary(userData.challenge100Participants, userData.challenge100Progress, userData.challenge100Frozen || []);
+}
+
+// Builds the Removal / Warning / Dashboard sections from the current table state. Removal and
+// Warning both key off "stagnant" cumulative counts — a blank week carries the previous count
+// forward via challenge100CarryForward, so two equal counts in a row means nothing new landed
+// in that week, not that progress reset to zero.
+function renderChallenge100Summary(participants, progress, frozen) {
+  const container = document.getElementById('c100-summary-content');
+  if (!container) return;
+  const { extended, currentMonday, currentIdx } = challenge100WeekContext();
+
+  const rows = participants.map(name => {
+    const cur   = challenge100CarryForward(progress, name, extended, currentIdx);
+    const prev1 = currentIdx - 1 >= 0 ? challenge100CarryForward(progress, name, extended, currentIdx - 1) : null;
+    const prev2 = currentIdx - 2 >= 0 ? challenge100CarryForward(progress, name, extended, currentIdx - 2) : null;
+    const diff  = prev1 !== null ? Math.min(cur - prev1, 7) : cur;
+    const matchesLast1 = prev1 !== null && cur === prev1;
+    const matchesLast2 = matchesLast1 && prev2 !== null && prev1 === prev2;
+    return { name, cur, diff, isFrozen: frozen.includes(name), matchesLast1, matchesLast2 };
+  });
+
+  const active  = rows.filter(r => !r.isFrozen);
+  const removal = active.filter(r => r.matchesLast2);
+  const warning = active.filter(r => r.matchesLast1 && !r.matchesLast2);
+
+  const removalHtml = removal.length ? `
+    <div class="c100-summary-section c100-summary-removal">
+      <h4>🚫 Removal Candidates <span class="c100-summary-count">${removal.length}</span></h4>
+      <p class="hint">No new progress for the last two weeks.</p>
+      <div class="c100-summary-list">
+        ${removal.map(r => `
+          <div class="c100-summary-row">
+            <span>${r.name}</span>
+            <button class="btn-secondary" onclick="challenge100ToggleFreeze('${encodeURIComponent(r.name)}')">❄ Freeze</button>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  const warningHtml = warning.length ? `
+    <div class="c100-summary-section c100-summary-warning">
+      <h4>⚠ Warning <span class="c100-summary-count">${warning.length}</span></h4>
+      <p class="hint">No new progress last week — another stagnant week will flag them for removal.</p>
+      <div class="c100-summary-names">${warning.map(r => r.name).join(', ')}</div>
+    </div>` : '';
+
+  const weekNum = currentIdx;
+  const sunday  = challenge100AddDays(currentMonday, 6);
+  const green   = active.filter(r => r.diff >= 6).length;
+  const yellow  = active.filter(r => r.diff === 5).length;
+  const red     = active.filter(r => r.diff < 5).length;
+
+  const sorted = [...active].sort((a, b) => b.cur - a.cur);
+  let rank = 0, lastCount = null;
+  const rankRows = sorted.map((r, i) => {
+    if (r.cur !== lastCount) { rank = i + 1; lastCount = r.cur; }
+    const dot = r.diff >= 6 ? 'green' : r.diff === 5 ? 'yellow' : 'red';
+    return `
+      <tr>
+        <td>${rank}</td>
+        <td>${r.name}</td>
+        <td>${r.cur}</td>
+        <td>${r.diff >= 0 ? '+' : ''}${r.diff}</td>
+        <td><span class="c100-dot c100-dot-${dot}"></span></td>
+      </tr>`;
+  }).join('');
+
+  const dashboardHtml = `
+    <div class="c100-summary-section c100-summary-dashboard">
+      <h4>100 Days Week ${weekNum} Summary — Till Sunday ${challenge100DateLabel(sunday)}</h4>
+      <div class="c100-dash-stats">
+        <span>Total active: <strong>${active.length}</strong></span>
+        <span><span class="c100-dot c100-dot-green"></span> ${green}</span>
+        <span><span class="c100-dot c100-dot-yellow"></span> ${yellow}</span>
+        <span><span class="c100-dot c100-dot-red"></span> ${red}</span>
+      </div>
+      <div class="table-scroll">
+        <table class="c100-rank-table">
+          <thead><tr><th>Rank</th><th>Name</th><th>Count</th><th>Δ vs last week</th><th></th></tr></thead>
+          <tbody>${rankRows || '<tr><td colspan="5" class="empty">No active participants</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  container.innerHTML = removalHtml + warningHtml + dashboardHtml;
+}
+
 // ── WhatsApp export parsing ──────────────────────────────────────────────────
 
 function challenge100TriggerUpload(mondayDate) {
@@ -2377,7 +2517,8 @@ async function challenge100FileSelected(input) {
     }
 
     const userData  = await getUserData();
-    const participants = userData.challenge100Participants;
+    // Frozen participants are excluded entirely — no new entries should ever land for them again.
+    const participants = userData.challenge100Participants.filter(n => !userData.challenge100Frozen.includes(n));
     if (!participants.length) { showToast('Add participants first', 0); return; }
 
     if (btn) btn.textContent = '⏳ Gemini is analyzing...';
@@ -5490,6 +5631,7 @@ function isAdmin() {
 async function checkUserAccess() {
   if (isAdmin()) {
     document.getElementById('tab-btn-admin')?.classList.remove('hidden');
+    document.getElementById('tab-btn-challenge100')?.classList.remove('hidden');
     hideAccessGate();
     // Ensure admin appears in the users list and leaderboard
     db.collection('user_roles').doc(state.user.uid).set({
@@ -5707,7 +5849,7 @@ function applyRoleVisibility(role) {
   const visible = showFor[role] || showFor.both;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
     const t = btn.dataset.tab;
-    if (t === 'admin') return;
+    if (t === 'admin' || t === 'challenge100') return;
     btn.style.display = visible.has(t) ? '' : 'none';
   });
   // If currently active tab is hidden, switch to first visible tab

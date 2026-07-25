@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=95">
+  <link rel="stylesheet" href="style.css?v=96">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -72,7 +72,7 @@
       <button class="tab-btn" data-tab="monthly">Monthly</button>
       <button class="tab-btn" data-tab="yearly">Yearly</button>
       <button class="tab-btn" data-tab="habits">Habits</button>
-      <button class="tab-btn" data-tab="challenge100">100 Days</button>
+      <button class="tab-btn hidden" id="tab-btn-challenge100" data-tab="challenge100">100 Days</button>
       <button class="tab-btn" data-tab="log">Journal</button>
       <button class="tab-btn" data-tab="planner">Planner</button>
       <button class="tab-btn" data-tab="settings">Settings</button>
@@ -553,6 +553,12 @@
         <table class="c100-table" id="challenge100-table"></table>
       </div>
 
+      <button class="btn-secondary" style="margin-top:14px" onclick="challenge100GenerateSummary()">📊 Generate Summary</button>
+
+      <div class="c100-summary-card hidden" id="c100-summary-card">
+        <div id="c100-summary-content"></div>
+      </div>
+
       <div class="c100-add-tabs" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
         <button type="button" class="c100-add-tab-btn active" data-c100-add="single" onclick="switchChallenge100AddMode('single')">Add One</button>
         <button type="button" class="c100-add-tab-btn" data-c100-add="bulk" onclick="switchChallenge100AddMode('bulk')">Add Many</button>
@@ -860,7 +866,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=114"></script>
+<script src="app.js?v=115"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
