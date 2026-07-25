@@ -2217,7 +2217,7 @@ function challenge100TriggerUploadFromSelect() {
 // a fixed regex to keep up with, so this replaced the earlier hand-written parser.
 async function extractChallenge100DaysViaGemini(text, participants, correctionNotes) {
   const notesBlock = (correctionNotes && correctionNotes.length)
-    ? `\nNotes from the admin's past corrections to earlier runs — apply these lessons (most recent last):\n${correctionNotes.slice(-15).map(n => `- ${n}`).join('\n')}\n`
+    ? `\nNotes from the admin's past corrections to earlier runs — apply these lessons (most recent last):\n${correctionNotes.slice(-20).map(n => `- ${n}`).join('\n')}\n`
     : '';
 
   const prompt = `You are analyzing a WhatsApp group chat export (.txt) for a "100 Days Fitness Challenge". Each participant is expected to post daily updates mentioning a day number, but the phrasing varies a lot, e.g.: "Day 1 completed", "Day 1, Day 2, Day 3", "Day 1 to Day 5 completed", "Days 15-18 done", "Day 12 ✅", "Day2 : Slow walking", "Day-1 (1 hour walking)", "Day 2 & 3: workout", or with stray punctuation/typos like "Day -1 -40 - walking" (this means Day 1 — the "-40" is an unrelated number, not a second day). A single message can report multiple days at once (catch-up posts) or just one.
