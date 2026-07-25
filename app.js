@@ -2368,7 +2368,7 @@ function renderChallenge100Summary(participants, progress, frozen) {
   // Session 1 — page-level header, shared across all sections below.
   const headerHtml = `
     <div class="c100-summary-header">
-      <h3>Week ${weekNum} Summary — Till Sunday ${challenge100DateLabel(sunday)}</h3>
+      <h3>🏆 Week ${weekNum} Summary — 🗓 Till Sunday ${challenge100DateLabel(sunday)}</h3>
     </div>`;
 
   // Session 2 — Removal section: new candidates (freeze) plus already-frozen members (unfreeze).
@@ -2402,7 +2402,7 @@ function renderChallenge100Summary(participants, progress, frozen) {
   // Session 3 — Warning section, unchanged.
   const warningHtml = warning.length ? `
     <div class="c100-summary-section c100-summary-warning">
-      <h4>⚠ Warning <span class="c100-summary-count">${warning.length}</span></h4>
+      <h4>⚠⚠⚠ Warning ⚠⚠⚠</h4>
       <p class="hint">These members haven't logged progress this past week. A gentle nudge might help — if next week is also quiet, they'll move to the removal list.</p>
       <div class="c100-summary-names">${warning.map(r => r.name).join(', ')}</div>
     </div>` : '';
@@ -2427,15 +2427,22 @@ function renderChallenge100Summary(participants, progress, frozen) {
       </tr>`;
   }).join('');
 
-  const dashboardHtml = `
-    <div class="c100-summary-section c100-summary-dashboard">
+  const overviewHtml = `
+    <div class="c100-summary-section c100-summary-overview">
       <h4>📊 Overall Status</h4>
-      <div class="c100-dash-stats">
-        <span>Total active: <strong>${active.length}</strong></span>
-        <span><span class="c100-dot c100-dot-green"></span> ${green}</span>
-        <span><span class="c100-dot c100-dot-yellow"></span> ${yellow}</span>
-        <span><span class="c100-dot c100-dot-red"></span> ${red}</span>
-      </div>
+      <p class="c100-dash-total">Total active: <strong>${active.length}</strong></p>
+      <table class="c100-status-table">
+        <tbody>
+          <tr class="c100-status-row-green"><td>🟢 Green</td><td>${green}</td></tr>
+          <tr class="c100-status-row-yellow"><td>🟡 Yellow</td><td>${yellow}</td></tr>
+          <tr class="c100-status-row-red"><td>🔴 Red</td><td>${red}</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+
+  const rankHtml = `
+    <div class="c100-summary-section c100-summary-dashboard">
+      <h4>📋 Detailed Status</h4>
       <div class="table-scroll">
         <table class="c100-rank-table">
           <thead><tr><th>Rank</th><th>Name</th><th>Count</th><th>Δ vs last week</th></tr></thead>
@@ -2444,7 +2451,7 @@ function renderChallenge100Summary(participants, progress, frozen) {
       </div>
     </div>`;
 
-  container.innerHTML = headerHtml + removalHtml + warningHtml + dashboardHtml;
+  container.innerHTML = headerHtml + removalHtml + warningHtml + overviewHtml + rankHtml;
 }
 
 // ── WhatsApp export parsing ──────────────────────────────────────────────────
