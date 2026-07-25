@@ -2063,7 +2063,8 @@ function renderChallenge100Table(participants, progress) {
   const table = document.getElementById('challenge100-table');
   if (!table) return;
   const mondays = getChallenge100Mondays();
-  const today = todayStr();
+  // TEMP override for testing the 27-Jul upload flow early — revert to todayStr() once confirmed.
+  const today = '2026-07-27';
   const currentMonday = [...mondays, CHALLENGE100_BASELINE_KEY].sort().reverse().find(m => m <= today) || mondays[0];
   renderChallenge100UploadBar(currentMonday);
   // Baseline "week 0" column, prepended before the real weekly columns
