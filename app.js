@@ -3562,7 +3562,34 @@ async function downloadExcel() {
       }
     } catch(e) { console.error('Habits failed', e); }
 
-    // ── 10. Planner — each planner tab = one sheet, blocks stacked ─────────
+    // ── 10. 100 Days Challenge ───────────────────────────────────────────────
+    try {
+      const c100Participants = userData.challenge100Participants || [];
+      const c100Progress     = userData.challenge100Progress || {};
+      const c100Frozen       = userData.challenge100Frozen || [];
+      if (c100Participants.length) {
+        const ws = wb.addWorksheet('E - 100 Days Challenge');
+        const { mondays } = challenge100WeekContext();
+        const columns = [CHALLENGE100_BASELINE_KEY, ...mondays];
+        const header = ['Participant', ...columns.map(m => m === CHALLENGE100_BASELINE_KEY ? 'Start' : challenge100DateLabel(m)), 'Frozen'];
+        const hRow = ws.addRow(header);
+        styleRow(hRow, header.length, BLUE_FILL, BLUE_FONT);
+        ws.getColumn(1).width = 24;
+        columns.forEach((_, i) => { ws.getColumn(2 + i).width = 12; });
+        ws.getColumn(2 + columns.length).width = 10;
+
+        c100Participants.forEach(name => {
+          const vals = columns.map(m => {
+            const v = (c100Progress[m] || {})[name];
+            return (v !== undefined && v !== null) ? v : (m === CHALLENGE100_BASELINE_KEY ? 0 : '');
+          });
+          const row = ws.addRow([name, ...vals, c100Frozen.includes(name) ? 'Yes' : '']);
+          borderRow(row, header.length);
+        });
+      }
+    } catch(e) { console.error('100 Days Challenge failed', e); }
+
+    // ── 11. Planner — each planner tab = one sheet, blocks stacked ─────────
     try {
       const exportPlanners = (state.planners && state.planners.length) ? state.planners : (userData.planners || []);
       exportPlanners.forEach(pl => {
