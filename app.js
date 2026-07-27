@@ -2041,8 +2041,7 @@ function getChallenge100Mondays() {
 function challenge100WeekContext() {
   const mondays = getChallenge100Mondays();
   const extended = [CHALLENGE100_BASELINE_KEY, ...mondays];
-  // TEMP override for testing the 27-Jul upload flow early — revert to todayStr() once confirmed.
-  const today = '2026-07-27';
+  const today = todayStr();
   const currentMonday = [...extended].sort().reverse().find(m => m <= today) || mondays[0];
   const currentIdx = extended.indexOf(currentMonday);
   return { mondays, extended, currentMonday, currentIdx };
@@ -2495,23 +2494,74 @@ function challenge100BuildShareText(s) {
     '```', '',
   );
 
-  lines.push('📋 Detailed Status', '```');
-  s.ranked.forEach(r => {
-    const sign = r.diff >= 0 ? '+' : '';
-    lines.push(`${String(r.rank).padEnd(3)}${r.name.padEnd(20)}${String(r.cur).padEnd(6)}${sign}${r.diff}`);
-  });
-  lines.push('```');
+  if (s.ranked.length) lines.push('📋 Detailed Status — see attached image' + (s.ranked.length > 18 ? 's' : ''));
 
   return lines.join('\n');
+}
+
+// Renders a chunk of the rank list as an offscreen table and captures it with html2canvas. Kept
+// as a standalone temp element (not the visible on-screen table) so it can be split into several
+// narrower images — with a large roster, one giant image shrinks to unreadable text in WhatsApp.
+async function challenge100CaptureRankImage(rows, weekNum, partLabel) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed; left:-9999px; top:0; width:380px; background:#151F32; padding:16px; font-family:inherit;';
+  wrap.innerHTML = `
+    <h4 style="margin:0 0 10px;color:#F8FAFC;font-size:14px;">📋 Detailed Status${partLabel ? ` — ${partLabel}` : ''}</h4>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;color:#F8FAFC;">
+      <thead><tr>
+        <th style="text-align:left;padding:6px;color:#94A3B8;font-size:10px;text-transform:uppercase;border-bottom:1px solid #2A3752;">Rank</th>
+        <th style="text-align:left;padding:6px;color:#94A3B8;font-size:10px;text-transform:uppercase;border-bottom:1px solid #2A3752;">Name</th>
+        <th style="text-align:left;padding:6px;color:#94A3B8;font-size:10px;text-transform:uppercase;border-bottom:1px solid #2A3752;">Count</th>
+        <th style="text-align:left;padding:6px;color:#94A3B8;font-size:10px;text-transform:uppercase;border-bottom:1px solid #2A3752;">Δ</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => {
+          const dot = r.diff >= 6 ? '#4ADE80' : r.diff === 5 ? '#FCD34D' : '#F87171';
+          const sign = r.diff >= 0 ? '+' : '';
+          return `<tr>
+            <td style="padding:6px;border-bottom:1px solid #232F49;">${r.rank}</td>
+            <td style="padding:6px;border-bottom:1px solid #232F49;">${r.name}</td>
+            <td style="padding:6px;border-bottom:1px solid #232F49;">${r.cur}</td>
+            <td style="padding:6px;border-bottom:1px solid #232F49;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${dot};margin-right:4px;"></span>${sign}${r.diff}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+  document.body.appendChild(wrap);
+  try {
+    const cvs = await html2canvas(wrap, { backgroundColor: '#151F32', scale: 2, logging: false, useCORS: true });
+    const blob = await new Promise(resolve => cvs.toBlob(resolve, 'image/png'));
+    return blob ? new File([blob], `challenge100-week${weekNum}${partLabel ? `-${partLabel.replace(/\s+/g, '')}` : ''}.png`, { type: 'image/png' }) : null;
+  } finally {
+    wrap.remove();
+  }
 }
 
 async function challenge100ShareSummary() {
   const userData = await getUserData();
   const s = challenge100ComputeSummary(userData.challenge100Participants, userData.challenge100Progress, userData.challenge100Frozen || []);
   const text = challenge100BuildShareText(s);
-  if (navigator.share) {
-    try { await navigator.share({ text }); return; } catch (e) { /* cancelled or unsupported — fall through to wa.me */ }
+
+  const files = [];
+  if (typeof html2canvas !== 'undefined' && s.ranked.length) {
+    showToast('Preparing images…');
+    const half  = Math.ceil(s.ranked.length / 2);
+    const parts = [s.ranked.slice(0, half), s.ranked.slice(half)].filter(p => p.length);
+    for (let i = 0; i < parts.length; i++) {
+      const file = await challenge100CaptureRankImage(parts[i], s.weekNum, parts.length > 1 ? `Part ${i + 1}` : '');
+      if (file) files.push(file);
+    }
   }
+
+  if (navigator.share && (!files.length || navigator.canShare?.({ files }))) {
+    try { await navigator.share(files.length ? { text, files } : { text }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+
+  files.forEach(file => {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a'); a.href = url; a.download = file.name; a.click();
+    URL.revokeObjectURL(url);
+  });
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
