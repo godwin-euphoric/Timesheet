@@ -4294,14 +4294,27 @@ function renderPlannerBlock(pi, bi, block) {
     // Default: table mode
     const cols = block.cols || ['Column 1', 'Column 2'];
     const rows = block.rows || [];
+    const colFilters = (state.plannerFilters && state.plannerFilters[`${pi}-${bi}`]) || {};
     const colThs = cols.map((col, ci) => {
       const w = block.colWidths && block.colWidths[ci];
+      const activeVal = colFilters[ci];
+      const uniqueVals = [...new Set(rows.map(r => String(r['c' + ci] || '').trim()).filter(Boolean))].sort();
+      const filterDd = uniqueVals.length ? `
+        <div class="planner-col-filter-wrap">
+          <button class="btn-planner-icon planner-col-filter-btn${activeVal ? ' active' : ''}" title="Filter by ${escHtml(col)}"
+            onclick="togglePlannerColFilter(event,${pi},${bi},${ci})">⏷</button>
+          <div class="planner-col-filter-dropdown hidden" id="pcf-${pi}-${bi}-${ci}">
+            <button class="${!activeVal ? 'active' : ''}" data-pi="${pi}" data-bi="${bi}" data-ci="${ci}" data-val="" onclick="setPlannerColFilterFromBtn(this)">All</button>
+            ${uniqueVals.map(v => `<button class="${activeVal === v ? 'active' : ''}" data-pi="${pi}" data-bi="${bi}" data-ci="${ci}" data-val="${escHtml(v)}" onclick="setPlannerColFilterFromBtn(this)">${escHtml(v)}</button>`).join('')}
+          </div>
+        </div>` : '';
       return `
       <th class="planner-col-th"${w ? ` style="width:${w};min-width:${w};"` : ''}>
         <div class="planner-col-th-inner">
           <button class="btn-planner-icon btn-planner-insert-col" title="Insert column before" onclick="insertPlannerColumnBefore(${pi},${bi},${ci})">⊕</button>
           <input class="planner-col-name" value="${escHtml(col)}"
             onblur="updatePlannerColName(${pi},${bi},${ci},this.value)" onclick="this.select()">
+          ${filterDd}
           ${cols.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="removePlannerColumn(${pi},${bi},${ci})">✕</button>` : ''}
         </div>
         <span class="planner-col-resizer" title="Drag to resize column" onmousedown="startPlannerColResize(event,${pi},${bi},${ci})"></span>
@@ -4315,25 +4328,39 @@ function renderPlannerBlock(pi, bi, block) {
         </td>`).join('');
       return `<tr>${cells}
         <td class="planner-row-del-td">
+          <button class="btn-planner-icon btn-planner-insert-row" title="Insert row above" onclick="insertPlannerRowBefore(${pi},${bi},${ri})">⊕</button>
           <button class="btn-planner-icon" title="Remove row" onclick="removePlannerRow(${pi},${bi},${ri})">✕</button>
         </td></tr>`;
     };
 
+    let visIdx = rows.map((_, i) => i);
+    Object.keys(colFilters).forEach(ci => {
+      const val = colFilters[ci];
+      if (!val) return;
+      visIdx = visIdx.filter(ri => String(rows[ri]['c' + ci] || '').trim() === val);
+    });
+    const filterActive = Object.values(colFilters).some(Boolean);
+
     let rowTabsNav = '';
     let bodyRows;
     if (block.rowTabs) {
-      const ari = rows.length ? Math.max(0, Math.min(block.activeRowTab || 0, rows.length - 1)) : 0;
+      const ari = visIdx.length ? (visIdx.includes(block.activeRowTab) ? block.activeRowTab : visIdx[0]) : 0;
       block.activeRowTab = ari;
-      rowTabsNav = `<div class="planner-row-tab-nav">${rows.map((row, ri) => {
-        const label = String(row['c0'] || '').split('\n')[0].trim().slice(0, 24) || `Row ${ri + 1}`;
+      rowTabsNav = `<div class="planner-row-tab-nav">${visIdx.map(ri => {
+        const label = String(rows[ri]['c0'] || '').split('\n')[0].trim().slice(0, 24) || `Row ${ri + 1}`;
         return `<button class="planner-row-tab-btn${ri === ari ? ' active' : ''}" onclick="switchPlannerRowTab(${pi},${bi},${ri})">${escHtml(label)}</button>`;
       }).join('')}</div>`;
-      bodyRows = rows.length ? renderTableRow(rows[ari], ari) : '';
+      bodyRows = visIdx.length ? renderTableRow(rows[ari], ari) : '';
     } else {
-      bodyRows = rows.map(renderTableRow).join('');
+      bodyRows = visIdx.map(ri => renderTableRow(rows[ri], ri)).join('');
     }
 
-    body = `${rowTabsNav}<div class="table-scroll">
+    const filterBar = filterActive ? `<div class="planner-filter-bar">
+        Filtered: ${visIdx.length} / ${rows.length} rows
+        <button class="btn-planner-sm" onclick="clearPlannerBlockFilters(${pi},${bi})">✕ Clear filters</button>
+      </div>` : '';
+
+    body = `${filterBar}${rowTabsNav}<div class="table-scroll">
         <table class="planner-table">
           <thead><tr>${colThs}
             <th class="planner-row-del-td"></th>
@@ -4550,10 +4577,40 @@ function togglePlannerBlockMenu(e, pi, bi) {
 
 function hidePlannerBlockMenu() {
   document.querySelectorAll('.planner-block-dropdown').forEach(d => d.classList.add('hidden'));
+  document.querySelectorAll('.planner-col-filter-dropdown').forEach(d => d.classList.add('hidden'));
 }
 
 document.addEventListener('click', hidePlannerBlockMenu);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hidePlannerBlockMenu(); });
+
+// ── Column filters (view-only, not persisted) ──────────────────────────────
+function togglePlannerColFilter(e, pi, bi, ci) {
+  e.stopPropagation();
+  const ddId = `pcf-${pi}-${bi}-${ci}`;
+  document.querySelectorAll('.planner-col-filter-dropdown').forEach(d => {
+    if (d.id !== ddId) d.classList.add('hidden');
+  });
+  document.querySelectorAll('.planner-block-dropdown').forEach(d => d.classList.add('hidden'));
+  document.getElementById(ddId)?.classList.toggle('hidden');
+}
+
+function setPlannerColFilterFromBtn(btn) {
+  setPlannerColFilter(+btn.dataset.pi, +btn.dataset.bi, +btn.dataset.ci, btn.dataset.val);
+}
+
+function setPlannerColFilter(pi, bi, ci, val) {
+  if (!state.plannerFilters) state.plannerFilters = {};
+  const key = `${pi}-${bi}`;
+  if (!state.plannerFilters[key]) state.plannerFilters[key] = {};
+  if (val) state.plannerFilters[key][ci] = val;
+  else delete state.plannerFilters[key][ci];
+  renderPlannerTab();
+}
+
+function clearPlannerBlockFilters(pi, bi) {
+  if (state.plannerFilters) delete state.plannerFilters[`${pi}-${bi}`];
+  renderPlannerTab();
+}
 
 async function ctxDuplicatePlannerBlock() {
   hidePlannerBlockMenu();
@@ -4857,6 +4914,16 @@ async function removePlannerRow(pi, bi, ri) {
   renderPlannerTab();
 }
 
+async function insertPlannerRowBefore(pi, bi, ri) {
+  const block  = state.planners[pi].blocks[bi];
+  const newRow = {};
+  block.cols.forEach((_, i) => { newRow['c' + i] = ''; });
+  block.rows.splice(ri, 0, newRow);
+  if (block.rowTabs && block.activeRowTab >= ri) block.activeRowTab++;
+  await saveUserData({ planners: state.planners });
+  renderPlannerTab();
+}
+
 function switchPlannerRowTab(pi, bi, ri) {
   state.planners[pi].blocks[bi].activeRowTab = ri;
   renderPlannerTab();
@@ -4890,6 +4957,7 @@ async function insertPlannerColumnBefore(pi, bi, ci) {
     for (let i = newLen - 1; i > ci; i--) row['c' + i] = row['c' + (i - 1)];
     row['c' + ci] = '';
   });
+  if (state.plannerFilters) delete state.plannerFilters[`${pi}-${bi}`];
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }
@@ -4903,6 +4971,7 @@ async function removePlannerColumn(pi, bi, ci) {
     for (let i = ci; i < block.cols.length; i++) row['c' + i] = row['c' + (i + 1)] || '';
     delete row['c' + block.cols.length];
   });
+  if (state.plannerFilters) delete state.plannerFilters[`${pi}-${bi}`];
   await saveUserData({ planners: state.planners });
   renderPlannerTab();
 }

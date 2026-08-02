@@ -1382,8 +1382,9 @@ textarea#fm-notes:focus {
 }
 .planner-row-del-td {
   padding: 6px 4px; vertical-align: middle; text-align: center;
-  border-bottom: 1px solid var(--border); width: 30px;
+  border-bottom: 1px solid var(--border); width: 46px; white-space: nowrap;
 }
+.btn-planner-insert-row:hover { color: var(--lime) !important; background: rgba(200,255,0,0.1) !important; }
 .planner-cell {
   width: 100%; resize: none; overflow: hidden;
   background: transparent; border: none; outline: none;
@@ -1438,6 +1439,30 @@ textarea#fm-notes:focus {
   padding: 8px 14px; font-size: 13px; cursor: pointer; border-radius: 6px;
 }
 .planner-block-dropdown button:hover { background: rgba(255,255,255,0.06); }
+
+/* Planner column filter dropdown */
+.planner-col-filter-wrap { position: relative; flex-shrink: 0; }
+.planner-col-filter-btn.active { color: var(--primary-h); background: rgba(99,102,241,0.15); }
+.planner-col-filter-dropdown {
+  position: absolute; left: 0; top: calc(100% + 4px); z-index: 999;
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px; min-width: 140px; max-width: 260px;
+  max-height: 260px; overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.planner-col-filter-dropdown button {
+  display: block; width: 100%; text-align: left;
+  background: none; border: none; color: var(--text);
+  padding: 7px 12px; font-size: 12px; cursor: pointer; border-radius: 6px;
+  white-space: normal; word-break: break-word;
+}
+.planner-col-filter-dropdown button:hover { background: rgba(255,255,255,0.06); }
+.planner-col-filter-dropdown button.active { color: var(--primary-h); font-weight: 700; }
+
+.planner-filter-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 12px; color: var(--muted); padding: 6px 4px; margin-bottom: 4px;
+}
 
 /* Planner block checklist modes */
 .pcl-simple { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
