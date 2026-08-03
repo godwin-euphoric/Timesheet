@@ -2220,7 +2220,7 @@ async function challenge100ToggleFreeze(encodedName) {
   await saveUserData({ challenge100Frozen: userData.challenge100Frozen });
   renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
   showToast(idx === -1 ? `Froze ${name}` : `Unfroze ${name}`);
-  renderChallenge100Summary();
+  renderChallenge100Summary(userData.challenge100Participants, userData.challenge100Progress, userData.challenge100Frozen);
 }
 
 // Click-to-edit a participant's name — renames them everywhere (progress history + any
