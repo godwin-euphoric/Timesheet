@@ -2454,7 +2454,10 @@ function renderChallenge100Summary(participants, progress, frozen) {
 
   const rankHtml = `
     <div class="c100-summary-section c100-summary-dashboard">
-      <h4>📋 Detailed Status</h4>
+      <div class="c100-summary-header">
+        <h4>📋 Detailed Status</h4>
+        <button class="btn-secondary c100-share-btn" onclick="challenge100ShareDetailSummary()">📤 Share to WhatsApp</button>
+      </div>
       <div class="table-scroll">
         <table class="c100-rank-table">
           <thead><tr><th>Rank</th><th>Name</th><th>Count</th><th>Δ vs last week</th></tr></thead>
@@ -2504,6 +2507,44 @@ async function challenge100ShareSummary() {
   const userData = await getUserData();
   const s = challenge100ComputeSummary(userData.challenge100Participants, userData.challenge100Progress, userData.challenge100Frozen || []);
   const text = challenge100BuildShareText(s);
+  if (navigator.share) {
+    try { await navigator.share({ text }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+// Separate share for the Detailed Status table — starts at Overall Status rather than repeating
+// Warning/Removal, since those are already covered by the main Share to WhatsApp button above.
+function challenge100BuildDetailShareText(s) {
+  const lines = [`🏆 Week ${s.weekNum} Summary — 🗓 Till Sunday ${challenge100DateLabel(s.sunday)}`, ''];
+
+  lines.push(
+    '📊 Overall Status', '',
+    `Total active: ${s.active.length}`,
+    '```',
+    `🟢 ${'Green'.padEnd(8)}: ${s.green}`,
+    `🟡 ${'Yellow'.padEnd(8)}: ${s.yellow}`,
+    `🔴 ${'Red'.padEnd(8)}: ${s.red}`,
+    '```',
+    '',
+  );
+
+  const nameW = Math.max(4, ...s.ranked.map(r => r.name.length));
+  lines.push(
+    '📋 Detailed Status',
+    '```',
+    `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} ${'Cnt'.padStart(4)}  Δ`,
+    ...s.ranked.map(r => `${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(r.cur).padStart(4)}  ${r.diff >= 0 ? '+' : ''}${r.diff}`),
+    '```',
+  );
+
+  return lines.join('\n');
+}
+
+async function challenge100ShareDetailSummary() {
+  const userData = await getUserData();
+  const s = challenge100ComputeSummary(userData.challenge100Participants, userData.challenge100Progress, userData.challenge100Frozen || []);
+  const text = challenge100BuildDetailShareText(s);
   if (navigator.share) {
     try { await navigator.share({ text }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
