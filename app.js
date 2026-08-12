@@ -120,35 +120,14 @@ function isIOS() {
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  if (window.navigator.standalone === true) {
-    // iOS home-screen apps get an isolated storage partition from Safari, so
-    // signing in via a separate Safari tab never reaches this app's session.
-    // Redirect in place instead — it stays inside the same standalone context.
-    localStorage.setItem('pwa_google_redirect_pending', '1');
-    auth.signInWithRedirect(provider);
-  } else {
-    auth.signInWithPopup(provider).catch(e => {
-      if (e.code !== 'auth/popup-closed-by-user') showToast('Sign-in failed: ' + e.message);
-    });
-  }
+  // signInWithRedirect relies on sessionStorage surviving a full-page navigation
+  // away and back, which iOS refuses in a home-screen "standalone" app (it throws
+  // auth/missing-initial-state there). A popup window doesn't need that round trip
+  // to survive page storage, so use it in both standalone and normal browser tabs.
+  auth.signInWithPopup(provider).catch(e => {
+    if (e.code !== 'auth/popup-closed-by-user') showToast('Sign-in failed: ' + (e.code || '?') + ' — ' + e.message, 0);
+  });
 }
-
-if (localStorage.getItem('pwa_google_redirect_pending')) {
-  document.getElementById('pwa-signin-overlay')?.classList.remove('hidden');
-}
-
-const redirectWasPending = !!localStorage.getItem('pwa_google_redirect_pending');
-auth.getRedirectResult().then(result => {
-  if (redirectWasPending) {
-    showToast(result && result.user ? 'Redirect OK: signed in as ' + result.user.email : 'Redirect returned no user/error (likely blocked by Safari)', 0);
-  }
-}).catch(e => {
-  if (redirectWasPending) showToast('Redirect error: ' + (e.code || '?') + ' — ' + e.message, 0);
-  else if (e.code && e.code !== 'auth/no-auth-event') showToast('Sign-in failed: ' + e.message);
-}).finally(() => {
-  localStorage.removeItem('pwa_google_redirect_pending');
-  document.getElementById('pwa-signin-overlay')?.classList.add('hidden');
-});
 
 
 function doSignOut() {
