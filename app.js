@@ -121,13 +121,11 @@ function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   if (window.navigator.standalone === true) {
-    // iOS home screen: open Safari, user signs in there, auto-reload on return
-    localStorage.setItem('pwa_ios_signin_pending', '1');
-    document.getElementById('btn-google').classList.add('hidden');
-    document.getElementById('pwa-ios-guide').classList.remove('hidden');
-    openInSafari();
-    // After 8s show manual fallback in case visibilitychange doesn't fire
-    setTimeout(() => document.getElementById('btn-ios-back').classList.remove('hidden'), 8000);
+    // iOS home-screen apps get an isolated storage partition from Safari, so
+    // signing in via a separate Safari tab never reaches this app's session.
+    // Redirect in place instead — it stays inside the same standalone context.
+    localStorage.setItem('pwa_google_redirect_pending', '1');
+    auth.signInWithRedirect(provider);
   } else {
     auth.signInWithPopup(provider).catch(e => {
       if (e.code !== 'auth/popup-closed-by-user') showToast('Sign-in failed: ' + e.message);
@@ -135,30 +133,15 @@ function signInWithGoogle() {
   }
 }
 
-// iOS only: when user returns from Safari after signing in, reload to pick up auth
-if (window.navigator.standalone === true) {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && localStorage.getItem('pwa_ios_signin_pending')) {
-      localStorage.removeItem('pwa_ios_signin_pending');
-      window.location.reload();
-    }
-  });
+if (localStorage.getItem('pwa_google_redirect_pending')) {
+  document.getElementById('pwa-signin-overlay')?.classList.remove('hidden');
 }
 
-function openInSafari() {
-  const a = document.createElement('a');
-  a.href = window.location.href.split('?')[0].split('#')[0];
-  a.target = '_blank'; a.rel = 'noopener';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-}
-
-function reloadAfterSafariSignIn() {
-  window.location.reload();
-}
-
-// Handle any leftover redirect result (edge cases)
 auth.getRedirectResult().catch(e => {
   if (e.code && e.code !== 'auth/no-auth-event') showToast('Sign-in failed: ' + e.message);
+}).finally(() => {
+  localStorage.removeItem('pwa_google_redirect_pending');
+  document.getElementById('pwa-signin-overlay')?.classList.add('hidden');
 });
 
 
@@ -197,13 +180,6 @@ auth.onAuthStateChanged(user => {
   } else {
     document.getElementById('auth-screen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
-    // iOS standalone: if sign-in was pending but PWA was killed and restarted,
-    // auth may not have propagated — show guide with manual fallback immediately
-    if (window.navigator.standalone === true && localStorage.getItem('pwa_ios_signin_pending')) {
-      document.getElementById('btn-google').classList.add('hidden');
-      document.getElementById('pwa-ios-guide').classList.remove('hidden');
-      document.getElementById('btn-ios-back').classList.remove('hidden');
-    }
   }
 });
 
