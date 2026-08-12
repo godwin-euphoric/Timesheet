@@ -109,6 +109,7 @@ body {
   box-shadow: 0 6px 24px rgba(99,102,241,0.25);
   transform: translateY(-2px);
 }
+.gis-button-container { display: flex; justify-content: center; }
 .pwa-signin-overlay {
   position: fixed; inset: 0; z-index: 9999;
   background: var(--bg);

@@ -117,17 +117,50 @@ function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
 
+// Fallback path — kept in case Google Identity Services hasn't taken over the
+// button (see initGoogleIdentityServices below). Both Firebase's own popup and
+// redirect helpers are unreliable across browsers: signInWithRedirect throws
+// auth/missing-initial-state on iOS home-screen apps (sessionStorage doesn't
+// survive the full-page navigation there), and signInWithPopup hangs on Chrome
+// because it polls popup.closed, which Chrome's Cross-Origin-Opener-Policy
+// enforcement silently blocks. Google Identity Services avoids both.
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  // signInWithRedirect relies on sessionStorage surviving a full-page navigation
-  // away and back, which iOS refuses in a home-screen "standalone" app (it throws
-  // auth/missing-initial-state there). A popup window doesn't need that round trip
-  // to survive page storage, so use it in both standalone and normal browser tabs.
   auth.signInWithPopup(provider).catch(e => {
     if (e.code !== 'auth/popup-closed-by-user') showToast('Sign-in failed: ' + (e.code || '?') + ' — ' + e.message, 0);
   });
 }
+
+const GOOGLE_OAUTH_CLIENT_ID = '1004023329023-9vqb3s7hsld3hodald9mghgloqfvuca2.apps.googleusercontent.com';
+
+function handleGoogleCredential(response) {
+  const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
+  auth.signInWithCredential(credential).catch(e => {
+    showToast('Sign-in failed: ' + (e.code || '?') + ' — ' + e.message, 0);
+  });
+}
+
+function initGoogleIdentityServices() {
+  if (!window.google?.accounts?.id) { setTimeout(initGoogleIdentityServices, 300); return; }
+  const container = document.getElementById('gis-button-container');
+  google.accounts.id.initialize({
+    client_id: GOOGLE_OAUTH_CLIENT_ID,
+    callback: handleGoogleCredential,
+    ux_mode: 'popup',
+  });
+  google.accounts.id.renderButton(container, { type: 'standard', theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', width: 280 });
+  // Only swap to the Google-rendered button once it actually appears — if this
+  // origin isn't yet added to "Authorized JavaScript origins" in Google Cloud
+  // Console, renderButton silently no-ops and the classic button stays usable.
+  setTimeout(() => {
+    if (container.querySelector('iframe')) {
+      container.classList.remove('hidden');
+      document.getElementById('btn-google').classList.add('hidden');
+    }
+  }, 1200);
+}
+initGoogleIdentityServices();
 
 
 function doSignOut() {
