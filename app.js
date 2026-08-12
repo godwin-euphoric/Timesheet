@@ -137,8 +137,14 @@ if (localStorage.getItem('pwa_google_redirect_pending')) {
   document.getElementById('pwa-signin-overlay')?.classList.remove('hidden');
 }
 
-auth.getRedirectResult().catch(e => {
-  if (e.code && e.code !== 'auth/no-auth-event') showToast('Sign-in failed: ' + e.message);
+const redirectWasPending = !!localStorage.getItem('pwa_google_redirect_pending');
+auth.getRedirectResult().then(result => {
+  if (redirectWasPending) {
+    showToast(result && result.user ? 'Redirect OK: signed in as ' + result.user.email : 'Redirect returned no user/error (likely blocked by Safari)', 0);
+  }
+}).catch(e => {
+  if (redirectWasPending) showToast('Redirect error: ' + (e.code || '?') + ' — ' + e.message, 0);
+  else if (e.code && e.code !== 'auth/no-auth-event') showToast('Sign-in failed: ' + e.message);
 }).finally(() => {
   localStorage.removeItem('pwa_google_redirect_pending');
   document.getElementById('pwa-signin-overlay')?.classList.add('hidden');
