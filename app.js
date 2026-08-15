@@ -382,7 +382,7 @@ function loadMainCategories(data) {
   sel.innerHTML = '<option value="">-- Select --</option>';
   data.categories.forEach(c => {
     if (c.category === FITNESS_CAT) {
-      // Replace Fitness with its 3 splits so they can be logged directly
+      // Replace Fitness with its splits so they can be logged directly
       FITNESS_SUBS.forEach(sub => {
         const opt = document.createElement('option');
         opt.value = sub; opt.textContent = sub;
@@ -1009,7 +1009,7 @@ async function persistLeaves() {
 }
 
 const FITNESS_CAT  = 'Fitness';
-const FITNESS_SUBS = ['fitGYM', 'fitMMA', 'fitOthers'];
+const FITNESS_SUBS = ['fitGYM', 'fitMMA', 'fitWalk', 'fitCycle', 'fitCricket', 'fitSwim', 'fitOthers'];
 
 // Social Media & Unwanted categories (replaces the old single "Wasted" field)
 const WASTED_SUBS = ['U_Random', 'Insta', 'FB', 'Unwanted'];
@@ -1192,10 +1192,10 @@ async function renderMonthlyTable(data) {
   const dayNames   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const hasFitness = categories.includes(FITNESS_CAT);
 
-  // Two-row header: row1 has group header for Fitness (colspan=3), row2 has sub-names
+  // Two-row header: row1 has group header for Fitness (colspan=FITNESS_SUBS.length), row2 has sub-names
   const headerRow1 = categories.map(c =>
     c === FITNESS_CAT
-      ? `<th colspan="3" class="fitness-group">${c}</th>`
+      ? `<th colspan="${FITNESS_SUBS.length}" class="fitness-group">${c}</th>`
       : `<th rowspan="2">${c}</th>`
   ).join('');
   const headerRow2 = hasFitness
@@ -1318,7 +1318,7 @@ async function renderMonthlyTable(data) {
     const bd = data.fitnessBreakdown || {};
     const gymDays = Object.values(bd).filter(d => (d.fitGYM || 0) > 0).length;
     const mmaDays = Object.values(bd).filter(d => (d.fitMMA || 0) > 0).length;
-    const colSpan = 2 + (categories.length - 1) + 3 + 2 + 1 + WASTED_SUBS.length; // Date,Day + cats(fitness=3) + Total,Status,Sleep + wasted subs
+    const colSpan = 2 + (categories.length - 1) + FITNESS_SUBS.length + 2 + 1 + WASTED_SUBS.length; // Date,Day + cats(fitness subs) + Total,Status,Sleep + wasted subs
     const fitTr = document.createElement('tr');
     fitTr.className = 'row-fitness-days';
     fitTr.innerHTML = `<td colspan="${colSpan}" style="text-align:center;padding:6px 12px;font-size:13px;color:#86efac;">
