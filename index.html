@@ -356,15 +356,9 @@
 
       <!-- Workout log -->
       <div class="diet-log-section">
-        <div class="diet-log-label">LOG WORKOUT</div>
-        <div class="diet-input-row">
-          <input type="text" id="reg-workout-input" class="diet-text-input"
-                 placeholder="e.g. Leg day, 5k run"
-                 onkeydown="if(event.key==='Enter')logRegWorkout()">
-          <button class="diet-send-btn" onclick="logRegWorkout()">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-          </button>
-        </div>
+        <div class="diet-log-label">LOG WORKOUT (minutes)</div>
+        <div id="reg-workout-grid" class="reg-workout-grid"></div>
+        <button class="btn-primary reg-workout-log-btn" onclick="logRegWorkoutMinutes()">Log Workout</button>
         <div id="reg-workout-list" class="reg-workout-list">
           <div class="diet-empty">No workouts logged yet</div>
         </div>
@@ -862,7 +856,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=129"></script>
+<script src="app.js?v=130"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

@@ -1010,6 +1010,10 @@ async function persistLeaves() {
 
 const FITNESS_CAT  = 'Fitness';
 const FITNESS_SUBS = ['fitGYM', 'fitMMA', 'fitWalk', 'fitCycle', 'fitCricket', 'fitSwim', 'fitOthers'];
+const FITNESS_LABELS = {
+  fitGYM: 'GYM', fitMMA: 'MMA', fitWalk: 'Walk', fitCycle: 'Cycle',
+  fitCricket: 'Cricket', fitSwim: 'Swim', fitOthers: 'Others',
+};
 
 // Social Media & Unwanted categories (replaces the old single "Wasted" field)
 const WASTED_SUBS = ['U_Random', 'Insta', 'FB', 'Unwanted'];
@@ -5378,6 +5382,7 @@ async function renderRegDay(dateStr) {
   renderRegSummaryRing(day.foods, target);
   renderRegFoodCards(day.foods, dateStr);
   document.getElementById('reg-food-save-row')?.classList.add('hidden');
+  renderRegWorkoutGrid();
   renderRegWorkoutList(day.workouts, dateStr);
   renderRegJunkButtons(day.junk);
   document.getElementById('reg-summary-text').value = day.summary || '';
@@ -5629,6 +5634,19 @@ function regStartMic() {
 }
 
 // ── Workout log ────────────────────────────────────────────────────────────
+// Minutes entered here are converted to hours and merged into the main
+// Timesheet's fitnessBreakdown for the same date/category, so the Monthly
+// tab's Fitness column and this Diet-tab log stay in sync in both directions.
+
+function renderRegWorkoutGrid() {
+  const grid = document.getElementById('reg-workout-grid');
+  if (!grid) return;
+  grid.innerHTML = FITNESS_SUBS.map(sub => `
+    <div class="reg-workout-cell">
+      <label for="reg-fit-${sub}">${escHtml(FITNESS_LABELS[sub] || sub)}</label>
+      <input type="number" id="reg-fit-${sub}" class="reg-workout-min-input" min="0" step="1" placeholder="0">
+    </div>`).join('');
+}
 
 function renderRegWorkoutList(workouts, dateStr) {
   const list = document.getElementById('reg-workout-list');
@@ -5644,18 +5662,34 @@ function renderRegWorkoutList(workouts, dateStr) {
     </div>`).join('');
 }
 
-async function logRegWorkout() {
-  const inp  = document.getElementById('reg-workout-input');
-  const name = inp.value.trim();
-  if (!name) return;
-  inp.value = '';
+async function logRegWorkoutMinutes() {
+  const entries = FITNESS_SUBS
+    .map(sub => ({ sub, mins: parseFloat(document.getElementById(`reg-fit-${sub}`)?.value) || 0 }))
+    .filter(e => e.mins > 0);
+  if (!entries.length) { showToast('Enter minutes for at least one workout'); return; }
 
-  const month = state.regDate.slice(0, 7);
-  const mData = await getRegMonthData(month);
-  const day   = regDayState(mData, state.regDate);
-  day.workouts.push({ id: pId(), name });
-  await saveRegMonthData(month, mData);
-  renderRegWorkoutList(day.workouts, state.regDate);
+  const dateStr = state.regDate;
+  const month   = dateStr.slice(0, 7);
+
+  const mainData = await getMonthData(month);
+  if (!mainData.fitnessBreakdown) mainData.fitnessBreakdown = {};
+  if (!mainData.fitnessBreakdown[dateStr]) mainData.fitnessBreakdown[dateStr] = {};
+  entries.forEach(({ sub, mins }) => {
+    const hrs = Math.round((mins / 60) * 100) / 100;
+    mainData.fitnessBreakdown[dateStr][sub] = Math.round(((mainData.fitnessBreakdown[dateStr][sub] || 0) + hrs) * 100) / 100;
+  });
+  syncFitnessTotal(mainData, dateStr);
+  await saveMonthData(month, mainData);
+
+  const regData = await getRegMonthData(month);
+  const day = regDayState(regData, dateStr);
+  entries.forEach(({ sub, mins }) => {
+    day.workouts.push({ id: pId(), name: `${FITNESS_LABELS[sub] || sub} ${mins}min`, sub, mins });
+  });
+  await saveRegMonthData(month, regData);
+
+  renderRegWorkoutGrid();
+  renderRegWorkoutList(day.workouts, dateStr);
   await recalcRegSummary();
   showToast('Workout logged');
 }
@@ -5664,8 +5698,23 @@ async function deleteRegWorkout(dateStr, id) {
   const month = dateStr.slice(0, 7);
   const mData = await getRegMonthData(month);
   const day   = regDayState(mData, dateStr);
+  const removed = day.workouts.find(w => w.id === id);
   day.workouts = day.workouts.filter(w => w.id !== id);
   await saveRegMonthData(month, mData);
+
+  if (removed && removed.sub && FITNESS_SUBS.includes(removed.sub)) {
+    const hrs = Math.round(((removed.mins || 0) / 60) * 100) / 100;
+    const mainData = await getMonthData(month);
+    const prev = mainData.fitnessBreakdown?.[dateStr]?.[removed.sub] || 0;
+    if (prev > 0) {
+      const next = Math.max(0, Math.round((prev - hrs) * 100) / 100);
+      if (next > 0) mainData.fitnessBreakdown[dateStr][removed.sub] = next;
+      else delete mainData.fitnessBreakdown[dateStr][removed.sub];
+      syncFitnessTotal(mainData, dateStr);
+      await saveMonthData(month, mainData);
+    }
+  }
+
   renderRegWorkoutList(day.workouts, dateStr);
   await recalcRegSummary();
 }
