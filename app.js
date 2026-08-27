@@ -2962,6 +2962,22 @@ async function loadSettingsTab() {
     setSaveState('settings-save-btn', false);
   }
   await populateDietSettingsFields();
+  await populatePendingFlags();
+}
+
+async function populatePendingFlags() {
+  const ud = await getUserData();
+  const cEl = document.getElementById('pending-calorie-deficit');
+  const wEl = document.getElementById('pending-walking');
+  if (cEl) cEl.checked = !!ud.pendingCalorieDeficit;
+  if (wEl) wEl.checked = !!ud.pendingWalking;
+}
+
+async function savePendingFlags() {
+  const calorieDeficit = document.getElementById('pending-calorie-deficit').checked;
+  const walking        = document.getElementById('pending-walking').checked;
+  await saveUserData({ pendingCalorieDeficit: calorieDeficit, pendingWalking: walking });
+  showToast('Saved');
 }
 
 function applySettingsVisibility() {
