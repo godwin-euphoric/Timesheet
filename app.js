@@ -5122,6 +5122,8 @@ async function callGemini(promptText) {
   let lastErr;
   for (let mi = 0; mi < DIET_MODELS.length; mi++) {
     const model = DIET_MODELS[mi];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
@@ -5131,7 +5133,8 @@ async function callGemini(promptText) {
           body: JSON.stringify({
             contents: [{ parts: [{ text: promptText }] }],
             generationConfig: { temperature: 0.15, maxOutputTokens: 8192 }
-          })
+          }),
+          signal: controller.signal
         }
       );
       if (!res.ok) {
@@ -5143,8 +5146,12 @@ async function callGemini(promptText) {
       const json = await res.json();
       return json.candidates?.[0]?.content?.parts?.[0]?.text || '';
     } catch (e) {
-      lastErr = e;
+      lastErr = e.name === 'AbortError'
+        ? new Error(`Gemini ${model} timed out after 10s`)
+        : e;
       if (mi < DIET_MODELS.length - 1) await dietSleep(1000);
+    } finally {
+      clearTimeout(timer);
     }
   }
   throw lastErr || new Error('All Gemini models failed.');
