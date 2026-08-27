@@ -2967,16 +2967,27 @@ async function loadSettingsTab() {
 
 async function populatePendingFlags() {
   const ud = await getUserData();
-  const cEl = document.getElementById('pending-calorie-deficit');
-  const wEl = document.getElementById('pending-walking');
-  if (cEl) cEl.checked = !!ud.pendingCalorieDeficit;
-  if (wEl) wEl.checked = !!ud.pendingWalking;
+  const cEl  = document.getElementById('pending-calorie-deficit');
+  const cNEl = document.getElementById('pending-calorie-deficit-note');
+  const wEl  = document.getElementById('pending-walking');
+  const wNEl = document.getElementById('pending-walking-note');
+  if (cEl)  cEl.checked  = !!ud.pendingCalorieDeficit;
+  if (cNEl) cNEl.value   = ud.pendingCalorieDeficitNote || '';
+  if (wEl)  wEl.checked  = !!ud.pendingWalking;
+  if (wNEl) wNEl.value   = ud.pendingWalkingNote || '';
 }
 
 async function savePendingFlags() {
-  const calorieDeficit = document.getElementById('pending-calorie-deficit').checked;
-  const walking        = document.getElementById('pending-walking').checked;
-  await saveUserData({ pendingCalorieDeficit: calorieDeficit, pendingWalking: walking });
+  const calorieDeficit     = document.getElementById('pending-calorie-deficit').checked;
+  const calorieDeficitNote = document.getElementById('pending-calorie-deficit-note').value.trim();
+  const walking            = document.getElementById('pending-walking').checked;
+  const walkingNote        = document.getElementById('pending-walking-note').value.trim();
+  await saveUserData({
+    pendingCalorieDeficit:     calorieDeficit,
+    pendingCalorieDeficitNote: calorieDeficitNote,
+    pendingWalking:            walking,
+    pendingWalkingNote:        walkingNote,
+  });
   showToast('Saved');
 }
 

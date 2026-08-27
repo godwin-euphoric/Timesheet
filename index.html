@@ -702,15 +702,23 @@
 
     <div class="card">
       <div class="card-title">📌 Pending</div>
-      <div class="reg-mode-radio-row">
-        <label class="reg-mode-radio">
-          <input type="checkbox" id="pending-calorie-deficit" onchange="savePendingFlags()">
-          Pending calorie deficit
-        </label>
-        <label class="reg-mode-radio">
-          <input type="checkbox" id="pending-walking" onchange="savePendingFlags()">
-          Pending walking
-        </label>
+      <div class="pending-flags-col">
+        <div class="pending-flag-row">
+          <label class="reg-mode-radio">
+            <input type="checkbox" id="pending-calorie-deficit" onchange="savePendingFlags()">
+            Pending calorie deficit
+          </label>
+          <input type="text" id="pending-calorie-deficit-note" class="pending-note-input"
+                 placeholder="e.g. 300 kcal" onchange="savePendingFlags()">
+        </div>
+        <div class="pending-flag-row">
+          <label class="reg-mode-radio">
+            <input type="checkbox" id="pending-walking" onchange="savePendingFlags()">
+            Pending walking
+          </label>
+          <input type="text" id="pending-walking-note" class="pending-note-input"
+                 placeholder="e.g. 30 min" onchange="savePendingFlags()">
+        </div>
       </div>
     </div>
 

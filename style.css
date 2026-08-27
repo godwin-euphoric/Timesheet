@@ -789,7 +789,17 @@ input.c100-name-edit-input {
   outline: none;
 }
 
-.c100-row-frozen td { opacity: 0.55; }
+.pending-flags-col { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.pending-flag-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pending-flag-row .reg-mode-radio { min-width: 190px; }
+.pending-note-input { width: 160px; }
+
+.c100-row-frozen td { opacity: 0.55; background: rgba(248,113,113,0.12); }
+.c100-row-frozen .c100-sno-cell,
+.c100-row-frozen .c100-name-cell { background: rgba(248,113,113,0.12); }
+.c100-row-frozen:hover td,
+.c100-row-frozen:hover .c100-sno-cell,
+.c100-row-frozen:hover .c100-name-cell { background: rgba(248,113,113,0.18); }
 .c100-frozen-tag {
   display: inline-block; margin-left: 6px; padding: 1px 7px;
   background: rgba(148,163,184,0.12); color: var(--muted);
