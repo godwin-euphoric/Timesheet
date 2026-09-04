@@ -298,7 +298,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, goalstatus: loadGoalStatusTab, challenge100: loadChallenge100Tab, log: loadLogTab, excelimport: loadExcelImportTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, log: loadLogTab, excelimport: loadExcelImportTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -2005,87 +2005,6 @@ function startEditHabit(td, index) {
     if (e.key === 'Enter')  input.blur();
     if (e.key === 'Escape') { saved = true; renderHabitsTable; input.blur(); }
   });
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-//  GOAL STATUS TAB
-// ══════════════════════════════════════════════════════════════════════════
-// Freeform spreadsheet-like table: user-defined columns, any number of rows.
-// Stored as parallel arrays (goalStatusColumns: string[], goalStatusRows: string[][])
-// so each row's cells line up with the column list by index.
-
-async function loadGoalStatusTab() {
-  const userData = await getUserData();
-  state.goalStatusColumns = userData.goalStatusColumns?.length ? [...userData.goalStatusColumns] : ['Goal', 'Status'];
-  state.goalStatusRows    = (userData.goalStatusRows || []).map(row => [...row]);
-  renderGoalStatusTable();
-  setSaveState('goalstatus-save-btn', false);
-}
-
-function renderGoalStatusTable() {
-  const table   = document.getElementById('goalstatus-table');
-  const columns = state.goalStatusColumns;
-  const rows    = state.goalStatusRows;
-
-  const headCells = columns.map((col, ci) => `
-    <th>
-      <div style="display:flex;align-items:center;gap:4px">
-        <input class="inline-input" type="text" value="${col}"
-          oninput="state.goalStatusColumns[${ci}] = this.value; setSaveState('goalstatus-save-btn', true)">
-        ${columns.length > 1 ? `<button class="btn-danger" title="Remove column" onclick="removeGoalStatusColumn(${ci})">✕</button>` : ''}
-      </div>
-    </th>`).join('');
-
-  const thead = `<thead><tr>${headCells}<th></th></tr></thead>`;
-
-  let bodyRows;
-  if (!rows.length) {
-    bodyRows = `<tr><td colspan="${columns.length + 1}" class="empty">No rows yet — click "+ Add Row" to start</td></tr>`;
-  } else {
-    bodyRows = rows.map((row, ri) => {
-      const cells = columns.map((_, ci) => `
-        <td><input class="inline-input" type="text" value="${row[ci] || ''}"
-          oninput="state.goalStatusRows[${ri}][${ci}] = this.value; setSaveState('goalstatus-save-btn', true)"></td>`).join('');
-      return `<tr>${cells}<td><button class="btn-danger" onclick="removeGoalStatusRow(${ri})">✕</button></td></tr>`;
-    }).join('');
-  }
-
-  table.innerHTML = thead + `<tbody>${bodyRows}</tbody>`;
-}
-
-function addGoalStatusRow() {
-  state.goalStatusRows.push(state.goalStatusColumns.map(() => ''));
-  renderGoalStatusTable();
-  setSaveState('goalstatus-save-btn', true);
-}
-
-function removeGoalStatusRow(i) {
-  state.goalStatusRows.splice(i, 1);
-  renderGoalStatusTable();
-  setSaveState('goalstatus-save-btn', true);
-}
-
-function addGoalStatusColumn() {
-  state.goalStatusColumns.push(`Column ${state.goalStatusColumns.length + 1}`);
-  state.goalStatusRows.forEach(row => row.push(''));
-  renderGoalStatusTable();
-  setSaveState('goalstatus-save-btn', true);
-}
-
-function removeGoalStatusColumn(ci) {
-  if (state.goalStatusColumns.length <= 1) return;
-  state.goalStatusColumns.splice(ci, 1);
-  state.goalStatusRows.forEach(row => row.splice(ci, 1));
-  renderGoalStatusTable();
-  setSaveState('goalstatus-save-btn', true);
-}
-
-async function saveGoalStatus() {
-  const columns = state.goalStatusColumns.filter(c => c.trim());
-  if (!columns.length) { showToast('Add at least one column'); return; }
-  await saveUserData({ goalStatusColumns: columns, goalStatusRows: state.goalStatusRows });
-  showToast('Goal Status saved');
-  setSaveState('goalstatus-save-btn', false);
 }
 
 // ══════════════════════════════════════════════════════════════════════════

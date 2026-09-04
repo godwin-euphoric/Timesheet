@@ -68,7 +68,6 @@
       <button class="tab-btn" data-tab="monthly">Monthly</button>
       <button class="tab-btn" data-tab="yearly">Yearly</button>
       <button class="tab-btn" data-tab="habits">Habits</button>
-      <button class="tab-btn" data-tab="goalstatus">Goal Status</button>
       <button class="tab-btn hidden" id="tab-btn-challenge100" data-tab="challenge100">100 Days</button>
       <button class="tab-btn" data-tab="log">Journal</button>
       <button class="tab-btn" data-tab="excelimport">Excel Import</button>
@@ -511,24 +510,6 @@
       </div>
       <div class="table-scroll">
         <table class="habits-table" id="habits-table"></table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══ GOAL STATUS ══════════════════════════════════════════════════════ -->
-  <div id="tab-goalstatus" class="tab-content">
-    <div class="card">
-      <div class="card-title">🎯 Goal Status</div>
-      <p class="hint">Freeform table — add as many rows and columns as you need. Click a column name to rename it.</p>
-      <div class="table-scroll">
-        <table class="data-table" id="goalstatus-table"></table>
-      </div>
-      <div class="add-row" style="margin-top:12px">
-        <button class="btn-secondary" onclick="addGoalStatusRow()">+ Add Row</button>
-        <button class="btn-secondary" onclick="addGoalStatusColumn()">+ Add Column</button>
-      </div>
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9">
-        <button id="goalstatus-save-btn" class="btn-primary is-clean" onclick="saveGoalStatus()">Save Goal Status</button>
       </div>
     </div>
   </div>
