@@ -1381,6 +1381,13 @@ textarea#fm-notes:focus {
   cursor: row-resize; user-select: none; touch-action: none;
 }
 .planner-row-resizer:hover, .planner-row-resizer:active { background: rgba(99,102,241,0.35); }
+.planner-cell[data-fixed-h="1"] {
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.planner-cell[data-fixed-h="1"]::-webkit-scrollbar { width: 6px; height: 6px; }
+.planner-cell[data-fixed-h="1"]::-webkit-scrollbar-track { background: transparent; }
+.planner-cell[data-fixed-h="1"]::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.planner-cell[data-fixed-h="1"]::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 .btn-planner-insert-row:hover { color: var(--lime) !important; background: rgba(200,255,0,0.1) !important; }
 .planner-cell {
   width: 100%; resize: none; overflow: hidden;
