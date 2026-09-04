@@ -609,17 +609,6 @@
 
   <!-- ══ GOAL TRACKER ═══════════════════════════════════════════════════════ -->
   <div id="tab-excelimport" class="tab-content">
-    <div class="card">
-      <div class="card-title">🎯 GoalTracker</div>
-      <p class="hint">Add rows and columns freely below, or upload an Excel file — each sheet in the workbook becomes an editable sub-tab. Edits save automatically. Download to edit in desktop Excel, then re-upload to bring your changes back.</p>
-      <div class="add-row">
-        <input type="file" id="excelimport-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImportFile(this)">
-        <button class="btn-primary" onclick="document.getElementById('excelimport-file-input').click()">Choose Excel File</button>
-        <button class="btn-secondary" onclick="downloadExcelImport()">⬇ Download</button>
-      </div>
-      <span id="excelimport-filename" class="hint" style="display:block;margin-top:8px"></span>
-    </div>
-
     <div class="card hidden" id="excelimport-sheets-card">
       <div class="planner-sub-tabs" id="excelimport-sub-tabs"></div>
       <div id="excelimport-filter-bar"></div>
@@ -630,6 +619,17 @@
         <button class="btn-planner-add-row" onclick="excelImportAddRow()">+ Row</button>
         <button class="btn-planner-add-row" onclick="excelImportAddColumn()">+ Column</button>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎯 GoalTracker</div>
+      <p class="hint">Add rows and columns freely below, or upload an Excel file — each sheet in the workbook becomes an editable sub-tab. Edits save automatically. Download to edit in desktop Excel, then re-upload to bring your changes back.</p>
+      <div class="add-row">
+        <input type="file" id="excelimport-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImportFile(this)">
+        <button class="btn-primary" onclick="document.getElementById('excelimport-file-input').click()">Choose Excel File</button>
+        <button class="btn-secondary" onclick="downloadExcelImport()">⬇ Download</button>
+      </div>
+      <span id="excelimport-filename" class="hint" style="display:block;margin-top:8px"></span>
     </div>
   </div>
 
