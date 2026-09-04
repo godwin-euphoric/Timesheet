@@ -298,7 +298,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, log: loadLogTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, goalstatus: loadGoalStatusTab, challenge100: loadChallenge100Tab, log: loadLogTab, excelimport: loadExcelImportTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -2005,6 +2005,182 @@ function startEditHabit(td, index) {
     if (e.key === 'Enter')  input.blur();
     if (e.key === 'Escape') { saved = true; renderHabitsTable; input.blur(); }
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  GOAL STATUS TAB
+// ══════════════════════════════════════════════════════════════════════════
+// Freeform spreadsheet-like table: user-defined columns, any number of rows.
+// Stored as parallel arrays (goalStatusColumns: string[], goalStatusRows: string[][])
+// so each row's cells line up with the column list by index.
+
+async function loadGoalStatusTab() {
+  const userData = await getUserData();
+  state.goalStatusColumns = userData.goalStatusColumns?.length ? [...userData.goalStatusColumns] : ['Goal', 'Status'];
+  state.goalStatusRows    = (userData.goalStatusRows || []).map(row => [...row]);
+  renderGoalStatusTable();
+  setSaveState('goalstatus-save-btn', false);
+}
+
+function renderGoalStatusTable() {
+  const table   = document.getElementById('goalstatus-table');
+  const columns = state.goalStatusColumns;
+  const rows    = state.goalStatusRows;
+
+  const headCells = columns.map((col, ci) => `
+    <th>
+      <div style="display:flex;align-items:center;gap:4px">
+        <input class="inline-input" type="text" value="${col}"
+          oninput="state.goalStatusColumns[${ci}] = this.value; setSaveState('goalstatus-save-btn', true)">
+        ${columns.length > 1 ? `<button class="btn-danger" title="Remove column" onclick="removeGoalStatusColumn(${ci})">✕</button>` : ''}
+      </div>
+    </th>`).join('');
+
+  const thead = `<thead><tr>${headCells}<th></th></tr></thead>`;
+
+  let bodyRows;
+  if (!rows.length) {
+    bodyRows = `<tr><td colspan="${columns.length + 1}" class="empty">No rows yet — click "+ Add Row" to start</td></tr>`;
+  } else {
+    bodyRows = rows.map((row, ri) => {
+      const cells = columns.map((_, ci) => `
+        <td><input class="inline-input" type="text" value="${row[ci] || ''}"
+          oninput="state.goalStatusRows[${ri}][${ci}] = this.value; setSaveState('goalstatus-save-btn', true)"></td>`).join('');
+      return `<tr>${cells}<td><button class="btn-danger" onclick="removeGoalStatusRow(${ri})">✕</button></td></tr>`;
+    }).join('');
+  }
+
+  table.innerHTML = thead + `<tbody>${bodyRows}</tbody>`;
+}
+
+function addGoalStatusRow() {
+  state.goalStatusRows.push(state.goalStatusColumns.map(() => ''));
+  renderGoalStatusTable();
+  setSaveState('goalstatus-save-btn', true);
+}
+
+function removeGoalStatusRow(i) {
+  state.goalStatusRows.splice(i, 1);
+  renderGoalStatusTable();
+  setSaveState('goalstatus-save-btn', true);
+}
+
+function addGoalStatusColumn() {
+  state.goalStatusColumns.push(`Column ${state.goalStatusColumns.length + 1}`);
+  state.goalStatusRows.forEach(row => row.push(''));
+  renderGoalStatusTable();
+  setSaveState('goalstatus-save-btn', true);
+}
+
+function removeGoalStatusColumn(ci) {
+  if (state.goalStatusColumns.length <= 1) return;
+  state.goalStatusColumns.splice(ci, 1);
+  state.goalStatusRows.forEach(row => row.splice(ci, 1));
+  renderGoalStatusTable();
+  setSaveState('goalstatus-save-btn', true);
+}
+
+async function saveGoalStatus() {
+  const columns = state.goalStatusColumns.filter(c => c.trim());
+  if (!columns.length) { showToast('Add at least one column'); return; }
+  await saveUserData({ goalStatusColumns: columns, goalStatusRows: state.goalStatusRows });
+  showToast('Goal Status saved');
+  setSaveState('goalstatus-save-btn', false);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  EXCEL IMPORT TAB
+// ══════════════════════════════════════════════════════════════════════════
+// Uploads an arbitrary .xlsx workbook and renders each sheet as a read-only
+// sub-tab. Stored as-is (excelImport: { fileName, importedAt, sheets }) so it
+// survives a reload without re-uploading.
+
+async function loadExcelImportTab() {
+  const userData = await getUserData();
+  state.excelImport = userData.excelImport || null;
+  renderExcelImportUI();
+}
+
+async function handleExcelImportFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (typeof XLSX === 'undefined') { showToast('Refresh the page and try again (library not loaded)'); return; }
+  showToast('Reading file...');
+  try {
+    const buf = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
+
+    const sheets = wb.SheetNames.map(name => {
+      const ws   = wb.Sheets[name];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+      return { name, rows };
+    }).filter(s => s.rows.length);
+
+    if (!sheets.length) { showToast('No data found in that file'); return; }
+
+    const excelImport = { fileName: file.name, importedAt: new Date().toISOString(), sheets };
+    await saveUserData({ excelImport });
+    state.excelImport = excelImport;
+    state.excelImportActiveSheet = sheets[0].name;
+    renderExcelImportUI();
+    showToast(`Imported ${sheets.length} sheet${sheets.length > 1 ? 's' : ''}`);
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to read that Excel file: ' + e.message);
+  } finally {
+    input.value = '';
+  }
+}
+
+function renderExcelImportUI() {
+  const nameEl = document.getElementById('excelimport-filename');
+  const card   = document.getElementById('excelimport-sheets-card');
+  const data   = state.excelImport;
+
+  if (!data || !data.sheets?.length) {
+    nameEl.textContent = '';
+    card.classList.add('hidden');
+    return;
+  }
+
+  nameEl.textContent = `${data.fileName} — imported ${new Date(data.importedAt).toLocaleString()}`;
+  card.classList.remove('hidden');
+
+  if (!state.excelImportActiveSheet || !data.sheets.some(s => s.name === state.excelImportActiveSheet)) {
+    state.excelImportActiveSheet = data.sheets[0].name;
+  }
+  renderExcelImportSubTabs();
+  renderExcelImportSheetTable();
+}
+
+function renderExcelImportSubTabs() {
+  const nav = document.getElementById('excelimport-sub-tabs');
+  nav.innerHTML = state.excelImport.sheets.map(s => `
+    <button class="planner-sub-tab${s.name === state.excelImportActiveSheet ? ' active' : ''}"
+      onclick="switchExcelImportSheet('${encodeURIComponent(s.name)}')">${escHtml(s.name)}</button>
+  `).join('');
+}
+
+function switchExcelImportSheet(encodedName) {
+  state.excelImportActiveSheet = decodeURIComponent(encodedName);
+  renderExcelImportSubTabs();
+  renderExcelImportSheetTable();
+}
+
+function renderExcelImportSheetTable() {
+  const table = document.getElementById('excelimport-sheet-table');
+  const sheet = state.excelImport.sheets.find(s => s.name === state.excelImportActiveSheet);
+  if (!sheet || !sheet.rows.length) { table.innerHTML = '<tr><td class="empty">Empty sheet</td></tr>'; return; }
+
+  const [header, ...rows] = sheet.rows;
+  const thead = `<thead><tr>${header.map(h => `<th>${escHtml(h)}</th>`).join('')}</tr></thead>`;
+  const tbody = `<tbody>${rows.map(r => `<tr>${header.map((_, ci) => `<td>${escHtml(r[ci])}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  table.innerHTML = thead + tbody;
 }
 
 // ══════════════════════════════════════════════════════════════════════════

@@ -68,8 +68,10 @@
       <button class="tab-btn" data-tab="monthly">Monthly</button>
       <button class="tab-btn" data-tab="yearly">Yearly</button>
       <button class="tab-btn" data-tab="habits">Habits</button>
+      <button class="tab-btn" data-tab="goalstatus">Goal Status</button>
       <button class="tab-btn hidden" id="tab-btn-challenge100" data-tab="challenge100">100 Days</button>
       <button class="tab-btn" data-tab="log">Journal</button>
+      <button class="tab-btn" data-tab="excelimport">Excel Import</button>
       <button class="tab-btn" data-tab="settings">Settings</button>
       <button class="tab-btn" data-tab="health">Health</button>
       <button class="tab-btn hidden" id="tab-btn-admin" data-tab="admin">Admin</button>
@@ -513,6 +515,24 @@
     </div>
   </div>
 
+  <!-- ══ GOAL STATUS ══════════════════════════════════════════════════════ -->
+  <div id="tab-goalstatus" class="tab-content">
+    <div class="card">
+      <div class="card-title">🎯 Goal Status</div>
+      <p class="hint">Freeform table — add as many rows and columns as you need. Click a column name to rename it.</p>
+      <div class="table-scroll">
+        <table class="data-table" id="goalstatus-table"></table>
+      </div>
+      <div class="add-row" style="margin-top:12px">
+        <button class="btn-secondary" onclick="addGoalStatusRow()">+ Add Row</button>
+        <button class="btn-secondary" onclick="addGoalStatusColumn()">+ Add Column</button>
+      </div>
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9">
+        <button id="goalstatus-save-btn" class="btn-primary is-clean" onclick="saveGoalStatus()">Save Goal Status</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ 100 DAYS CHALLENGE ═══════════════════════════════════════════════════ -->
   <div id="tab-challenge100" class="tab-content">
 
@@ -604,6 +624,26 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- ══ EXCEL IMPORT ═══════════════════════════════════════════════════════ -->
+  <div id="tab-excelimport" class="tab-content">
+    <div class="card">
+      <div class="card-title">📥 Import Excel</div>
+      <p class="hint">Upload an Excel file — each sheet in the workbook becomes a sub-tab below.</p>
+      <div class="add-row">
+        <input type="file" id="excelimport-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImportFile(this)">
+        <button class="btn-primary" onclick="document.getElementById('excelimport-file-input').click()">Choose Excel File</button>
+        <span id="excelimport-filename" class="hint" style="margin:0"></span>
+      </div>
+    </div>
+
+    <div class="card hidden" id="excelimport-sheets-card">
+      <div class="planner-sub-tabs" id="excelimport-sub-tabs"></div>
+      <div class="table-scroll" style="margin-top:12px">
+        <table class="data-table" id="excelimport-sheet-table"></table>
+      </div>
+    </div>
   </div>
 
   <!-- ══ PLANNER ════════════════════════════════════════════════════════════ -->
