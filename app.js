@@ -2193,9 +2193,10 @@ function renderExcelImportSheetTable() {
 
     const sortDir  = sort && sort.ci === ci ? sort.dir : null;
     const sortIcon = sortDir === 'asc' ? '↑' : sortDir === 'desc' ? '↓' : '↕';
+    const w = sheet.colWidths?.[ci];
 
     return `
-    <th class="planner-col-th">
+    <th class="planner-col-th"${w ? ` style="width:${w};min-width:${w};"` : ''}>
       <div class="planner-col-th-inner">
         <button class="btn-planner-icon btn-planner-insert-col" title="Insert column before" onclick="excelImportInsertColumnBefore(${ci})">⊕</button>
         <input class="planner-col-name" value="${escHtml(h)}"
@@ -2204,6 +2205,7 @@ function renderExcelImportSheetTable() {
         ${filterDd}
         ${header.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="excelImportRemoveColumn(${ci})">✕</button>` : ''}
       </div>
+      <span class="planner-col-resizer" title="Drag to resize column" onmousedown="startExcelImportColResize(event,${ci})"></span>
     </th>`;
   }).join('');
   const thead = `<thead><tr>${headCells}<th class="planner-row-del-td"></th></tr></thead>`;
@@ -2312,6 +2314,7 @@ function excelImportAddColumn() {
 function excelImportInsertColumnBefore(ci) {
   const sheet = excelImportActiveSheet();
   sheet.rows.forEach(row => row.r.splice(ci, 0, ''));
+  if (sheet.colWidths) sheet.colWidths.splice(ci, 0, '');
   clearExcelImportViewState();
   renderExcelImportSheetTable();
   scheduleExcelImportSave();
@@ -2321,8 +2324,38 @@ function excelImportRemoveColumn(ci) {
   const sheet = excelImportActiveSheet();
   if (sheet.rows[0].r.length <= 1) return;
   sheet.rows.forEach(row => row.r.splice(ci, 1));
+  if (sheet.colWidths) sheet.colWidths.splice(ci, 1);
   clearExcelImportViewState();
   renderExcelImportSheetTable();
+  scheduleExcelImportSave();
+}
+
+let _excelImportColResize = null;
+
+function startExcelImportColResize(e, ci) {
+  e.preventDefault();
+  const th = e.target.closest('th');
+  _excelImportColResize = { ci, th, startX: e.clientX, startWidth: th.offsetWidth };
+  document.addEventListener('mousemove', moveExcelImportColResize);
+  document.addEventListener('mouseup', endExcelImportColResize);
+}
+
+function moveExcelImportColResize(e) {
+  if (!_excelImportColResize) return;
+  const newWidth = Math.max(50, _excelImportColResize.startWidth + (e.clientX - _excelImportColResize.startX));
+  _excelImportColResize.th.style.width = newWidth + 'px';
+  _excelImportColResize.th.style.minWidth = newWidth + 'px';
+}
+
+function endExcelImportColResize() {
+  document.removeEventListener('mousemove', moveExcelImportColResize);
+  document.removeEventListener('mouseup', endExcelImportColResize);
+  if (!_excelImportColResize) return;
+  const { ci, th } = _excelImportColResize;
+  _excelImportColResize = null;
+  const sheet = excelImportActiveSheet();
+  if (!sheet.colWidths) sheet.colWidths = [];
+  sheet.colWidths[ci] = th.style.width;
   scheduleExcelImportSave();
 }
 
