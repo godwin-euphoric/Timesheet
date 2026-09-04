@@ -611,10 +611,11 @@
   <div id="tab-excelimport" class="tab-content">
     <div class="card">
       <div class="card-title">🎯 GoalTracker</div>
-      <p class="hint">Add rows and columns freely below, or upload an Excel file — each sheet in the workbook becomes an editable sub-tab. Edits save automatically.</p>
+      <p class="hint">Add rows and columns freely below, or upload an Excel file — each sheet in the workbook becomes an editable sub-tab. Edits save automatically. Download to edit in desktop Excel, then re-upload to bring your changes back.</p>
       <div class="add-row">
         <input type="file" id="excelimport-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImportFile(this)">
         <button class="btn-primary" onclick="document.getElementById('excelimport-file-input').click()">Choose Excel File</button>
+        <button class="btn-secondary" onclick="downloadExcelImport()">⬇ Download</button>
         <span id="excelimport-filename" class="hint" style="margin:0"></span>
       </div>
     </div>

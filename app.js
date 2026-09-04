@@ -2069,6 +2069,20 @@ async function handleExcelImportFile(input) {
   }
 }
 
+function downloadExcelImport() {
+  if (typeof XLSX === 'undefined') { showToast('Refresh the page and try again (library not loaded)'); return; }
+  const data = state.excelImport;
+  if (!data || !data.sheets?.length) { showToast('Nothing to download yet'); return; }
+
+  const wb = XLSX.utils.book_new();
+  data.sheets.forEach(sheet => {
+    const aoa = sheet.rows.map(row => row.r);
+    const ws  = XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb, ws, sheet.name.slice(0, 31) || 'Sheet1');
+  });
+  XLSX.writeFile(wb, data.fileName || 'GoalTracker.xlsx');
+}
+
 function renderExcelImportUI() {
   const nameEl = document.getElementById('excelimport-filename');
   const card   = document.getElementById('excelimport-sheets-card');
@@ -2325,6 +2339,19 @@ const CHALLENGE100_END   = '2026-11-30'; // last Monday (inclusive)
 // an upload target, just a starting reference point. A cell can still be manually edited if
 // ever needed, same as any other column.
 const CHALLENGE100_BASELINE_KEY = '2026-07-20';
+
+// Target finish line for the countdown shown in the Detailed Status header.
+const CHALLENGE100_FINISH_DATE = '2026-11-30';
+
+// Calendar days from today (the executing date) through CHALLENGE100_FINISH_DATE, inclusive of
+// both ends — Sundays are counted like any other day, not skipped.
+function challenge100DaysLeft() {
+  const [fy, fm, fd] = CHALLENGE100_FINISH_DATE.split('-').map(Number);
+  const finish = new Date(fy, fm - 1, fd);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((finish - today) / 86400000) + 1;
+}
 
 // Every Monday from CHALLENGE100_START to CHALLENGE100_END, inclusive
 function getChallenge100Mondays() {
@@ -2758,7 +2785,7 @@ function renderChallenge100Summary(participants, progress, frozen) {
   const rankHtml = `
     <div class="c100-summary-section c100-summary-dashboard">
       <div class="c100-summary-header">
-        <h4>📋 Detailed Status</h4>
+        <h4>📋 Detailed Status ( Days Left Including Sunday : ${challenge100DaysLeft()} )</h4>
         <button class="btn-secondary c100-share-btn" onclick="challenge100ShareDetailSummary()">📤 Share to WhatsApp</button>
       </div>
       <div class="table-scroll">
@@ -2834,7 +2861,7 @@ function challenge100BuildDetailShareText(s) {
 
   const nameW = Math.max(4, ...s.ranked.map(r => r.name.length));
   lines.push(
-    '📋 Detailed Status',
+    `📋 Detailed Status ( Days Left Including Sunday : ${challenge100DaysLeft()} )`,
     '```',
     `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} ${'Cnt'.padStart(4)}  Δ`,
     ...s.ranked.map(r => `${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(r.cur).padStart(4)}  ${r.diff >= 0 ? '+' : ''}${r.diff}`),
