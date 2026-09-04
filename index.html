@@ -630,7 +630,7 @@
   <div id="tab-excelimport" class="tab-content">
     <div class="card">
       <div class="card-title">📥 Import Excel</div>
-      <p class="hint">Upload an Excel file — each sheet in the workbook becomes a sub-tab below.</p>
+      <p class="hint">Upload an Excel file — each sheet in the workbook becomes an editable sub-tab below.</p>
       <div class="add-row">
         <input type="file" id="excelimport-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImportFile(this)">
         <button class="btn-primary" onclick="document.getElementById('excelimport-file-input').click()">Choose Excel File</button>
@@ -642,6 +642,13 @@
       <div class="planner-sub-tabs" id="excelimport-sub-tabs"></div>
       <div class="table-scroll" style="margin-top:12px">
         <table class="data-table" id="excelimport-sheet-table"></table>
+      </div>
+      <div class="add-row" style="margin-top:12px">
+        <button class="btn-secondary" onclick="excelImportAddRow()">+ Add Row</button>
+        <button class="btn-secondary" onclick="excelImportAddColumn()">+ Add Column</button>
+      </div>
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9">
+        <button id="excelimport-save-btn" class="btn-primary is-clean" onclick="saveExcelImport()">Save Changes</button>
       </div>
     </div>
   </div>

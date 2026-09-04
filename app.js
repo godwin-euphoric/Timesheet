@@ -2091,14 +2091,17 @@ async function saveGoalStatus() {
 // ══════════════════════════════════════════════════════════════════════════
 //  EXCEL IMPORT TAB
 // ══════════════════════════════════════════════════════════════════════════
-// Uploads an arbitrary .xlsx workbook and renders each sheet as a read-only
+// Uploads an arbitrary .xlsx workbook and renders each sheet as an editable
 // sub-tab. Stored as-is (excelImport: { fileName, importedAt, sheets }) so it
-// survives a reload without re-uploading.
+// survives a reload without re-uploading. Each sheet's rows (including the
+// header row at index 0) are stored as { r: string[] } so the array of rows
+// stays Firestore-safe (arrays can't nest directly inside arrays).
 
 async function loadExcelImportTab() {
   const userData = await getUserData();
   state.excelImport = userData.excelImport || null;
   renderExcelImportUI();
+  setSaveState('excelimport-save-btn', false);
 }
 
 async function handleExcelImportFile(input) {
@@ -2172,15 +2175,84 @@ function switchExcelImportSheet(encodedName) {
   renderExcelImportSheetTable();
 }
 
+function excelImportActiveSheet() {
+  return state.excelImport?.sheets.find(s => s.name === state.excelImportActiveSheet);
+}
+
 function renderExcelImportSheetTable() {
   const table = document.getElementById('excelimport-sheet-table');
-  const sheet = state.excelImport.sheets.find(s => s.name === state.excelImportActiveSheet);
+  const sheet = excelImportActiveSheet();
   if (!sheet || !sheet.rows.length) { table.innerHTML = '<tr><td class="empty">Empty sheet</td></tr>'; return; }
 
-  const [header, ...rows] = sheet.rows.map(row => row.r);
-  const thead = `<thead><tr>${header.map(h => `<th>${escHtml(h)}</th>`).join('')}</tr></thead>`;
-  const tbody = `<tbody>${rows.map(r => `<tr>${header.map((_, ci) => `<td>${escHtml(r[ci])}</td>`).join('')}</tr>`).join('')}</tbody>`;
-  table.innerHTML = thead + tbody;
+  const header   = sheet.rows[0].r;
+  const dataRows = sheet.rows.slice(1);
+
+  const headCells = header.map((h, ci) => `
+    <th>
+      <div style="display:flex;align-items:center;gap:4px">
+        <input class="inline-input" type="text" value="${escHtml(h)}"
+          oninput="excelImportUpdateCell(0, ${ci}, this.value)">
+        ${header.length > 1 ? `<button class="btn-danger" title="Remove column" onclick="excelImportRemoveColumn(${ci})">✕</button>` : ''}
+      </div>
+    </th>`).join('');
+  const thead = `<thead><tr>${headCells}<th></th></tr></thead>`;
+
+  let bodyRows;
+  if (!dataRows.length) {
+    bodyRows = `<tr><td colspan="${header.length + 1}" class="empty">No rows — click "+ Add Row" to start</td></tr>`;
+  } else {
+    bodyRows = dataRows.map((row, di) => {
+      const ri    = di + 1;
+      const cells = header.map((_, ci) => `
+        <td><input class="inline-input" type="text" value="${escHtml(row.r[ci] || '')}"
+          oninput="excelImportUpdateCell(${ri}, ${ci}, this.value)"></td>`).join('');
+      return `<tr>${cells}<td><button class="btn-danger" onclick="excelImportRemoveRow(${ri})">✕</button></td></tr>`;
+    }).join('');
+  }
+
+  table.innerHTML = thead + `<tbody>${bodyRows}</tbody>`;
+}
+
+function excelImportUpdateCell(ri, ci, value) {
+  const sheet = excelImportActiveSheet();
+  sheet.rows[ri].r[ci] = value;
+  setSaveState('excelimport-save-btn', true);
+}
+
+function excelImportAddRow() {
+  const sheet = excelImportActiveSheet();
+  const colCount = sheet.rows[0].r.length;
+  sheet.rows.push({ r: Array(colCount).fill('') });
+  renderExcelImportSheetTable();
+  setSaveState('excelimport-save-btn', true);
+}
+
+function excelImportRemoveRow(ri) {
+  const sheet = excelImportActiveSheet();
+  sheet.rows.splice(ri, 1);
+  renderExcelImportSheetTable();
+  setSaveState('excelimport-save-btn', true);
+}
+
+function excelImportAddColumn() {
+  const sheet = excelImportActiveSheet();
+  sheet.rows.forEach(row => row.r.push(''));
+  renderExcelImportSheetTable();
+  setSaveState('excelimport-save-btn', true);
+}
+
+function excelImportRemoveColumn(ci) {
+  const sheet = excelImportActiveSheet();
+  if (sheet.rows[0].r.length <= 1) return;
+  sheet.rows.forEach(row => row.r.splice(ci, 1));
+  renderExcelImportSheetTable();
+  setSaveState('excelimport-save-btn', true);
+}
+
+async function saveExcelImport() {
+  await saveUserData({ excelImport: state.excelImport });
+  showToast('Saved');
+  setSaveState('excelimport-save-btn', false);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
