@@ -2008,13 +2008,16 @@ function startEditHabit(td, index) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-//  EXCEL IMPORT TAB
+//  GOAL TRACKER TAB
 // ══════════════════════════════════════════════════════════════════════════
-// Uploads an arbitrary .xlsx workbook and renders each sheet as an editable
-// sub-tab. Stored as-is (excelImport: { fileName, importedAt, sheets }) so it
-// survives a reload without re-uploading. Each sheet's rows (including the
-// header row at index 0) are stored as { r: string[] } so the array of rows
-// stays Firestore-safe (arrays can't nest directly inside arrays).
+// Freeform editable table (add/remove rows and columns) that can also import
+// an arbitrary .xlsx workbook, rendering each sheet as an editable sub-tab.
+// Stored as-is (excelImport: { fileName, importedAt, sheets }) so it survives
+// a reload without re-uploading. Each sheet's rows (including the header row
+// at index 0) are stored as { r: string[] } so the array of rows stays
+// Firestore-safe (arrays can't nest directly inside arrays). When nothing has
+// been imported yet, a single blank sheet is used so the table is always
+// editable, not just after an import.
 
 async function loadExcelImportTab() {
   const userData = await getUserData();
@@ -2062,15 +2065,19 @@ async function handleExcelImportFile(input) {
 function renderExcelImportUI() {
   const nameEl = document.getElementById('excelimport-filename');
   const card   = document.getElementById('excelimport-sheets-card');
-  const data   = state.excelImport;
+  let data = state.excelImport;
 
   if (!data || !data.sheets?.length) {
-    nameEl.textContent = '';
-    card.classList.add('hidden');
-    return;
+    data = state.excelImport = {
+      fileName: null,
+      importedAt: null,
+      sheets: [{ name: 'Sheet1', rows: [{ r: ['Goal', 'Status'] }] }],
+    };
   }
 
-  nameEl.textContent = `${data.fileName} — imported ${new Date(data.importedAt).toLocaleString()}`;
+  nameEl.textContent = data.fileName
+    ? `${data.fileName} — imported ${new Date(data.importedAt).toLocaleString()}`
+    : '';
   card.classList.remove('hidden');
 
   if (!state.excelImportActiveSheet || !data.sheets.some(s => s.name === state.excelImportActiveSheet)) {
