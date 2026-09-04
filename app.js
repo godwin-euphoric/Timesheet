@@ -2804,6 +2804,9 @@ function renderChallenge100Summary(participants, progress, frozen) {
     </div>`;
 
   // Session 5 — rank table: indicator dot lives inside the diff cell, no separate column.
+  // "Days Left" per participant is the overall countdown minus their own cumulative count —
+  // how many of the remaining days they still need to close the gap to 100.
+  const overallDaysLeft = challenge100DaysLeft();
   const rankRows = s.ranked.map(r => {
     const dot = r.diff >= 6 ? 'green' : r.diff === 5 ? 'yellow' : 'red';
     return `
@@ -2812,19 +2815,20 @@ function renderChallenge100Summary(participants, progress, frozen) {
         <td>${r.name}</td>
         <td>${r.cur}</td>
         <td><span class="c100-dot c100-dot-${dot}"></span>${r.diff >= 0 ? '+' : ''}${r.diff}</td>
+        <td>${overallDaysLeft - r.cur}</td>
       </tr>`;
   }).join('');
 
   const rankHtml = `
     <div class="c100-summary-section c100-summary-dashboard">
       <div class="c100-summary-header">
-        <h4>📋 Detailed Status ( Days Left Including Sunday : ${challenge100DaysLeft()} )</h4>
+        <h4>📋 Detailed Status ( Days Left Including Sunday : ${overallDaysLeft} )</h4>
         <button class="btn-secondary c100-share-btn" onclick="challenge100ShareDetailSummary()">📤 Share to WhatsApp</button>
       </div>
       <div class="table-scroll">
         <table class="c100-rank-table">
-          <thead><tr><th>Rank</th><th>Name</th><th>Count</th><th>Δ vs last week</th></tr></thead>
-          <tbody>${rankRows || '<tr><td colspan="4" class="empty">No active participants</td></tr>'}</tbody>
+          <thead><tr><th>Rank</th><th>Name</th><th>Count</th><th>Δ vs last week</th><th>Days Left</th></tr></thead>
+          <tbody>${rankRows || '<tr><td colspan="5" class="empty">No active participants</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
@@ -2892,12 +2896,13 @@ function challenge100BuildDetailShareText(s) {
     '',
   );
 
+  const overallDaysLeft = challenge100DaysLeft();
   const nameW = Math.max(4, ...s.ranked.map(r => r.name.length));
   lines.push(
-    `📋 Detailed Status ( Days Left Including Sunday : ${challenge100DaysLeft()} )`,
+    `📋 Detailed Status ( Days Left Including Sunday : ${overallDaysLeft} )`,
     '```',
-    `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} ${'Cnt'.padStart(4)}  Δ`,
-    ...s.ranked.map(r => `${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(r.cur).padStart(4)}  ${r.diff >= 0 ? '+' : ''}${r.diff}`),
+    `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} ${'Cnt'.padStart(4)}  Δ   DL`,
+    ...s.ranked.map(r => `${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(r.cur).padStart(4)}  ${r.diff >= 0 ? '+' : ''}${r.diff}  ${overallDaysLeft - r.cur}`),
     '```',
   );
 
