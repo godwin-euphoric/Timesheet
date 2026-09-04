@@ -2379,11 +2379,25 @@ const CHALLENGE100_FINISH_DATE = '2026-11-30';
 // Calendar days from today (the executing date) through CHALLENGE100_FINISH_DATE, inclusive of
 // both ends — Sundays are counted like any other day, not skipped.
 function challenge100DaysLeft() {
+  return challenge100DaysLeftBreakdown().total;
+}
+
+// Same countdown, split into Sundays vs every other day — shown as "X Weekdays + X Sundays" in
+// the Detailed Status header so it reads as an actual working-days picture, not just a raw count.
+function challenge100DaysLeftBreakdown() {
   const [fy, fm, fd] = CHALLENGE100_FINISH_DATE.split('-').map(Number);
   const finish = new Date(fy, fm - 1, fd);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((finish - today) / 86400000) + 1;
+  const total = Math.round((finish - today) / 86400000) + 1;
+
+  let sundays = 0;
+  const d = new Date(today);
+  for (let i = 0; i < total; i++) {
+    if (d.getDay() === 0) sundays++;
+    d.setDate(d.getDate() + 1);
+  }
+  return { total, sundays, weekdays: total - sundays };
 }
 
 // Every Monday from CHALLENGE100_START to CHALLENGE100_END, inclusive
@@ -2806,7 +2820,8 @@ function renderChallenge100Summary(participants, progress, frozen) {
   // Session 5 — rank table: indicator dot lives inside the diff cell, no separate column.
   // "Days Left" per participant is the overall countdown minus their own cumulative count —
   // how many of the remaining days they still need to close the gap to 100.
-  const overallDaysLeft = challenge100DaysLeft();
+  const daysLeftInfo = challenge100DaysLeftBreakdown();
+  const overallDaysLeft = daysLeftInfo.total;
   const rankRows = s.ranked.map(r => {
     const dot = r.diff >= 6 ? 'green' : r.diff === 5 ? 'yellow' : 'red';
     return `
@@ -2822,7 +2837,7 @@ function renderChallenge100Summary(participants, progress, frozen) {
   const rankHtml = `
     <div class="c100-summary-section c100-summary-dashboard">
       <div class="c100-summary-header">
-        <h4>📋 Detailed Status ( Days Left Including Sunday : ${overallDaysLeft} )</h4>
+        <h4>📋 Detailed Status ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays )</h4>
         <button class="btn-secondary c100-share-btn" onclick="challenge100ShareDetailSummary()">📤 Share to WhatsApp</button>
       </div>
       <div class="table-scroll">
@@ -2896,10 +2911,11 @@ function challenge100BuildDetailShareText(s) {
     '',
   );
 
-  const overallDaysLeft = challenge100DaysLeft();
+  const daysLeftInfo = challenge100DaysLeftBreakdown();
+  const overallDaysLeft = daysLeftInfo.total;
   const nameW = Math.max(4, ...s.ranked.map(r => r.name.length));
   lines.push(
-    `📋 Detailed Status ( Days Left Including Sunday : ${overallDaysLeft} )`,
+    `📋 Detailed Status ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays )`,
     '```',
     `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} ${'Cnt'.padStart(4)}  Δ   DL`,
     ...s.ranked.map(r => `${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(r.cur).padStart(4)}  ${r.diff >= 0 ? '+' : ''}${r.diff}  ${overallDaysLeft - r.cur}`),
