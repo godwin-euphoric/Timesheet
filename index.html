@@ -611,7 +611,7 @@
   <div id="tab-excelimport" class="tab-content">
     <div class="card">
       <div class="card-title">🎯 GoalTracker</div>
-      <p class="hint">Add rows and columns freely below, or upload an Excel file — each sheet in the workbook becomes an editable sub-tab.</p>
+      <p class="hint">Add rows and columns freely below, or upload an Excel file — each sheet in the workbook becomes an editable sub-tab. Edits save automatically.</p>
       <div class="add-row">
         <input type="file" id="excelimport-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImportFile(this)">
         <button class="btn-primary" onclick="document.getElementById('excelimport-file-input').click()">Choose Excel File</button>
@@ -621,15 +621,13 @@
 
     <div class="card hidden" id="excelimport-sheets-card">
       <div class="planner-sub-tabs" id="excelimport-sub-tabs"></div>
+      <div id="excelimport-filter-bar"></div>
       <div class="table-scroll" style="margin-top:12px">
-        <table class="data-table" id="excelimport-sheet-table"></table>
+        <table class="planner-table" id="excelimport-sheet-table"></table>
       </div>
-      <div class="add-row" style="margin-top:12px">
-        <button class="btn-secondary" onclick="excelImportAddRow()">+ Add Row</button>
-        <button class="btn-secondary" onclick="excelImportAddColumn()">+ Add Column</button>
-      </div>
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9">
-        <button id="excelimport-save-btn" class="btn-primary is-clean" onclick="saveExcelImport()">Save Changes</button>
+      <div class="planner-add-btns">
+        <button class="btn-planner-add-row" onclick="excelImportAddRow()">+ Row</button>
+        <button class="btn-planner-add-row" onclick="excelImportAddColumn()">+ Column</button>
       </div>
     </div>
   </div>

@@ -2010,8 +2010,10 @@ function startEditHabit(td, index) {
 // ══════════════════════════════════════════════════════════════════════════
 //  GOAL TRACKER TAB
 // ══════════════════════════════════════════════════════════════════════════
-// Freeform editable table (add/remove rows and columns) that can also import
-// an arbitrary .xlsx workbook, rendering each sheet as an editable sub-tab.
+// Freeform editable table (add/remove/insert rows and columns) that can also
+// import an arbitrary .xlsx workbook, rendering each sheet as an editable
+// sub-tab. Editing matches the Planner tab's table: auto-growing textarea
+// cells that save on blur, debounced to Firestore — no manual save button.
 // Stored as-is (excelImport: { fileName, importedAt, sheets }) so it survives
 // a reload without re-uploading. Each sheet's rows (including the header row
 // at index 0) are stored as { r: string[] } so the array of rows stays
@@ -2019,11 +2021,16 @@ function startEditHabit(td, index) {
 // been imported yet, a single blank sheet is used so the table is always
 // editable, not just after an import.
 
+let excelImportSaveTimer = null;
+function scheduleExcelImportSave() {
+  clearTimeout(excelImportSaveTimer);
+  excelImportSaveTimer = setTimeout(() => saveUserData({ excelImport: state.excelImport }), 800);
+}
+
 async function loadExcelImportTab() {
   const userData = await getUserData();
   state.excelImport = userData.excelImport || null;
   renderExcelImportUI();
-  setSaveState('excelimport-save-btn', false);
 }
 
 async function handleExcelImportFile(input) {
@@ -2105,44 +2112,157 @@ function excelImportActiveSheet() {
   return state.excelImport?.sheets.find(s => s.name === state.excelImportActiveSheet);
 }
 
+// Column filters/sort are view-only (not persisted), keyed by sheet name — mirrors
+// the Planner tab's column filter pattern (state.plannerFilters).
+function excelImportFilters() {
+  if (!state.excelImportFilters) state.excelImportFilters = {};
+  const key = state.excelImportActiveSheet;
+  if (!state.excelImportFilters[key]) state.excelImportFilters[key] = {};
+  return state.excelImportFilters[key];
+}
+
+function excelImportSort() {
+  state.excelImportSort = state.excelImportSort || {};
+  return state.excelImportSort[state.excelImportActiveSheet] || null;
+}
+
+function clearExcelImportViewState() {
+  const key = state.excelImportActiveSheet;
+  if (state.excelImportFilters) delete state.excelImportFilters[key];
+  if (state.excelImportSort) delete state.excelImportSort[key];
+}
+
 function renderExcelImportSheetTable() {
-  const table = document.getElementById('excelimport-sheet-table');
-  const sheet = excelImportActiveSheet();
-  if (!sheet || !sheet.rows.length) { table.innerHTML = '<tr><td class="empty">Empty sheet</td></tr>'; return; }
+  const table     = document.getElementById('excelimport-sheet-table');
+  const filterBar = document.getElementById('excelimport-filter-bar');
+  const sheet     = excelImportActiveSheet();
+  if (!sheet || !sheet.rows.length) { table.innerHTML = '<tr><td class="empty">Empty sheet</td></tr>'; filterBar.innerHTML = ''; return; }
 
   const header   = sheet.rows[0].r;
-  const dataRows = sheet.rows.slice(1);
+  const dataRows = sheet.rows.slice(1); // di (0-based) -> absolute ri = di + 1
 
-  const headCells = header.map((h, ci) => `
-    <th>
-      <div style="display:flex;align-items:center;gap:4px">
-        <input class="inline-input" type="text" value="${escHtml(h)}"
-          oninput="excelImportUpdateCell(0, ${ci}, this.value)">
-        ${header.length > 1 ? `<button class="btn-danger" title="Remove column" onclick="excelImportRemoveColumn(${ci})">✕</button>` : ''}
+  const filters = excelImportFilters();
+  const sort    = excelImportSort();
+
+  let visIdx = dataRows.map((_, di) => di);
+  Object.keys(filters).forEach(ci => {
+    const val = filters[ci];
+    if (!val) return;
+    visIdx = visIdx.filter(di => String(dataRows[di].r[ci] || '').trim() === val);
+  });
+  const filterActive = Object.values(filters).some(Boolean);
+
+  if (sort) {
+    const { ci, dir } = sort;
+    visIdx = [...visIdx].sort((a, b) => {
+      const va = String(dataRows[a].r[ci] || ''), vb = String(dataRows[b].r[ci] || '');
+      const na = parseFloat(va), nb = parseFloat(vb);
+      const cmp = (va.trim() !== '' && vb.trim() !== '' && !isNaN(na) && !isNaN(nb))
+        ? na - nb
+        : va.localeCompare(vb, undefined, { numeric: true, sensitivity: 'base' });
+      return dir === 'asc' ? cmp : -cmp;
+    });
+  }
+
+  const headCells = header.map((h, ci) => {
+    const uniqueVals = [...new Set(dataRows.map(r => String(r.r[ci] || '').trim()).filter(Boolean))].sort();
+    const activeVal  = filters[ci];
+    const filterDd = uniqueVals.length ? `
+      <div class="planner-col-filter-wrap">
+        <button class="btn-planner-icon planner-col-filter-btn${activeVal ? ' active' : ''}" title="Filter by ${escHtml(h) || 'this column'}"
+          onclick="toggleExcelImportColFilter(event, ${ci})">⏷</button>
+        <div class="planner-col-filter-dropdown hidden" id="eicf-${ci}">
+          <button class="${!activeVal ? 'active' : ''}" data-ci="${ci}" data-val="" onclick="setExcelImportColFilterFromBtn(this)">All</button>
+          ${uniqueVals.map(v => `<button class="${activeVal === v ? 'active' : ''}" data-ci="${ci}" data-val="${escHtml(v)}" onclick="setExcelImportColFilterFromBtn(this)">${escHtml(v)}</button>`).join('')}
+        </div>
+      </div>` : '';
+
+    const sortDir  = sort && sort.ci === ci ? sort.dir : null;
+    const sortIcon = sortDir === 'asc' ? '↑' : sortDir === 'desc' ? '↓' : '↕';
+
+    return `
+    <th class="planner-col-th">
+      <div class="planner-col-th-inner">
+        <button class="btn-planner-icon btn-planner-insert-col" title="Insert column before" onclick="excelImportInsertColumnBefore(${ci})">⊕</button>
+        <input class="planner-col-name" value="${escHtml(h)}"
+          onblur="excelImportUpdateCell(0, ${ci}, this.value)" onclick="this.select()">
+        <button class="btn-planner-icon" title="Sort by ${escHtml(h) || 'this column'}" onclick="toggleExcelImportSort(${ci})">${sortIcon}</button>
+        ${filterDd}
+        ${header.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="excelImportRemoveColumn(${ci})">✕</button>` : ''}
       </div>
-    </th>`).join('');
-  const thead = `<thead><tr>${headCells}<th></th></tr></thead>`;
+    </th>`;
+  }).join('');
+  const thead = `<thead><tr>${headCells}<th class="planner-row-del-td"></th></tr></thead>`;
 
   let bodyRows;
-  if (!dataRows.length) {
-    bodyRows = `<tr><td colspan="${header.length + 1}" class="empty">No rows — click "+ Add Row" to start</td></tr>`;
+  if (!visIdx.length) {
+    bodyRows = `<tr><td colspan="${header.length + 1}" class="empty">${dataRows.length ? 'No rows match the filter' : 'No rows — click "+ Row" to start'}</td></tr>`;
   } else {
-    bodyRows = dataRows.map((row, di) => {
-      const ri    = di + 1;
+    bodyRows = visIdx.map(di => {
+      const ri  = di + 1;
+      const row = dataRows[di];
       const cells = header.map((_, ci) => `
-        <td><input class="inline-input" type="text" value="${escHtml(row.r[ci] || '')}"
-          oninput="excelImportUpdateCell(${ri}, ${ci}, this.value)"></td>`).join('');
-      return `<tr>${cells}<td><button class="btn-danger" onclick="excelImportRemoveRow(${ri})">✕</button></td></tr>`;
+        <td class="planner-cell-td">
+          <textarea class="planner-cell" rows="1"
+            onblur="excelImportUpdateCell(${ri}, ${ci}, this.value)">${escHtml(row.r[ci] || '')}</textarea>
+        </td>`).join('');
+      return `<tr>${cells}
+        <td class="planner-row-del-td">
+          <button class="btn-planner-icon btn-planner-insert-row" title="Insert row above" onclick="excelImportInsertRowBefore(${ri})">⊕</button>
+          <button class="btn-planner-icon" title="Remove row" onclick="excelImportRemoveRow(${ri})">✕</button>
+        </td></tr>`;
     }).join('');
   }
 
+  filterBar.innerHTML = filterActive ? `<div class="planner-filter-bar">
+      Filtered: ${visIdx.length} / ${dataRows.length} rows
+      <button class="btn-planner-sm" onclick="clearExcelImportFilters()">✕ Clear filters</button>
+    </div>` : '';
+
   table.innerHTML = thead + `<tbody>${bodyRows}</tbody>`;
+  table.querySelectorAll('.planner-cell').forEach(ta => {
+    autoResizeTa(ta);
+    ta.addEventListener('input', () => autoResizeTa(ta));
+  });
+}
+
+function toggleExcelImportColFilter(e, ci) {
+  e.stopPropagation();
+  const ddId = `eicf-${ci}`;
+  document.querySelectorAll('.planner-col-filter-dropdown').forEach(d => {
+    if (d.id !== ddId) d.classList.add('hidden');
+  });
+  document.getElementById(ddId)?.classList.toggle('hidden');
+}
+
+function setExcelImportColFilterFromBtn(btn) {
+  const filters = excelImportFilters();
+  const val = btn.dataset.val;
+  if (val) filters[+btn.dataset.ci] = val;
+  else delete filters[+btn.dataset.ci];
+  renderExcelImportSheetTable();
+}
+
+function clearExcelImportFilters() {
+  const key = state.excelImportActiveSheet;
+  if (state.excelImportFilters) delete state.excelImportFilters[key];
+  renderExcelImportSheetTable();
+}
+
+function toggleExcelImportSort(ci) {
+  state.excelImportSort = state.excelImportSort || {};
+  const key = state.excelImportActiveSheet;
+  const cur = state.excelImportSort[key];
+  if (!cur || cur.ci !== ci)   state.excelImportSort[key] = { ci, dir: 'asc' };
+  else if (cur.dir === 'asc')  state.excelImportSort[key] = { ci, dir: 'desc' };
+  else                         delete state.excelImportSort[key];
+  renderExcelImportSheetTable();
 }
 
 function excelImportUpdateCell(ri, ci, value) {
   const sheet = excelImportActiveSheet();
   sheet.rows[ri].r[ci] = value;
-  setSaveState('excelimport-save-btn', true);
+  scheduleExcelImportSave();
 }
 
 function excelImportAddRow() {
@@ -2150,35 +2270,46 @@ function excelImportAddRow() {
   const colCount = sheet.rows[0].r.length;
   sheet.rows.push({ r: Array(colCount).fill('') });
   renderExcelImportSheetTable();
-  setSaveState('excelimport-save-btn', true);
+  scheduleExcelImportSave();
+}
+
+function excelImportInsertRowBefore(ri) {
+  const sheet    = excelImportActiveSheet();
+  const colCount = sheet.rows[0].r.length;
+  sheet.rows.splice(ri, 0, { r: Array(colCount).fill('') });
+  renderExcelImportSheetTable();
+  scheduleExcelImportSave();
 }
 
 function excelImportRemoveRow(ri) {
   const sheet = excelImportActiveSheet();
   sheet.rows.splice(ri, 1);
   renderExcelImportSheetTable();
-  setSaveState('excelimport-save-btn', true);
+  scheduleExcelImportSave();
 }
 
 function excelImportAddColumn() {
   const sheet = excelImportActiveSheet();
   sheet.rows.forEach(row => row.r.push(''));
   renderExcelImportSheetTable();
-  setSaveState('excelimport-save-btn', true);
+  scheduleExcelImportSave();
+}
+
+function excelImportInsertColumnBefore(ci) {
+  const sheet = excelImportActiveSheet();
+  sheet.rows.forEach(row => row.r.splice(ci, 0, ''));
+  clearExcelImportViewState();
+  renderExcelImportSheetTable();
+  scheduleExcelImportSave();
 }
 
 function excelImportRemoveColumn(ci) {
   const sheet = excelImportActiveSheet();
   if (sheet.rows[0].r.length <= 1) return;
   sheet.rows.forEach(row => row.r.splice(ci, 1));
+  clearExcelImportViewState();
   renderExcelImportSheetTable();
-  setSaveState('excelimport-save-btn', true);
-}
-
-async function saveExcelImport() {
-  await saveUserData({ excelImport: state.excelImport });
-  showToast('Saved');
-  setSaveState('excelimport-save-btn', false);
+  scheduleExcelImportSave();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
