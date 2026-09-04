@@ -2118,7 +2118,7 @@ async function handleExcelImportFile(input) {
     const sheets = wb.SheetNames.map(name => {
       const ws   = wb.Sheets[name];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-      return { name, rows };
+      return { name, rows: rows.map(r => ({ r })) };
     }).filter(s => s.rows.length);
 
     if (!sheets.length) { showToast('No data found in that file'); return; }
@@ -2177,7 +2177,7 @@ function renderExcelImportSheetTable() {
   const sheet = state.excelImport.sheets.find(s => s.name === state.excelImportActiveSheet);
   if (!sheet || !sheet.rows.length) { table.innerHTML = '<tr><td class="empty">Empty sheet</td></tr>'; return; }
 
-  const [header, ...rows] = sheet.rows;
+  const [header, ...rows] = sheet.rows.map(row => row.r);
   const thead = `<thead><tr>${header.map(h => `<th>${escHtml(h)}</th>`).join('')}</tr></thead>`;
   const tbody = `<tbody>${rows.map(r => `<tr>${header.map((_, ci) => `<td>${escHtml(r[ci])}</td>`).join('')}</tr>`).join('')}</tbody>`;
   table.innerHTML = thead + tbody;
