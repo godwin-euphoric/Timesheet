@@ -1385,6 +1385,20 @@ textarea#fm-notes:focus {
 }
 .planner-cell:focus { background: rgba(99,102,241,0.08); }
 
+/* GoalTracker table: fixed layout so column widths (drag or typed) are
+   actually honored instead of the column re-growing to fit content. */
+#excelimport-sheet-table { table-layout: fixed; }
+#excelimport-sheet-table .planner-col-th-inner { flex-wrap: wrap; }
+#excelimport-sheet-table .planner-cell { word-break: break-word; overflow-wrap: anywhere; }
+.planner-col-width-input {
+  width: 54px; flex-shrink: 0; background: var(--card2); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text); font-size: 11px; padding: 2px 4px; text-align: center;
+  -moz-appearance: textfield;
+}
+.planner-col-width-input::-webkit-outer-spin-button,
+.planner-col-width-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.planner-col-width-input:focus { color: var(--primary-h); border-color: var(--primary); outline: none; }
+
 .btn-planner-icon {
   background: none; border: none; cursor: pointer;
   color: var(--muted); font-size: 11px; padding: 2px 4px;

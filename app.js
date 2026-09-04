@@ -2203,6 +2203,10 @@ function renderExcelImportSheetTable() {
           onblur="excelImportUpdateCell(0, ${ci}, this.value)" onclick="this.select()">
         <button class="btn-planner-icon" title="Sort by ${escHtml(h) || 'this column'}" onclick="toggleExcelImportSort(${ci})">${sortIcon}</button>
         ${filterDd}
+        <input class="planner-col-width-input" type="number" min="50" placeholder="px"
+          title="Column width in pixels" value="${w ? parseInt(w) : ''}"
+          onblur="setExcelImportColWidthFromInput(${ci}, this.value)"
+          onkeydown="if(event.key==='Enter') this.blur()" onclick="this.select()">
         ${header.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="excelImportRemoveColumn(${ci})">✕</button>` : ''}
       </div>
       <span class="planner-col-resizer" title="Drag to resize column" onmousedown="startExcelImportColResize(event,${ci})"></span>
@@ -2356,6 +2360,16 @@ function endExcelImportColResize() {
   const sheet = excelImportActiveSheet();
   if (!sheet.colWidths) sheet.colWidths = [];
   sheet.colWidths[ci] = th.style.width;
+  renderExcelImportSheetTable();
+  scheduleExcelImportSave();
+}
+
+function setExcelImportColWidthFromInput(ci, value) {
+  const px = parseInt(value, 10);
+  const sheet = excelImportActiveSheet();
+  if (!sheet.colWidths) sheet.colWidths = [];
+  sheet.colWidths[ci] = (px && px >= 50) ? px + 'px' : '';
+  renderExcelImportSheetTable();
   scheduleExcelImportSave();
 }
 
