@@ -616,8 +616,8 @@
         <input type="file" id="excelimport-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImportFile(this)">
         <button class="btn-primary" onclick="document.getElementById('excelimport-file-input').click()">Choose Excel File</button>
         <button class="btn-secondary" onclick="downloadExcelImport()">⬇ Download</button>
-        <span id="excelimport-filename" class="hint" style="margin:0"></span>
       </div>
+      <span id="excelimport-filename" class="hint" style="display:block;margin-top:8px"></span>
     </div>
 
     <div class="card hidden" id="excelimport-sheets-card">

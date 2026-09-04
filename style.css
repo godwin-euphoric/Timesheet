@@ -1385,17 +1385,11 @@ textarea#fm-notes:focus {
 }
 .planner-cell:focus { background: rgba(99,102,241,0.08); }
 
-/* GoalTracker table: fixed layout so column widths (drag or typed) are
+/* GoalTracker table: fixed layout so column widths (via the drag handle) are
    actually honored instead of the column re-growing to fit content. */
 #excelimport-sheet-table { table-layout: fixed; }
 #excelimport-sheet-table .planner-col-th-inner { flex-wrap: wrap; }
 #excelimport-sheet-table .planner-cell { word-break: break-word; overflow-wrap: anywhere; }
-.planner-col-width-input {
-  flex-shrink: 0; background: var(--card2); border: 1px solid var(--border);
-  border-radius: 4px; color: var(--text); font-size: 11px; padding: 2px 4px;
-  cursor: pointer; max-width: 68px;
-}
-.planner-col-width-input:focus { color: var(--primary-h); border-color: var(--primary); outline: none; }
 
 .btn-planner-icon {
   background: none; border: none; cursor: pointer;
