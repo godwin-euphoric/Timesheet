@@ -1391,12 +1391,10 @@ textarea#fm-notes:focus {
 #excelimport-sheet-table .planner-col-th-inner { flex-wrap: wrap; }
 #excelimport-sheet-table .planner-cell { word-break: break-word; overflow-wrap: anywhere; }
 .planner-col-width-input {
-  width: 54px; flex-shrink: 0; background: var(--card2); border: 1px solid var(--border);
-  border-radius: 4px; color: var(--text); font-size: 11px; padding: 2px 4px; text-align: center;
-  -moz-appearance: textfield;
+  flex-shrink: 0; background: var(--card2); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text); font-size: 11px; padding: 2px 4px;
+  cursor: pointer; max-width: 68px;
 }
-.planner-col-width-input::-webkit-outer-spin-button,
-.planner-col-width-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .planner-col-width-input:focus { color: var(--primary-h); border-color: var(--primary); outline: none; }
 
 .btn-planner-icon {

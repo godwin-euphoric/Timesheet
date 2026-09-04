@@ -2203,10 +2203,7 @@ function renderExcelImportSheetTable() {
           onblur="excelImportUpdateCell(0, ${ci}, this.value)" onclick="this.select()">
         <button class="btn-planner-icon" title="Sort by ${escHtml(h) || 'this column'}" onclick="toggleExcelImportSort(${ci})">${sortIcon}</button>
         ${filterDd}
-        <input class="planner-col-width-input" type="number" min="50" placeholder="px"
-          title="Column width in pixels" value="${w ? parseInt(w) : ''}"
-          onblur="setExcelImportColWidthFromInput(${ci}, this.value)"
-          onkeydown="if(event.key==='Enter') this.blur()" onclick="this.select()">
+        ${excelImportColWidthSelect(ci, w)}
         ${header.length > 1 ? `<button class="btn-planner-icon" title="Remove column" onclick="excelImportRemoveColumn(${ci})">✕</button>` : ''}
       </div>
       <span class="planner-col-resizer" title="Drag to resize column" onmousedown="startExcelImportColResize(event,${ci})"></span>
@@ -2362,6 +2359,19 @@ function endExcelImportColResize() {
   sheet.colWidths[ci] = th.style.width;
   renderExcelImportSheetTable();
   scheduleExcelImportSave();
+}
+
+const EXCEL_IMPORT_COL_WIDTH_PRESETS = [80, 100, 120, 150, 180, 220, 260, 320, 400];
+
+function excelImportColWidthSelect(ci, w) {
+  const current = w ? parseInt(w) : '';
+  const presets = EXCEL_IMPORT_COL_WIDTH_PRESETS.slice();
+  if (current && !presets.includes(current)) presets.push(current);
+  presets.sort((a, b) => a - b);
+  const options = [`<option value="">Auto</option>`]
+    .concat(presets.map(p => `<option value="${p}"${p === current ? ' selected' : ''}>${p}px</option>`));
+  return `<select class="planner-col-width-input" title="Column width"
+      onchange="setExcelImportColWidthFromInput(${ci}, this.value)">${options.join('')}</select>`;
 }
 
 function setExcelImportColWidthFromInput(ci, value) {
