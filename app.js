@@ -2217,15 +2217,17 @@ function renderExcelImportSheetTable() {
     bodyRows = visIdx.map(di => {
       const ri  = di + 1;
       const row = dataRows[di];
+      const rh  = sheet.rowHeights?.[ri];
       const cells = header.map((_, ci) => `
         <td class="planner-cell-td">
-          <textarea class="planner-cell" rows="1"
+          <textarea class="planner-cell" rows="1"${rh ? ` data-fixed-h="1" style="height:${rh};min-height:0;overflow-y:auto;"` : ''}
             onblur="excelImportUpdateCell(${ri}, ${ci}, this.value)">${escHtml(row.r[ci] || '')}</textarea>
         </td>`).join('');
       return `<tr>${cells}
         <td class="planner-row-del-td">
           <button class="btn-planner-icon btn-planner-insert-row" title="Insert row above" onclick="excelImportInsertRowBefore(${ri})">⊕</button>
           <button class="btn-planner-icon" title="Remove row" onclick="excelImportRemoveRow(${ri})">✕</button>
+          <span class="planner-row-resizer" title="Drag to resize row height" onmousedown="startExcelImportRowResize(event,${ri})"></span>
         </td></tr>`;
     }).join('');
   }
@@ -2237,6 +2239,7 @@ function renderExcelImportSheetTable() {
 
   table.innerHTML = thead + `<tbody>${bodyRows}</tbody>`;
   table.querySelectorAll('.planner-cell').forEach(ta => {
+    if (ta.dataset.fixedH === '1') return;
     autoResizeTa(ta);
     ta.addEventListener('input', () => autoResizeTa(ta));
   });
@@ -2293,6 +2296,7 @@ function excelImportInsertRowBefore(ri) {
   const sheet    = excelImportActiveSheet();
   const colCount = sheet.rows[0].r.length;
   sheet.rows.splice(ri, 0, { r: Array(colCount).fill('') });
+  if (sheet.rowHeights) sheet.rowHeights.splice(ri, 0, '');
   renderExcelImportSheetTable();
   scheduleExcelImportSave();
 }
@@ -2300,6 +2304,7 @@ function excelImportInsertRowBefore(ri) {
 function excelImportRemoveRow(ri) {
   const sheet = excelImportActiveSheet();
   sheet.rows.splice(ri, 1);
+  if (sheet.rowHeights) sheet.rowHeights.splice(ri, 1);
   renderExcelImportSheetTable();
   scheduleExcelImportSave();
 }
@@ -2356,6 +2361,41 @@ function endExcelImportColResize() {
   const sheet = excelImportActiveSheet();
   if (!sheet.colWidths) sheet.colWidths = [];
   sheet.colWidths[ci] = th.style.width;
+  renderExcelImportSheetTable();
+  scheduleExcelImportSave();
+}
+
+let _excelImportRowResize = null;
+
+function startExcelImportRowResize(e, ri) {
+  e.preventDefault();
+  const tr = e.target.closest('tr');
+  _excelImportRowResize = { ri, tr, startY: e.clientY, startHeight: tr.querySelector('.planner-cell').offsetHeight };
+  document.addEventListener('mousemove', moveExcelImportRowResize);
+  document.addEventListener('mouseup', endExcelImportRowResize);
+}
+
+function moveExcelImportRowResize(e) {
+  if (!_excelImportRowResize) return;
+  const newHeight = Math.max(24, _excelImportRowResize.startHeight + (e.clientY - _excelImportRowResize.startY));
+  _excelImportRowResize.tr.querySelectorAll('textarea.planner-cell').forEach(ta => {
+    ta.style.height = newHeight + 'px';
+    ta.style.minHeight = '0';
+    ta.style.overflowY = 'auto';
+  });
+}
+
+function endExcelImportRowResize() {
+  document.removeEventListener('mousemove', moveExcelImportRowResize);
+  document.removeEventListener('mouseup', endExcelImportRowResize);
+  if (!_excelImportRowResize) return;
+  const { ri, tr } = _excelImportRowResize;
+  _excelImportRowResize = null;
+  const ta = tr.querySelector('textarea.planner-cell');
+  const sheet = excelImportActiveSheet();
+  if (!sheet.rowHeights) sheet.rowHeights = [];
+  while (sheet.rowHeights.length < ri) sheet.rowHeights.push('');
+  sheet.rowHeights[ri] = ta ? ta.style.height : '';
   renderExcelImportSheetTable();
   scheduleExcelImportSave();
 }

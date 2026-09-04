@@ -1374,7 +1374,13 @@ textarea#fm-notes:focus {
 .planner-row-del-td {
   padding: 6px 4px; vertical-align: middle; text-align: center;
   border-bottom: 1px solid var(--border); width: 46px; white-space: nowrap;
+  position: relative;
 }
+.planner-row-resizer {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
+  cursor: row-resize; user-select: none; touch-action: none;
+}
+.planner-row-resizer:hover, .planner-row-resizer:active { background: rgba(99,102,241,0.35); }
 .btn-planner-insert-row:hover { color: var(--lime) !important; background: rgba(200,255,0,0.1) !important; }
 .planner-cell {
   width: 100%; resize: none; overflow: hidden;
