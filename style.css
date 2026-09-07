@@ -860,7 +860,7 @@ input.c100-name-edit-input {
 .c100-rank-table th { text-align: left; padding: 8px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
 .c100-rank-table td { padding: 8px; border-bottom: 1px solid var(--border); }
 .c100-summary-daysleft h4 { color: var(--text); font-size: 15px; }
-.c100-row-daysleft-red td { background: var(--red-bg); color: var(--red); }
+.c100-summary-row-red { background: var(--red-bg); color: var(--red); }
 
 @media (max-width: 768px) {
   .c100-table { width: max-content; min-width: 100%; }

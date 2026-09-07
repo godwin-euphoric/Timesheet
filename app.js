@@ -2896,31 +2896,23 @@ function renderChallenge100Summary(participants, progress, frozen) {
       </div>
     </div>`;
 
-  // Session 6 — Days Left to Reach 100: how many more count-days each participant still needs,
-  // split into Weekdays/Sundays same as the overall countdown. Highlighted red when the overall
-  // days left still covers what they need (overallDaysLeft >= their days left) — i.e. they can
-  // still finish on the days remaining, worth flagging on the summary.
+  // Session 6 — Days Left to Reach 100: how many more count-days each participant still needs.
+  // Highlighted red when that's more than the overall days left — they can't get there even if
+  // every remaining day counts, worth flagging on the summary.
   const daysLeftRows = s.ranked.map(r => {
     const needed = Math.max(0, 100 - r.cur);
-    const b = challenge100BreakdownForDays(needed);
-    const flagged = overallDaysLeft >= needed;
+    const flagged = needed > overallDaysLeft;
     return `
-      <tr class="${flagged ? 'c100-row-daysleft-red' : ''}">
-        <td>${r.rank}</td>
-        <td>${r.name}</td>
-        <td>${needed} ( ${b.weekdays} Weekdays + ${b.sundays} Sundays )</td>
-      </tr>`;
+      <div class="c100-summary-row${flagged ? ' c100-summary-row-red' : ''}">
+        <span>${r.name}</span>
+        <span>${needed}</span>
+      </div>`;
   }).join('');
 
   const daysLeftHtml = `
     <div class="c100-summary-section c100-summary-daysleft">
-      <h4>🎯 Days Left to Reach 100 ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays )</h4>
-      <div class="table-scroll">
-        <table class="c100-rank-table">
-          <thead><tr><th>Rank</th><th>Name</th><th>Days Left</th></tr></thead>
-          <tbody>${daysLeftRows || '<tr><td colspan="3" class="empty">No active participants</td></tr>'}</tbody>
-        </table>
-      </div>
+      <h4>🎯 Days Left to Reach 100 ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays : ${overallDaysLeft} )</h4>
+      <div class="c100-summary-list">${daysLeftRows || '<p class="empty">No active participants</p>'}</div>
     </div>`;
 
   container.innerHTML = headerHtml + removalHtml + warningHtml + overviewHtml + rankHtml + daysLeftHtml;
@@ -2998,16 +2990,15 @@ function challenge100BuildDetailShareText(s) {
     '',
   );
 
-  // Days Left to reach 100 for each participant — 🔴 marks anyone the overall countdown can
-  // still cover (overallDaysLeft >= their days needed), same rule as the on-screen red highlight.
+  // Days Left to reach 100 for each participant — 🔴 marks anyone who needs more days than are
+  // left overall, same rule as the on-screen red highlight.
   lines.push(
-    `🎯 Days Left to Reach 100 ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays )`,
+    `🎯 Days Left to Reach 100 ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays : ${overallDaysLeft} )`,
     '```',
     ...s.ranked.map(r => {
       const needed = Math.max(0, 100 - r.cur);
-      const b = challenge100BreakdownForDays(needed);
-      const flag = overallDaysLeft >= needed ? '🔴' : '  ';
-      return `${flag}${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(needed).padStart(3)} (${b.weekdays}wd+${b.sundays}su)`;
+      const flag = needed > overallDaysLeft ? '🔴' : '  ';
+      return `${flag}${r.name.padEnd(nameW)} : ${needed}`;
     }),
     '```',
   );
