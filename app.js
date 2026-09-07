@@ -2431,9 +2431,16 @@ function challenge100DaysLeftBreakdown() {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const total = Math.round((finish - today) / 86400000) + 1;
+  return challenge100BreakdownForDays(total);
+}
 
+// Splits any calendar-day count into Weekdays vs Sundays, counting forward from today — the
+// building block behind both the overall countdown and each participant's own "days left to
+// reach 100" figure.
+function challenge100BreakdownForDays(total) {
   let sundays = 0;
-  const d = new Date(today);
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   for (let i = 0; i < total; i++) {
     if (d.getDay() === 0) sundays++;
     d.setDate(d.getDate() + 1);
@@ -2889,7 +2896,34 @@ function renderChallenge100Summary(participants, progress, frozen) {
       </div>
     </div>`;
 
-  container.innerHTML = headerHtml + removalHtml + warningHtml + overviewHtml + rankHtml;
+  // Session 6 — Days Left to Reach 100: how many more count-days each participant still needs,
+  // split into Weekdays/Sundays same as the overall countdown. Highlighted red when the overall
+  // days left still covers what they need (overallDaysLeft >= their days left) — i.e. they can
+  // still finish on the days remaining, worth flagging on the summary.
+  const daysLeftRows = s.ranked.map(r => {
+    const needed = Math.max(0, 100 - r.cur);
+    const b = challenge100BreakdownForDays(needed);
+    const flagged = overallDaysLeft >= needed;
+    return `
+      <tr class="${flagged ? 'c100-row-daysleft-red' : ''}">
+        <td>${r.rank}</td>
+        <td>${r.name}</td>
+        <td>${needed} ( ${b.weekdays} Weekdays + ${b.sundays} Sundays )</td>
+      </tr>`;
+  }).join('');
+
+  const daysLeftHtml = `
+    <div class="c100-summary-section c100-summary-daysleft">
+      <h4>🎯 Days Left to Reach 100 ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays )</h4>
+      <div class="table-scroll">
+        <table class="c100-rank-table">
+          <thead><tr><th>Rank</th><th>Name</th><th>Days Left</th></tr></thead>
+          <tbody>${daysLeftRows || '<tr><td colspan="3" class="empty">No active participants</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  container.innerHTML = headerHtml + removalHtml + warningHtml + overviewHtml + rankHtml + daysLeftHtml;
 }
 
 // Plain-text rendering of the same summary for WhatsApp. WhatsApp text messages ignore HTML, and
@@ -2960,6 +2994,21 @@ function challenge100BuildDetailShareText(s) {
     '```',
     `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} ${'Cnt'.padStart(4)}  Δ   DL`,
     ...s.ranked.map(r => `${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(r.cur).padStart(4)}  ${r.diff >= 0 ? '+' : ''}${r.diff}  ${overallDaysLeft - r.cur}`),
+    '```',
+    '',
+  );
+
+  // Days Left to reach 100 for each participant — 🔴 marks anyone the overall countdown can
+  // still cover (overallDaysLeft >= their days needed), same rule as the on-screen red highlight.
+  lines.push(
+    `🎯 Days Left to Reach 100 ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays )`,
+    '```',
+    ...s.ranked.map(r => {
+      const needed = Math.max(0, 100 - r.cur);
+      const b = challenge100BreakdownForDays(needed);
+      const flag = overallDaysLeft >= needed ? '🔴' : '  ';
+      return `${flag}${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(needed).padStart(3)} (${b.weekdays}wd+${b.sundays}su)`;
+    }),
     '```',
   );
 
