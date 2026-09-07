@@ -2878,20 +2878,19 @@ function renderChallenge100Summary(participants, progress, frozen) {
         <td>${r.name}</td>
         <td>${r.cur}</td>
         <td><span class="c100-dot c100-dot-${dot}"></span>${r.diff >= 0 ? '+' : ''}${r.diff}</td>
-        <td>${overallDaysLeft - r.cur}</td>
       </tr>`;
   }).join('');
 
   const rankHtml = `
     <div class="c100-summary-section c100-summary-dashboard">
       <div class="c100-summary-header">
-        <h4>📋 Detailed Status ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays )</h4>
+        <h4>📋 Detailed Status</h4>
         <button class="btn-secondary c100-share-btn" onclick="challenge100ShareDetailSummary()">📤 Share to WhatsApp</button>
       </div>
       <div class="table-scroll">
         <table class="c100-rank-table">
-          <thead><tr><th>Rank</th><th>Name</th><th>Count</th><th>Δ vs last week</th><th>Days Left</th></tr></thead>
-          <tbody>${rankRows || '<tr><td colspan="5" class="empty">No active participants</td></tr>'}</tbody>
+          <thead><tr><th>Rank</th><th>Name</th><th>Count</th><th>Δ vs last week</th></tr></thead>
+          <tbody>${rankRows || '<tr><td colspan="4" class="empty">No active participants</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
@@ -2988,10 +2987,10 @@ function challenge100BuildDetailShareText(s) {
   const overallDaysLeft = daysLeftInfo.total;
   const nameW = Math.max(4, ...s.ranked.map(r => r.name.length));
   lines.push(
-    `📋 Detailed Status ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays )`,
+    '📋 Detailed Status',
     '```',
-    `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} ${'Cnt'.padStart(4)}  Δ   DL`,
-    ...s.ranked.map(r => `${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(r.cur).padStart(4)}  ${r.diff >= 0 ? '+' : ''}${r.diff}  ${overallDaysLeft - r.cur}`),
+    `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} ${'Cnt'.padStart(4)}  Δ`,
+    ...s.ranked.map(r => `${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(r.cur).padStart(4)}  ${r.diff >= 0 ? '+' : ''}${r.diff}`),
     '```',
     '',
   );
