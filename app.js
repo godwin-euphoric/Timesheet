@@ -2896,18 +2896,17 @@ function renderChallenge100Summary(participants, progress, frozen) {
       </div>
     </div>`;
 
-  // Session 6 — Days Left to Reach 100: how many more count-days each participant still needs,
-  // split into Weekdays/Sundays same as the overall countdown. Highlighted red when that's more
-  // than the overall days left — they can't get there even if every remaining day counts.
+  // Session 6 — Days Left to Reach 100: how many more count-days each participant still needs.
+  // Highlighted red when that's more than the overall days left — they can't get there even if
+  // every remaining day counts.
   const daysLeftRows = s.ranked.map(r => {
     const needed = Math.max(0, 100 - r.cur);
-    const b = challenge100BreakdownForDays(needed);
     const flagged = needed > overallDaysLeft;
     return `
       <tr class="${flagged ? 'c100-row-daysleft-red' : ''}">
         <td>${r.rank}</td>
         <td>${r.name}</td>
-        <td>${needed} ( ${b.weekdays} Weekdays + ${b.sundays} Sundays )</td>
+        <td>${needed}</td>
       </tr>`;
   }).join('');
 
@@ -3005,9 +3004,8 @@ function challenge100BuildDetailShareText(s) {
     `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} DL`,
     ...s.ranked.map(r => {
       const needed = Math.max(0, 100 - r.cur);
-      const b = challenge100BreakdownForDays(needed);
       const flag = needed > overallDaysLeft ? '🔴' : '  ';
-      return `${flag}${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${needed} (${b.weekdays}wd+${b.sundays}su)`;
+      return `${flag}${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${needed}`;
     }),
     '```',
   );
