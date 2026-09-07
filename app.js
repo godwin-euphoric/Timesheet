@@ -2896,23 +2896,30 @@ function renderChallenge100Summary(participants, progress, frozen) {
       </div>
     </div>`;
 
-  // Session 6 — Days Left to Reach 100: how many more count-days each participant still needs.
-  // Highlighted red when that's more than the overall days left — they can't get there even if
-  // every remaining day counts, worth flagging on the summary.
+  // Session 6 — Days Left to Reach 100: how many more count-days each participant still needs,
+  // split into Weekdays/Sundays same as the overall countdown. Highlighted red when that's more
+  // than the overall days left — they can't get there even if every remaining day counts.
   const daysLeftRows = s.ranked.map(r => {
     const needed = Math.max(0, 100 - r.cur);
+    const b = challenge100BreakdownForDays(needed);
     const flagged = needed > overallDaysLeft;
     return `
-      <div class="c100-summary-row${flagged ? ' c100-summary-row-red' : ''}">
-        <span>${r.name}</span>
-        <span>${needed}</span>
-      </div>`;
+      <tr class="${flagged ? 'c100-row-daysleft-red' : ''}">
+        <td>${r.rank}</td>
+        <td>${r.name}</td>
+        <td>${needed} ( ${b.weekdays} Weekdays + ${b.sundays} Sundays )</td>
+      </tr>`;
   }).join('');
 
   const daysLeftHtml = `
     <div class="c100-summary-section c100-summary-daysleft">
       <h4>🎯 Days Left to Reach 100 ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays : ${overallDaysLeft} )</h4>
-      <div class="c100-summary-list">${daysLeftRows || '<p class="empty">No active participants</p>'}</div>
+      <div class="table-scroll">
+        <table class="c100-rank-table">
+          <thead><tr><th>Rank</th><th>Name</th><th>Days Left</th></tr></thead>
+          <tbody>${daysLeftRows || '<tr><td colspan="3" class="empty">No active participants</td></tr>'}</tbody>
+        </table>
+      </div>
     </div>`;
 
   container.innerHTML = headerHtml + removalHtml + warningHtml + overviewHtml + rankHtml + daysLeftHtml;
@@ -2995,10 +3002,12 @@ function challenge100BuildDetailShareText(s) {
   lines.push(
     `🎯 Days Left to Reach 100 ( ${daysLeftInfo.weekdays} Weekdays + ${daysLeftInfo.sundays} Sundays : ${overallDaysLeft} )`,
     '```',
+    `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} DL`,
     ...s.ranked.map(r => {
       const needed = Math.max(0, 100 - r.cur);
+      const b = challenge100BreakdownForDays(needed);
       const flag = needed > overallDaysLeft ? '🔴' : '  ';
-      return `${flag}${r.name.padEnd(nameW)} : ${needed}`;
+      return `${flag}${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${needed} (${b.weekdays}wd+${b.sundays}su)`;
     }),
     '```',
   );
