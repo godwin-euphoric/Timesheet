@@ -71,7 +71,6 @@
       <button class="tab-btn hidden" id="tab-btn-challenge100" data-tab="challenge100">100 Days</button>
       <button class="tab-btn" data-tab="log">Journal</button>
       <button class="tab-btn" data-tab="excelimport">GoalTracker</button>
-      <button class="tab-btn" data-tab="calculator">Calculator</button>
       <button class="tab-btn" data-tab="settings">Settings</button>
       <button class="tab-btn" data-tab="health">Health</button>
       <button class="tab-btn hidden" id="tab-btn-admin" data-tab="admin">Admin</button>
@@ -631,84 +630,6 @@
         <button class="btn-secondary" onclick="downloadExcelImport()">⬇ Download</button>
       </div>
       <span id="excelimport-filename" class="hint" style="display:block;margin-top:8px"></span>
-    </div>
-  </div>
-
-  <!-- ══ CALCULATOR ═══════════════════════════════════════════════════════════ -->
-  <div id="tab-calculator" class="tab-content">
-    <div class="planner-sub-tabs" id="calc-sub-tabs"></div>
-
-    <div id="calc-loans-panel">
-      <div class="card">
-        <div class="card-title">💰 Loans</div>
-        <p class="hint">Pending recalculates live from To Pay − Paid. The Gold Principal, Gold Interest and Jeni Akka Amount rows auto-fill from the trackers below.</p>
-        <div class="table-scroll">
-          <table class="calc-table" id="calc-loans-table"></table>
-        </div>
-        <div class="planner-add-btns">
-          <button class="btn-planner-add-row" onclick="calcLoanAddRow()">+ Row</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">🥇 Gold Principal + Interest Paid</div>
-        <div class="table-scroll">
-          <table class="calc-table" id="calc-gold-table"></table>
-        </div>
-        <div class="planner-add-btns">
-          <button class="btn-planner-add-row" onclick="calcGoldAddRow()">+ Row</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">🪙 Jeni Akka Amount Schedule</div>
-        <div class="table-scroll">
-          <table class="calc-table" id="calc-jeni-table"></table>
-        </div>
-        <div class="planner-add-btns">
-          <button class="btn-planner-add-row" onclick="calcJeniAddRow()">+ Row</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="calc-monthly-panel" class="hidden">
-      <div class="card">
-        <div class="card-title">📅 Salary &amp; Expenses</div>
-        <div class="table-scroll">
-          <table class="calc-table" id="calc-salary-table"></table>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">🎁 To Give to Me</div>
-        <div class="table-scroll"><table class="calc-table" id="calc-toGiveToMe-table"></table></div>
-        <div class="planner-add-btns"><button class="btn-planner-add-row" onclick="calcLedgerAddRow('toGiveToMe')">+ Row</button></div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">🏦 HDFC</div>
-        <div class="table-scroll"><table class="calc-table" id="calc-hdfc-table"></table></div>
-        <div class="planner-add-btns"><button class="btn-planner-add-row" onclick="calcHdfcAddRow()">+ Row</button></div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">👧 Pratheeba / Misc</div>
-        <div class="table-scroll"><table class="calc-table" id="calc-pratheeba-table"></table></div>
-        <div class="planner-add-btns"><button class="btn-planner-add-row" onclick="calcLedgerAddRow('pratheeba')">+ Row</button></div>
-        <p class="hint">Available (HDFC "To Settle" total − Pratheeba total): <span id="calc-pratheeba-available">0</span></p>
-      </div>
-
-      <div class="card">
-        <div class="card-title">🧾 Expense</div>
-        <div class="table-scroll"><table class="calc-table" id="calc-expenseRS-table"></table></div>
-        <div class="planner-add-btns"><button class="btn-planner-add-row" onclick="calcLedgerAddRow('expenseRS')">+ Row</button></div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">💳 Credit Card / Big Expense Tracker</div>
-        <div class="table-scroll"><table class="calc-table" id="calc-creditcard-table"></table></div>
-        <div class="planner-add-btns"><button class="btn-planner-add-row" onclick="calcCreditAddRow()">+ Row</button></div>
-      </div>
     </div>
   </div>
 
