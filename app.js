@@ -298,7 +298,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, log: loadLogTab, excelimport: loadExcelImportTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, log: loadLogTab, excelimport: loadExcelImportTab, calculator: loadCalculatorTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -2398,6 +2398,545 @@ function endExcelImportRowResize() {
   sheet.rowHeights[ri] = ta ? ta.style.height : '';
   renderExcelImportSheetTable();
   scheduleExcelImportSave();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  CALCULATOR TAB
+// ══════════════════════════════════════════════════════════════════════════
+// Reproduces "Calcualtor Amounts.xlsx" (its Loans + Monthly sheets) as live,
+// editable tables — every derived cell (Pending, totals, Static Total, Total
+// Expense, Remaining, Available in Hand, ...) is a plain JS formula
+// recomputed on input, not a static import of the sheet's last-saved values
+// (those values are only used as the starting defaults, seeded below).
+// Saves to Firestore debounced, same pattern as the GoalTracker tab. Typing
+// stays smooth because an input's own edit only patches the affected
+// computed cells directly (see the calc*Recalc functions) instead of
+// re-rendering the whole table — a full re-render only happens on
+// sub-tab switch, initial load, or an add/remove-row action.
+
+state.calculatorActiveTab = 'loans'; // 'loans' | 'monthly'
+
+const CALC_EXPENSE_ITEMS = ['Gold Loan', 'Father Money', 'Housing Loan', 'EMI', 'Food Expense', 'Coworking Space + Bangalore Trips', 'Variable Expense + Eatables'];
+const CALC_STATIC_ITEMS  = ['Current 500', 'Gas', 'Pratheeba', 'Gershwin and Mummy', 'Father Mom Money', 'Internet', 'Book', 'Godwin Class', 'Freddy Class', 'Claude', 'Maintenance + Common Current', 'Insurance'];
+const CALC_LEDGER_HEADERS = { toGiveToMe: ['Name', 'Amount'], pratheeba: ['Item', 'Amount'], expenseRS: ['Item', 'Amount'] };
+
+function calcNum(v) { const n = Number(v); return isFinite(n) ? n : 0; }
+function calcFmt(n) { return calcNum(n).toLocaleString('en-IN'); }
+
+// Starting values seeded from the original workbook, so the tab opens already
+// matching it — everything below is then freely editable/addable/removable.
+function calcDefaultData() {
+  return {
+    loans: {
+      rows: [
+        { source: 'Johnson',           toPay: 100000,  schedule: '2025-12-01',           paid: 0,      kind: 'normal' },
+        { source: 'Gowtham',           toPay: 100000,  schedule: '2026-05-01',           paid: 0,      kind: 'normal' },
+        { source: 'Gowtham SG',        toPay: 100000,  schedule: '2025-10-01',           paid: 0,      kind: 'normal' },
+        { source: 'Malaravan',         toPay: 50000,   schedule: '2025-11-01',           paid: 50000,  kind: 'normal' },
+        { source: 'Kiki',              toPay: 200000,  schedule: 'Aug-2025 / Sep-2025',  paid: 200000, kind: 'normal' },
+        { source: 'Sunil Anna',        toPay: 300000,  schedule: '2027-05-01',           paid: 0,      kind: 'normal' },
+        { source: 'Shabu Anna',        toPay: 100000,  schedule: '2027-05-01',           paid: 0,      kind: 'normal' },
+        { source: 'Hari',              toPay: 100000,  schedule: '2028-05-01',           paid: 0,      kind: 'normal' },
+        { source: 'Ganesh',            toPay: 100000,  schedule: '2025-11-01',           paid: 0,      kind: 'normal' },
+        { source: 'Gold Principal',    toPay: 2500000, schedule: 'Monthly',              paid: 0,      kind: 'goldPrincipal' },
+        { source: 'Gold Interest',     toPay: 480000,  schedule: 'Roughly 20000/month',  paid: 0,      kind: 'goldInterest' },
+        { source: 'Jeni Akka Amount',  toPay: 0,       schedule: '',                     paid: 0,      kind: 'jeniAkka' },
+      ],
+      goldTracker: [
+        { month: 'June, 2026', principal: 407000, interest: 20000 },
+        { month: 'July, 2026', principal: 300000, interest: 20000 },
+      ],
+      jeniTracker: [
+        { month: 'March, 2026',  toPay: 13000, paid: 13000 },
+        { month: 'April, 2026',  toPay: 13100, paid: 13100 },
+        { month: 'May, 2026',    toPay: 13200, paid: 13200 },
+        { month: 'June, 2026',   toPay: 13300, paid: 13300 },
+        { month: 'July, 2026',   toPay: 13400, paid: 13400 },
+        { month: 'August, 2026', toPay: 13500, paid: 13500 },
+        { month: 'March, 2027',  toPay: 13600, paid: 13600 },
+        { month: 'April, 2027',  toPay: 13700, paid: 0 },
+        { month: 'May, 2027',    toPay: 13800, paid: 0 },
+        { month: 'June, 2027',   toPay: 13900, paid: 0 },
+        { month: 'July, 2027',   toPay: 14000, paid: 0 },
+        { month: 'August, 2027', toPay: 14100, paid: 0 },
+        { month: 'March, 2028',  toPay: 14200, paid: 0 },
+        { month: 'April, 2028',  toPay: 14300, paid: 0 },
+        { month: 'May, 2028',    toPay: 14450, paid: 0 },
+        { month: 'March, 2027',  toPay: 14600, paid: 0 },
+        { month: 'April, 2027',  toPay: 14750, paid: 0 },
+        { month: 'May, 2027',    toPay: 14900, paid: 0 },
+        { month: 'June, 2027',   toPay: 15050, paid: 0 },
+        { month: 'July, 2027',   toPay: 15200, paid: 0 },
+        { month: 'August, 2027', toPay: 15350, paid: 0 },
+        { month: 'March, 2028',  toPay: 15500, paid: 0 },
+        { month: 'April, 2028',  toPay: 15650, paid: 0 },
+        { month: 'May, 2028',    toPay: 15800, paid: 0 },
+        { month: 'June, 2028',   toPay: 16000, paid: 0 },
+      ],
+    },
+    monthly: {
+      months: ['July', 'August'],
+      salary: {
+        July:   {
+          considered: 94725,
+          expenses: { 'Gold Loan': 12000, 'Father Money': 2000, 'Housing Loan': 15000, 'EMI': 14000, 'Food Expense': 12000, 'Coworking Space + Bangalore Trips': 9000, 'Variable Expense + Eatables': 15000 },
+          static:   { 'Current 500': 0, 'Gas': 0, 'Pratheeba': 0, 'Gershwin and Mummy': 2000, 'Father Mom Money': 2500, 'Internet': 3000, 'Book': 0, 'Godwin Class': 3000, 'Freddy Class': 1000, 'Claude': 2200, 'Maintenance + Common Current': 425, 'Insurance': 1600 },
+        },
+        August: {
+          considered: 94725,
+          expenses: { 'Gold Loan': 12000, 'Father Money': 2000, 'Housing Loan': 15000, 'EMI': 14000, 'Food Expense': 12000, 'Coworking Space + Bangalore Trips': 6000, 'Variable Expense + Eatables': 15000 },
+          static:   { 'Current 500': 0, 'Gas': 0, 'Pratheeba': 2000, 'Gershwin and Mummy': 500, 'Father Mom Money': 2000, 'Internet': 0, 'Book': 0, 'Godwin Class': 3000, 'Freddy Class': 3000, 'Claude': 2200, 'Maintenance + Common Current': 0, 'Insurance': 1600 },
+        },
+      },
+      toGiveToMe: [
+        { label: 'Goodwin', amount: 10000 },
+      ],
+      hdfc: [
+        { label: 'HDFC',                  amount: 962,  inSettleTotal: true },
+        { label: 'Dhanasekar',            amount: 3500, inSettleTotal: true },
+        { label: 'Vignesh',               amount: 930,  inSettleTotal: true },
+        { label: 'Turf - Mohan, Naveen',  amount: 400,  inSettleTotal: true },
+        { label: 'Brittle',               amount: 1990, inSettleTotal: false },
+        { label: 'Purse',                 amount: 0,    inSettleTotal: false },
+      ],
+      pratheeba: [
+        { label: 'Pratheeba Cricket Class', amount: 2500 },
+        { label: 'Pratheeba Cab',           amount: 350 },
+        { label: 'Insurance',               amount: 1400 },
+        { label: 'Credit Card',             amount: 0 },
+        { label: 'Borrowed',                amount: 0 },
+      ],
+      expenseRS: [
+        { label: 'HDFC Insurance',    amount: 1500 },
+        { label: 'Variable Expense',  amount: 10000 },
+        { label: 'Freddy Class',      amount: 2000 },
+        { label: 'Credit Card',       amount: 0 },
+      ],
+      creditCardTracker: [
+        { item: 'All Expense',    total: 7449,  paid: 7449, notes: 'Paid on Sept-5' },
+        { item: 'Gold',           total: 12000, paid: 0,    notes: 'Next Month' },
+        { item: 'Cricket Kit',    total: 4000,  paid: 1000, notes: 'Sep 13 - Inform Gershwin' },
+        { item: 'Freddy School',  total: 40500, paid: 0,    notes: '' },
+        { item: 'Coworking Space', total: 9440, paid: 0,    notes: '' },
+      ],
+    },
+  };
+}
+
+let calcSaveTimer = null;
+function scheduleCalcSave() {
+  clearTimeout(calcSaveTimer);
+  calcSaveTimer = setTimeout(() => saveUserData({ calculator: state.calculator }), 800);
+}
+
+async function loadCalculatorTab() {
+  const userData = await getUserData();
+  state.calculator = userData.calculator || calcDefaultData();
+  renderCalculatorUI();
+}
+
+function renderCalculatorUI() {
+  document.getElementById('calc-sub-tabs').innerHTML = `
+    <button class="planner-sub-tab${state.calculatorActiveTab === 'loans' ? ' active' : ''}" onclick="switchCalculatorTab('loans')">Loans</button>
+    <button class="planner-sub-tab${state.calculatorActiveTab === 'monthly' ? ' active' : ''}" onclick="switchCalculatorTab('monthly')">Monthly</button>
+  `;
+  document.getElementById('calc-loans-panel').classList.toggle('hidden', state.calculatorActiveTab !== 'loans');
+  document.getElementById('calc-monthly-panel').classList.toggle('hidden', state.calculatorActiveTab !== 'monthly');
+  if (state.calculatorActiveTab === 'loans') renderCalcLoans(); else renderCalcMonthly();
+}
+
+function switchCalculatorTab(tab) {
+  state.calculatorActiveTab = tab;
+  renderCalculatorUI();
+}
+
+// ── Loans sub-tab ───────────────────────────────────────────────────────────
+
+function calcLoanCell(r, i, field) {
+  const computed = (field === 'paid'  && (r.kind === 'goldPrincipal' || r.kind === 'goldInterest' || r.kind === 'jeniAkka'))
+                 || (field === 'toPay' && r.kind === 'jeniAkka');
+  if (computed) return `<span class="calc-computed" id="calc-loan-${field}-${i}">${calcFmt(r[field])}</span>`;
+  return `<input type="number" value="${calcNum(r[field])}" oninput="calcLoanRowInput(${i},'${field}',this.value)">`;
+}
+
+function renderCalcLoans() {
+  const L = state.calculator.loans;
+  const rowsHtml = L.rows.map((r, i) => `
+    <tr>
+      <td><input type="text" value="${escHtml(r.source)}" oninput="calcLoanRowInput(${i},'source',this.value)"></td>
+      <td>${calcLoanCell(r, i, 'toPay')}</td>
+      <td><input type="text" value="${escHtml(r.schedule)}" oninput="calcLoanRowInput(${i},'schedule',this.value)"></td>
+      <td>${calcLoanCell(r, i, 'paid')}</td>
+      <td class="calc-computed" id="calc-loan-pending-${i}">${calcFmt(calcNum(r.toPay) - calcNum(r.paid))}</td>
+      <td><button class="calc-row-del" onclick="calcLoanRemoveRow(${i})" title="Remove row">✕</button></td>
+    </tr>`).join('');
+
+  document.getElementById('calc-loans-table').innerHTML = `
+    <thead><tr><th>Source</th><th>To Pay</th><th>Repayment Schedule</th><th>Paid</th><th>Pending</th><th></th></tr></thead>
+    <tbody>${rowsHtml || '<tr><td colspan="6" class="empty">No loans yet</td></tr>'}</tbody>
+    <tfoot><tr class="calc-total-row">
+      <td>Total</td>
+      <td id="calc-loans-total-topay">0</td>
+      <td></td>
+      <td id="calc-loans-total-paid">0</td>
+      <td id="calc-loans-total-pending">0</td>
+      <td></td>
+    </tr></tfoot>`;
+
+  renderCalcGoldTracker();
+  renderCalcJeniTracker();
+  calcLoansRecalc();
+}
+
+function calcLoanRowInput(i, field, value) {
+  const r = state.calculator.loans.rows[i];
+  r[field] = (field === 'source' || field === 'schedule') ? value : calcNum(value);
+  calcLoansRecalc();
+  scheduleCalcSave();
+}
+
+function calcLoanAddRow() {
+  state.calculator.loans.rows.push({ source: '', toPay: 0, schedule: '', paid: 0, kind: 'normal' });
+  renderCalcLoans();
+  scheduleCalcSave();
+}
+
+function calcLoanRemoveRow(i) {
+  state.calculator.loans.rows.splice(i, 1);
+  renderCalcLoans();
+  scheduleCalcSave();
+}
+
+// Recomputes the Gold Principal / Gold Interest / Jeni Akka rows from their
+// linked trackers, then every row's Pending and the totals row — patches the
+// existing cells in place so an in-progress edit never loses focus.
+function calcLoansRecalc() {
+  const L = state.calculator.loans;
+  const goldPrincipalPaid = L.goldTracker.reduce((s, g) => s + calcNum(g.principal), 0);
+  const goldInterestPaid  = L.goldTracker.reduce((s, g) => s + calcNum(g.interest), 0);
+  const jeniToPay = L.jeniTracker.reduce((s, j) => s + calcNum(j.toPay), 0);
+  const jeniPaid  = L.jeniTracker.reduce((s, j) => s + calcNum(j.paid), 0);
+
+  let totalToPay = 0, totalPaid = 0, totalPending = 0;
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = calcFmt(v); };
+
+  L.rows.forEach((r, i) => {
+    if (r.kind === 'goldPrincipal') r.paid = goldPrincipalPaid;
+    if (r.kind === 'goldInterest')  r.paid = goldInterestPaid;
+    if (r.kind === 'jeniAkka')      { r.toPay = jeniToPay; r.paid = jeniPaid; }
+    setText(`calc-loan-paid-${i}`,  r.paid);
+    setText(`calc-loan-toPay-${i}`, r.toPay);
+    const pending = calcNum(r.toPay) - calcNum(r.paid);
+    setText(`calc-loan-pending-${i}`, pending);
+    totalToPay += calcNum(r.toPay);
+    totalPaid  += calcNum(r.paid);
+    totalPending += pending;
+  });
+
+  setText('calc-loans-total-topay',   totalToPay);
+  setText('calc-loans-total-paid',    totalPaid);
+  setText('calc-loans-total-pending', totalPending);
+}
+
+function renderCalcGoldTracker() {
+  const rows = state.calculator.loans.goldTracker;
+  document.getElementById('calc-gold-table').innerHTML = `
+    <thead><tr><th>Month</th><th>Principal</th><th>Interest</th><th></th></tr></thead>
+    <tbody>${rows.map((g, i) => `
+      <tr>
+        <td><input type="text" value="${escHtml(g.month)}" oninput="calcGoldRowInput(${i},'month',this.value)"></td>
+        <td><input type="number" value="${calcNum(g.principal)}" oninput="calcGoldRowInput(${i},'principal',this.value)"></td>
+        <td><input type="number" value="${calcNum(g.interest)}" oninput="calcGoldRowInput(${i},'interest',this.value)"></td>
+        <td><button class="calc-row-del" onclick="calcGoldRemoveRow(${i})" title="Remove row">✕</button></td>
+      </tr>`).join('') || '<tr><td colspan="4" class="empty">No entries yet</td></tr>'}</tbody>`;
+}
+
+function calcGoldRowInput(i, field, value) {
+  const g = state.calculator.loans.goldTracker[i];
+  g[field] = field === 'month' ? value : calcNum(value);
+  calcLoansRecalc();
+  scheduleCalcSave();
+}
+
+function calcGoldAddRow() {
+  state.calculator.loans.goldTracker.push({ month: '', principal: 0, interest: 0 });
+  renderCalcGoldTracker();
+  calcLoansRecalc();
+  scheduleCalcSave();
+}
+
+function calcGoldRemoveRow(i) {
+  state.calculator.loans.goldTracker.splice(i, 1);
+  renderCalcGoldTracker();
+  calcLoansRecalc();
+  scheduleCalcSave();
+}
+
+function renderCalcJeniTracker() {
+  const rows = state.calculator.loans.jeniTracker;
+  const totalToPay = rows.reduce((s, j) => s + calcNum(j.toPay), 0);
+  const totalPaid  = rows.reduce((s, j) => s + calcNum(j.paid), 0);
+  document.getElementById('calc-jeni-table').innerHTML = `
+    <thead><tr><th>S.No</th><th>Month</th><th>To Pay</th><th>Paid</th><th></th></tr></thead>
+    <tbody>${rows.map((j, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td><input type="text" value="${escHtml(j.month)}" oninput="calcJeniRowInput(${i},'month',this.value)"></td>
+        <td><input type="number" value="${calcNum(j.toPay)}" oninput="calcJeniRowInput(${i},'toPay',this.value)"></td>
+        <td><input type="number" value="${calcNum(j.paid)}" oninput="calcJeniRowInput(${i},'paid',this.value)"></td>
+        <td><button class="calc-row-del" onclick="calcJeniRemoveRow(${i})" title="Remove row">✕</button></td>
+      </tr>`).join('') || '<tr><td colspan="5" class="empty">No entries yet</td></tr>'}</tbody>
+    <tfoot><tr class="calc-total-row"><td></td><td>Total</td><td id="calc-jeni-total-topay">${calcFmt(totalToPay)}</td><td id="calc-jeni-total-paid">${calcFmt(totalPaid)}</td><td></td></tr></tfoot>`;
+}
+
+function calcJeniRowInput(i, field, value) {
+  const j = state.calculator.loans.jeniTracker[i];
+  j[field] = field === 'month' ? value : calcNum(value);
+  const rows = state.calculator.loans.jeniTracker;
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = calcFmt(v); };
+  setText('calc-jeni-total-topay', rows.reduce((s, x) => s + calcNum(x.toPay), 0));
+  setText('calc-jeni-total-paid',  rows.reduce((s, x) => s + calcNum(x.paid), 0));
+  calcLoansRecalc();
+  scheduleCalcSave();
+}
+
+function calcJeniAddRow() {
+  state.calculator.loans.jeniTracker.push({ month: '', toPay: 0, paid: 0 });
+  renderCalcJeniTracker();
+  calcLoansRecalc();
+  scheduleCalcSave();
+}
+
+function calcJeniRemoveRow(i) {
+  state.calculator.loans.jeniTracker.splice(i, 1);
+  renderCalcJeniTracker();
+  calcLoansRecalc();
+  scheduleCalcSave();
+}
+
+// ── Monthly sub-tab ─────────────────────────────────────────────────────────
+
+function renderCalcMonthly() {
+  const M = state.calculator.monthly;
+  document.getElementById('calc-salary-table').innerHTML = calcSalaryTableHtml(M);
+  M.months.forEach(m => calcSalaryRecalc(m));
+  renderCalcLedger('toGiveToMe');
+  renderCalcHdfc();
+  renderCalcLedger('pratheeba');
+  renderCalcLedger('expenseRS');
+  renderCalcCreditCardTracker();
+  calcMonthlyRecalcCrossTotals();
+}
+
+function calcSalaryTableHtml(M) {
+  const monthsHead = M.months.map(m => `<th>${escHtml(m)}</th>`).join('');
+  const expenseRows = CALC_EXPENSE_ITEMS.map(label => `
+    <tr><td>${escHtml(label)}</td>${M.months.map(m => `
+      <td><input type="number" value="${calcNum(M.salary[m].expenses[label])}" oninput="calcSalaryExpenseInput('${m}','${label}',this.value)"></td>`).join('')}</tr>`).join('');
+  const staticRows = CALC_STATIC_ITEMS.map(label => `
+    <tr><td class="calc-sub">${escHtml(label)}</td>${M.months.map(m => `
+      <td><input type="number" value="${calcNum(M.salary[m].static[label])}" oninput="calcSalaryStaticInput('${m}','${label}',this.value)"></td>`).join('')}</tr>`).join('');
+
+  return `
+    <thead><tr><th>Item</th>${monthsHead}</tr></thead>
+    <tbody>
+      <tr><td>Salary (Considered)</td>${M.months.map(m => `<td><input type="number" value="${calcNum(M.salary[m].considered)}" oninput="calcSalaryConsideredInput('${m}',this.value)"></td>`).join('')}</tr>
+      ${expenseRows}
+      ${staticRows}
+      <tr class="calc-total-row"><td>Static Total</td>${M.months.map(m => `<td id="calc-static-total-${m}">0</td>`).join('')}</tr>
+      <tr class="calc-total-row"><td>Total Expense</td>${M.months.map(m => `<td id="calc-total-expense-${m}">0</td>`).join('')}</tr>
+      <tr class="calc-total-row"><td>Remaining</td>${M.months.map(m => `<td id="calc-remaining-${m}">0</td>`).join('')}</tr>
+    </tbody>`;
+}
+
+function calcSalaryConsideredInput(m, value) {
+  state.calculator.monthly.salary[m].considered = calcNum(value);
+  calcSalaryRecalc(m);
+  scheduleCalcSave();
+}
+
+function calcSalaryExpenseInput(m, label, value) {
+  state.calculator.monthly.salary[m].expenses[label] = calcNum(value);
+  calcSalaryRecalc(m);
+  scheduleCalcSave();
+}
+
+function calcSalaryStaticInput(m, label, value) {
+  state.calculator.monthly.salary[m].static[label] = calcNum(value);
+  calcSalaryRecalc(m);
+  scheduleCalcSave();
+}
+
+function calcSalaryRecalc(m) {
+  const s = state.calculator.monthly.salary[m];
+  const staticTotal  = CALC_STATIC_ITEMS.reduce((sum, label) => sum + calcNum(s.static[label]), 0);
+  const expenseTotal = CALC_EXPENSE_ITEMS.reduce((sum, label) => sum + calcNum(s.expenses[label]), 0);
+  const totalExpense = expenseTotal + staticTotal;
+  const remaining = calcNum(s.considered) - totalExpense;
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = calcFmt(v); };
+  setText(`calc-static-total-${m}`,  staticTotal);
+  setText(`calc-total-expense-${m}`, totalExpense);
+  const remEl = document.getElementById(`calc-remaining-${m}`);
+  if (remEl) {
+    remEl.textContent = calcFmt(remaining);
+    remEl.classList.toggle('calc-negative', remaining < 0);
+  }
+}
+
+// Generic single-column (label, amount) ledger — used for To Give to Me,
+// Pratheeba/Misc and Expense. HDFC needs its own renderer (extra "counts
+// toward To Settle" flag + two cross-ledger totals), see below.
+function renderCalcLedger(key) {
+  const headers = CALC_LEDGER_HEADERS[key];
+  const rows = state.calculator.monthly[key];
+  const total = rows.reduce((s, r) => s + calcNum(r.amount), 0);
+  document.getElementById(`calc-${key}-table`).innerHTML = `
+    <thead><tr><th>${headers[0]}</th><th>${headers[1]}</th><th></th></tr></thead>
+    <tbody>${rows.map((r, i) => `
+      <tr>
+        <td><input type="text" value="${escHtml(r.label)}" oninput="calcLedgerInput('${key}',${i},'label',this.value)"></td>
+        <td><input type="number" value="${calcNum(r.amount)}" oninput="calcLedgerInput('${key}',${i},'amount',this.value)"></td>
+        <td><button class="calc-row-del" onclick="calcLedgerRemoveRow('${key}',${i})" title="Remove row">✕</button></td>
+      </tr>`).join('') || `<tr><td colspan="3" class="empty">No entries yet</td></tr>`}</tbody>
+    <tfoot><tr class="calc-total-row"><td>Total</td><td id="calc-${key}-total">${calcFmt(total)}</td><td></td></tr></tfoot>`;
+}
+
+function calcLedgerInput(key, i, field, value) {
+  state.calculator.monthly[key][i][field] = field === 'label' ? value : calcNum(value);
+  calcLedgerRecalcTotal(key);
+  calcMonthlyRecalcCrossTotals();
+  scheduleCalcSave();
+}
+
+function calcLedgerRecalcTotal(key) {
+  const rows = state.calculator.monthly[key];
+  const total = rows.reduce((s, r) => s + calcNum(r.amount), 0);
+  const el = document.getElementById(`calc-${key}-total`);
+  if (el) el.textContent = calcFmt(total);
+  return total;
+}
+
+function calcLedgerAddRow(key) {
+  state.calculator.monthly[key].push({ label: '', amount: 0 });
+  renderCalcLedger(key);
+  calcMonthlyRecalcCrossTotals();
+  scheduleCalcSave();
+}
+
+function calcLedgerRemoveRow(key, i) {
+  state.calculator.monthly[key].splice(i, 1);
+  renderCalcLedger(key);
+  calcMonthlyRecalcCrossTotals();
+  scheduleCalcSave();
+}
+
+// HDFC has two totals: "To Settle" (rows flagged inSettleTotal) and
+// "Available in Hand" (its HDFC row + its Purse row, matched by label).
+function renderCalcHdfc() {
+  const rows = state.calculator.monthly.hdfc;
+  document.getElementById('calc-hdfc-table').innerHTML = `
+    <thead><tr><th>Item</th><th>Amount</th><th>Counts to "To Settle"</th><th></th></tr></thead>
+    <tbody>${rows.map((r, i) => `
+      <tr>
+        <td><input type="text" value="${escHtml(r.label)}" oninput="calcHdfcInput(${i},'label',this.value)"></td>
+        <td><input type="number" value="${calcNum(r.amount)}" oninput="calcHdfcInput(${i},'amount',this.value)"></td>
+        <td style="text-align:center"><input type="checkbox" ${r.inSettleTotal ? 'checked' : ''} onchange="calcHdfcToggle(${i},this.checked)"></td>
+        <td><button class="calc-row-del" onclick="calcHdfcRemoveRow(${i})" title="Remove row">✕</button></td>
+      </tr>`).join('') || `<tr><td colspan="4" class="empty">No entries yet</td></tr>`}</tbody>
+    <tfoot>
+      <tr class="calc-total-row"><td>To Settle Total</td><td id="calc-hdfc-settle-total">0</td><td></td><td></td></tr>
+      <tr class="calc-total-row"><td>Available in Hand</td><td id="calc-hdfc-available-hand">0</td><td></td><td></td></tr>
+    </tfoot>`;
+  calcHdfcRecalc();
+}
+
+function calcHdfcRecalc() {
+  const rows = state.calculator.monthly.hdfc;
+  const settleTotal = rows.filter(r => r.inSettleTotal).reduce((s, r) => s + calcNum(r.amount), 0);
+  const hdfcRow  = rows.find(r => r.label.trim().toLowerCase() === 'hdfc');
+  const purseRow = rows.find(r => r.label.trim().toLowerCase() === 'purse');
+  const availableInHand = calcNum(hdfcRow?.amount) + calcNum(purseRow?.amount);
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = calcFmt(v); };
+  setText('calc-hdfc-settle-total', settleTotal);
+  setText('calc-hdfc-available-hand', availableInHand);
+  return settleTotal;
+}
+
+function calcHdfcInput(i, field, value) {
+  const r = state.calculator.monthly.hdfc[i];
+  r[field] = field === 'label' ? value : calcNum(value);
+  calcHdfcRecalc();
+  calcMonthlyRecalcCrossTotals();
+  scheduleCalcSave();
+}
+
+function calcHdfcToggle(i, checked) {
+  state.calculator.monthly.hdfc[i].inSettleTotal = checked;
+  calcHdfcRecalc();
+  calcMonthlyRecalcCrossTotals();
+  scheduleCalcSave();
+}
+
+function calcHdfcAddRow() {
+  state.calculator.monthly.hdfc.push({ label: '', amount: 0, inSettleTotal: true });
+  renderCalcHdfc();
+  calcMonthlyRecalcCrossTotals();
+  scheduleCalcSave();
+}
+
+function calcHdfcRemoveRow(i) {
+  state.calculator.monthly.hdfc.splice(i, 1);
+  renderCalcHdfc();
+  calcMonthlyRecalcCrossTotals();
+  scheduleCalcSave();
+}
+
+// Available = HDFC "To Settle" total − Pratheeba/Misc total.
+function calcMonthlyRecalcCrossTotals() {
+  const hdfcSettle = calcHdfcRecalc();
+  const pratheebaTotal = calcLedgerRecalcTotal('pratheeba');
+  const el = document.getElementById('calc-pratheeba-available');
+  if (el) el.textContent = calcFmt(hdfcSettle - pratheebaTotal);
+}
+
+function renderCalcCreditCardTracker() {
+  const rows = state.calculator.monthly.creditCardTracker;
+  const totalPending = rows.reduce((s, r) => s + (calcNum(r.total) - calcNum(r.paid)), 0);
+  document.getElementById('calc-creditcard-table').innerHTML = `
+    <thead><tr><th>Item</th><th>Total</th><th>Paid</th><th>Pending</th><th>Notes</th><th></th></tr></thead>
+    <tbody>${rows.map((r, i) => `
+      <tr>
+        <td><input type="text" value="${escHtml(r.item)}" oninput="calcCreditRowInput(${i},'item',this.value)"></td>
+        <td><input type="number" value="${calcNum(r.total)}" oninput="calcCreditRowInput(${i},'total',this.value)"></td>
+        <td><input type="number" value="${calcNum(r.paid)}" oninput="calcCreditRowInput(${i},'paid',this.value)"></td>
+        <td class="calc-computed" id="calc-credit-pending-${i}">${calcFmt(calcNum(r.total) - calcNum(r.paid))}</td>
+        <td><input type="text" value="${escHtml(r.notes)}" oninput="calcCreditRowInput(${i},'notes',this.value)"></td>
+        <td><button class="calc-row-del" onclick="calcCreditRemoveRow(${i})" title="Remove row">✕</button></td>
+      </tr>`).join('') || `<tr><td colspan="6" class="empty">No entries yet</td></tr>`}</tbody>
+    <tfoot><tr class="calc-total-row"><td>Total</td><td></td><td></td><td id="calc-credit-total-pending">${calcFmt(totalPending)}</td><td></td><td></td></tr></tfoot>`;
+}
+
+function calcCreditRowInput(i, field, value) {
+  const r = state.calculator.monthly.creditCardTracker[i];
+  r[field] = (field === 'item' || field === 'notes') ? value : calcNum(value);
+  const rows = state.calculator.monthly.creditCardTracker;
+  const pendingEl = document.getElementById(`calc-credit-pending-${i}`);
+  if (pendingEl) pendingEl.textContent = calcFmt(calcNum(r.total) - calcNum(r.paid));
+  const totalEl = document.getElementById('calc-credit-total-pending');
+  if (totalEl) totalEl.textContent = calcFmt(rows.reduce((s, x) => s + (calcNum(x.total) - calcNum(x.paid)), 0));
+  scheduleCalcSave();
+}
+
+function calcCreditAddRow() {
+  state.calculator.monthly.creditCardTracker.push({ item: '', total: 0, paid: 0, notes: '' });
+  renderCalcCreditCardTracker();
+  scheduleCalcSave();
+}
+
+function calcCreditRemoveRow(i) {
+  state.calculator.monthly.creditCardTracker.splice(i, 1);
+  renderCalcCreditCardTracker();
+  scheduleCalcSave();
 }
 
 // ══════════════════════════════════════════════════════════════════════════

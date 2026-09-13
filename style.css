@@ -862,6 +862,32 @@ input.c100-name-edit-input {
 .c100-summary-daysleft h4 { color: var(--text); font-size: 15px; }
 .c100-row-daysleft-red td { background: var(--red-bg); color: var(--red); }
 
+/* ══ Calculator tab (Loans + Monthly) ══════════════════════════════════════ */
+.calc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.calc-table th { text-align: left; padding: 8px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.calc-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.calc-table td.calc-sub { padding-left: 20px; color: var(--muted); }
+.calc-table input[type="text"], .calc-table input[type="number"] {
+  height: 30px; padding: 0 8px; width: 100%; min-width: 90px;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--text); font-size: 13px; box-shadow: none;
+}
+.calc-table input[type="text"]:hover, .calc-table input[type="number"]:hover,
+.calc-table input[type="text"]:focus, .calc-table input[type="number"]:focus {
+  border-color: var(--border); background: var(--card2);
+}
+.calc-table input[readonly] { color: var(--muted); }
+.calc-table tfoot .calc-total-row td, .calc-table tbody tr.calc-total-row td {
+  font-weight: 700; color: var(--text); border-top: 1.5px solid var(--border); border-bottom: none;
+}
+.calc-computed { display: inline-block; padding: 0 8px; color: var(--muted); font-weight: 600; }
+.calc-negative { color: var(--red); }
+.calc-row-del {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 4px 6px; border-radius: 6px;
+}
+.calc-row-del:hover { color: var(--red); background: var(--red-bg); }
+
 @media (max-width: 768px) {
   .c100-table { width: max-content; min-width: 100%; }
   .c100-name-col  { min-width: 120px; max-width: 120px; }
