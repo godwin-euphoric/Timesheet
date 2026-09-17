@@ -5893,6 +5893,7 @@ async function renderRegDay(dateStr) {
   renderRegWorkoutList(day.workouts, dateStr);
   renderRegJunkButtons(day.junk);
   document.getElementById('reg-summary-text').value = day.summary || '';
+  document.getElementById('reg-calcheck-textarea').value = day.calorieCheck || '';
   await recalcRegSummary();
 }
 
@@ -6104,8 +6105,9 @@ async function logRegFood() {
   }
 }
 
-// Standalone lookup — unlike logRegFood, this doesn't save anything, it just prints each
-// item's calorie estimate back into the same textarea the user typed into.
+// Standalone lookup — unlike logRegFood, this doesn't save any food entries, it just prints
+// each item's calorie estimate back into the same textarea the user typed into (and persists
+// that result, like saveRegCalorieCheck, so it survives a reload without an extra click).
 async function analyzeRegCalorieCheck() {
   const ta   = document.getElementById('reg-calcheck-textarea');
   const text = ta.value.trim();
@@ -6130,6 +6132,7 @@ async function analyzeRegCalorieCheck() {
     });
     lines.push('', `Total: ${total} kcal`);
     ta.value = lines.join('\n');
+    await saveRegCalorieCheck(true);
   } catch (e) {
     showDietError(e, `Calorie Check input: "${text}"`);
   } finally {
@@ -6300,6 +6303,16 @@ async function saveRegSummaryEdit() {
   const day   = regDayState(mData, state.regDate);
   day.summary = text;
   await saveRegMonthData(month, mData);
+}
+
+async function saveRegCalorieCheck(silent) {
+  const text  = document.getElementById('reg-calcheck-textarea').value;
+  const month = state.regDate.slice(0, 7);
+  const mData = await getRegMonthData(month);
+  const day   = regDayState(mData, state.regDate);
+  day.calorieCheck = text;
+  await saveRegMonthData(month, mData);
+  if (!silent) showToast('Calorie Check saved');
 }
 
 function shareRegSummaryToWhatsapp() {
