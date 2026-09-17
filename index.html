@@ -389,6 +389,19 @@
         </div>
       </div>
 
+      <!-- Calorie Check -->
+      <div class="diet-log-section">
+        <div class="diet-log-label">CALORIE CHECK</div>
+        <textarea id="reg-calcheck-textarea" class="reg-summary-textarea" rows="6"
+                  placeholder="Type foods here, e.g. 2 chapathi, 1 bowl dal, 100g rice — then hit Analyse"></textarea>
+        <div id="reg-calcheck-spinner" class="diet-ai-spinner hidden">
+          <div class="diet-spinner"></div> Analyzing with AI...
+        </div>
+        <div class="reg-summary-actions">
+          <button class="btn-primary" onclick="analyzeRegCalorieCheck()">Analyse</button>
+        </div>
+      </div>
+
     </div><!-- end regimen-content -->
   </div><!-- end tab-regimen -->
 

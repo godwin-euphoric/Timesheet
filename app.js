@@ -6104,6 +6104,40 @@ async function logRegFood() {
   }
 }
 
+// Standalone lookup — unlike logRegFood, this doesn't save anything, it just prints each
+// item's calorie estimate back into the same textarea the user typed into.
+async function analyzeRegCalorieCheck() {
+  const ta   = document.getElementById('reg-calcheck-textarea');
+  const text = ta.value.trim();
+  if (!text) { showToast('Type some foods first'); return; }
+
+  const spinner = document.getElementById('reg-calcheck-spinner');
+  spinner.classList.remove('hidden');
+  ta.disabled = true;
+
+  try {
+    const items = await parseFoodWithAI(text);
+    if (!items?.length) { showToast('AI could not parse that — try again'); return; }
+
+    let total = 0;
+    const lines = items.map(item => {
+      const qty  = parseFloat(item.quantity) || 1;
+      const cal  = Math.round(qty * (parseFloat(item.calories_per_unit) || 0));
+      total += cal;
+      const unit  = (item.unit || 'serving').trim();
+      const qtyLabel = (unit === 'g' || unit === 'ml') ? `${qty}${unit}` : `${qty} ${unit}`;
+      return `${item.name} (${qtyLabel}) — ${cal} kcal`;
+    });
+    lines.push('', `Total: ${total} kcal`);
+    ta.value = lines.join('\n');
+  } catch (e) {
+    showDietError(e, `Calorie Check input: "${text}"`);
+  } finally {
+    spinner.classList.add('hidden');
+    ta.disabled = false;
+  }
+}
+
 async function deleteRegFood(dateStr, id) {
   const month = dateStr.slice(0, 7);
   const mData = await getRegMonthData(month);
