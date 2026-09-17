@@ -237,6 +237,23 @@
 
     </div><!-- end log-row -->
 
+    <!-- Per-tab notes -->
+    <div class="card" id="main-tabnotes-card">
+      <div class="card-title">🗒 Tab Notes</div>
+      <div class="log-form">
+        <div class="field-group">
+          <label>Tab</label>
+          <select id="main-tabnotes-select" onchange="loadMainTabNote()">
+            <option value="">-- Select --</option>
+          </select>
+        </div>
+        <textarea id="main-tabnotes-text" class="main-notes-input" placeholder="Select a tab above, then jot a note for it here..."></textarea>
+        <div class="field-group form-action">
+          <button class="btn-primary" onclick="saveMainTabNote()">Save</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Journal logging on main tab -->
     <div class="card" id="main-fm-card">
       <div class="card-title">📚 Journal</div>

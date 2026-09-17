@@ -319,6 +319,43 @@ async function loadMainTab() {
   populateMainFmDropdown(ud.fmCategories || []);
   renderFmTablesMain(ud.fmCategories || [], ud.fmLog || []);
   loadFMTracker();
+  state.tabNotes = ud.tabNotes || {};
+  populateMainTabNotesDropdown();
+  loadMainTabNote();
+}
+
+// ── Per-tab notes ────────────────────────────────────────────────────────────
+// A dropdown of the site's visible tabs plus a free-text box, so a quick note about
+// any tab can be jotted from the Main tab without switching away. Stored keyed by
+// each tab's data-tab id (userData.tabNotes), independent of month/date.
+
+function populateMainTabNotesDropdown() {
+  const sel = document.getElementById('main-tabnotes-select');
+  if (!sel) return;
+  const prevValue = sel.value;
+  const options = [...document.querySelectorAll('.tab-btn')]
+    .filter(btn => !btn.classList.contains('hidden'))
+    .map(btn => `<option value="${btn.dataset.tab}">${escHtml(btn.textContent.trim())}</option>`)
+    .join('');
+  sel.innerHTML = '<option value="">-- Select --</option>' + options;
+  if ([...sel.options].some(o => o.value === prevValue)) sel.value = prevValue;
+}
+
+function loadMainTabNote() {
+  const sel = document.getElementById('main-tabnotes-select');
+  const ta  = document.getElementById('main-tabnotes-text');
+  if (!sel || !ta) return;
+  ta.value = sel.value ? (state.tabNotes?.[sel.value] || '') : '';
+}
+
+async function saveMainTabNote() {
+  const sel = document.getElementById('main-tabnotes-select');
+  if (!sel.value) { showToast('Select a tab first'); return; }
+  const ta = document.getElementById('main-tabnotes-text');
+  if (!state.tabNotes) state.tabNotes = {};
+  state.tabNotes[sel.value] = ta.value;
+  await saveUserData({ tabNotes: state.tabNotes });
+  showToast(`Note saved for ${sel.options[sel.selectedIndex].textContent}`);
 }
 
 let mainNotesTimer = null;
