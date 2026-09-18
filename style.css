@@ -621,15 +621,6 @@ td.sleep-cell:hover { background: #16243f !important; }
 .hwell-totals-row .hwell-row-label { color: var(--lime); }
 .hwell-total-cell { font-size: 11px; color: var(--muted); font-weight: 700; }
 
-.activeness-scale { display: flex; gap: 8px; margin-bottom: 12px; }
-.activeness-btn {
-  flex: 1; padding: 10px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--card2); color: var(--muted);
-  font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
-}
-.activeness-btn:hover { border-color: var(--primary); color: var(--text); }
-.activeness-btn.active { background: var(--primary-l); border-color: var(--primary); color: var(--primary-h); }
-
 /* ══ 100 Days Challenge ══════════════════════════════════════════════════════ */
 #tab-challenge100 { overflow-x: clip; }
 .c100-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 13px; }

@@ -1868,6 +1868,12 @@ const WELLNESS_FIXED = [
 ];
 const HWELL_TOTAL = HABITS_FIXED.length + WELLNESS_FIXED.length; // 16
 
+const ACTIVENESS_LEVELS = [
+  { id: 'low',    label: 'Activeness: Low' },
+  { id: 'medium', label: 'Activeness: Medium' },
+  { id: 'high',   label: 'Activeness: High' },
+];
+
 // ── Firestore (per-month doc, same pattern as the Diet/Regimen tab) ────────
 
 function habitsMonthRef(month) {
@@ -1938,6 +1944,21 @@ function hwellBuildRow(item, section, days, mData, today) {
   return `<tr><td class="hwell-row-label" title="${escHtml(item.label)}">${escHtml(item.label)}</td>${cells}</tr>`;
 }
 
+// Builds one row for an Activeness level — checked when that date's single activeness value matches.
+function hwellBuildActivenessRow(item, days, mData, today) {
+  const cells = days.map(d => {
+    const day  = mData.days[d] || {};
+    const done = day.activeness === item.id;
+    const dt   = new Date(d + 'T00:00:00');
+    const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+    return `<td class="hwell-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
+      <button type="button" class="hwell-grid-toggle ${done ? 'done' : ''}"
+        onclick="toggleHwellActiveness('${item.id}','${d}')">${done ? '✓' : ''}</button>
+    </td>`;
+  }).join('');
+  return `<tr><td class="hwell-row-label" title="${escHtml(item.label)}">${escHtml(item.label)}</td>${cells}</tr>`;
+}
+
 async function renderHwellGrid(month) {
   const mData     = await getHabitsMonthData(month);
   const [year, mon] = month.split('-').map(Number);
@@ -1968,8 +1989,11 @@ async function renderHwellGrid(month) {
   }).join('');
   const totalsRow = `<tr class="hwell-totals-row"><td class="hwell-row-label">Achieved</td>${totalCells}</tr>`;
 
+  const activenessRows = ACTIVENESS_LEVELS.map(item => hwellBuildActivenessRow(item, days, mData, today)).join('');
+
   document.getElementById('hwell-grid-table').innerHTML =
-    thead + `<tbody>${groupRow('HABITS')}${habitsRows}${groupRow('DAILY WELLNESS')}${wellnessRows}${totalsRow}</tbody>`;
+    thead + `<tbody>${groupRow('HABITS')}${habitsRows}${groupRow('DAILY WELLNESS')}${wellnessRows}${totalsRow}` +
+    `${groupRow('ACTIVENESS')}${activenessRows}</tbody>`;
 }
 
 async function renderHwellMonthAvg(month) {
@@ -1991,9 +2015,6 @@ async function renderHwellDayPanel(dateStr) {
   const day   = habitsDayState(mData, dateStr);
 
   document.getElementById('hwell-date-label').textContent = formatDietDateLabel(dateStr);
-  document.querySelectorAll('#hwell-activeness-scale .activeness-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.val === day.activeness);
-  });
   document.getElementById('hwell-activeness-notes').value = day.activenessNotes || '';
   document.getElementById('hwell-daily-judgement').value  = day.dailyJudgement || '';
 }
@@ -2012,17 +2033,15 @@ async function toggleHwellItem(section, id, dateStr) {
 }
 
 // ── Activeness ───────────────────────────────────────────────────────────
+// Rating is set from the grid (checkbox row per level, right after Achieved); notes stay here.
 
-async function setHwellActiveness(val) {
-  const dateStr = state.habitsDate;
-  const month   = dateStr.slice(0, 7);
-  const mData   = await getHabitsMonthData(month);
-  const day     = habitsDayState(mData, dateStr);
-  day.activeness = day.activeness === val ? null : val;
+async function toggleHwellActiveness(level, dateStr) {
+  const month = dateStr.slice(0, 7);
+  const mData = await getHabitsMonthData(month);
+  const day   = habitsDayState(mData, dateStr);
+  day.activeness = day.activeness === level ? null : level;
   await saveHabitsMonthData(month, mData);
-  document.querySelectorAll('#hwell-activeness-scale .activeness-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.val === day.activeness);
-  });
+  await renderHwellGrid(state.habitsMonth);
 }
 
 async function saveHwellActiveness(silent) {
