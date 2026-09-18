@@ -567,97 +567,49 @@ td.sleep-cell:hover { background: #16243f !important; }
 .wc-cell { width: 70px; }
 .wc-check { width: 17px; height: 17px; accent-color: var(--lime); cursor: pointer; }
 
-/* ══ Habit Tracker ═══════════════════════════════════════════════════════════ */
-#tab-habits { overflow-x: clip; }
-.habits-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 13px; }
-
-.habits-table th {
-  padding: 10px 16px; font-size: 11px; font-weight: 700;
-  color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px;
-  background: #0D1628; border-bottom: 2px solid var(--border);
-  text-align: center;
+/* ══ Habits / Daily Wellness tab ═══════════════════════════════════════════ */
+.hwell-avg-card {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 20px; margin-bottom: 16px;
 }
-.habit-name-col {
-  text-align: left !important; min-width: 180px;
-  position: sticky; left: 0; z-index: 20; background: #0D1628;
+.hwell-avg-label { font-size: 13px; color: var(--muted); font-weight: 600; }
+.hwell-avg-value { font-size: 20px; font-weight: 800; color: var(--lime); }
+
+.hwell-list { display: flex; flex-direction: column; gap: 8px; }
+.hwell-toggle {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left; cursor: pointer;
+  background: var(--card2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; font-family: inherit; transition: all 0.15s;
 }
-.habit-day-col   { min-width: 60px; }
-.habits-table th.col-today   { color: var(--amber); border-bottom-color: var(--amber); }
-.habits-table th.col-weekend { color: var(--muted); opacity: 0.6; }
-td.habit-check-cell.cell-weekend { background: rgba(255,255,255,0.02); }
-
-.habit-row td { border-bottom: 1px solid var(--border); }
-.habit-row:hover td { background: var(--card2); }
-
-.habit-name-cell {
-  padding: 12px 16px;
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  position: sticky; left: 0; z-index: 10; background: var(--card);
-}
-.habit-row:hover .habit-name-cell { background: var(--card2); }
-.habit-name-text { font-weight: 600; color: var(--text); }
-.drag-handle {
-  color: var(--muted); font-size: 16px; cursor: grab; flex-shrink: 0;
-  user-select: none; opacity: 0.5; transition: opacity 0.12s;
-}
-.habit-row:hover .drag-handle { opacity: 1; }
-.habit-row.dragging { opacity: 0.4; }
-.habit-row.drag-over td { background: var(--primary-l); border-top: 2px solid var(--primary); }
-
-.habit-name-cell { cursor: pointer; }
-.habit-name-cell:hover .habit-name-text { color: var(--primary-h); text-decoration: underline dotted; }
-
-input.habit-edit-input {
-  flex: 1; height: 30px !important; padding: 0 8px !important;
-  background: var(--card2) !important; color: var(--text) !important;
-  border: 2px solid var(--primary) !important; border-radius: 6px !important;
-  font-size: 13px; font-weight: 600;
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.18) !important;
-  outline: none;
-}
-
-.btn-habit-del {
-  opacity: 0; background: none; border: none; color: var(--muted);
-  font-size: 13px; cursor: pointer; padding: 2px 6px; border-radius: 4px;
-  transition: all 0.15s; flex-shrink: 0;
-}
-.habit-row:hover .btn-habit-del { opacity: 1; }
-.btn-habit-del:hover { background: var(--red-bg); color: var(--red); }
-
-.habit-check-cell { text-align: center; padding: 10px 8px; }
-.habit-check-cell.cell-today { background: rgba(252,211,77,0.05); }
-
-/* Tri-state habit button: blank → done (✓) → missed (✗) */
-.habit-tri {
-  width: 26px; height: 26px;
-  border: 2px solid var(--border); border-radius: 7px;
-  background: var(--card2); cursor: pointer;
-  transition: all 0.15s;
-  display: block; margin: 0 auto;
-  font-size: 15px; font-weight: 900; line-height: 1;
-  color: #0B1120; padding: 0;
-}
-.habit-tri:hover { border-color: var(--primary); }
-.habit-tri.hs-none   { background: var(--card2); }
-.habit-tri.hs-done   { background: var(--green); border-color: var(--green); color: #0B1120; }
-.habit-tri.hs-missed { background: var(--red);   border-color: var(--red);   color: #fff; }
-
-/* Add row */
-.habit-add-row td { padding: 10px 16px; border-top: 2px dashed var(--border); }
-.habit-add-inline {
-  display: flex; align-items: center; gap: 10px;
-}
-.habit-plus {
-  width: 28px; height: 28px; border-radius: 8px;
-  background: var(--primary-l); color: var(--primary-h);
+.hwell-toggle:hover { border-color: var(--primary); }
+.hwell-toggle-mark {
+  width: 22px; height: 22px; flex-shrink: 0;
+  border: 2px solid var(--border); border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 20px; font-weight: 700; flex-shrink: 0;
+  font-size: 13px; font-weight: 900; color: #0B1120;
+  transition: all 0.15s;
 }
-.habit-add-input {
-  flex: 1; height: 36px !important; padding: 0 12px !important;
-  background: var(--card2) !important; border-color: var(--border) !important;
-  border-radius: 8px !important; color: var(--text) !important; font-size: 13px;
+.hwell-toggle-label { font-size: 14px; color: var(--text); }
+.hwell-toggle.done { border-color: var(--green); background: rgba(74,222,128,0.08); }
+.hwell-toggle.done .hwell-toggle-mark { background: var(--green); border-color: var(--green); }
+.hwell-toggle.done .hwell-toggle-label { color: var(--green); font-weight: 600; }
+
+.hwell-count-row {
+  font-size: 13px; color: var(--muted); text-align: center;
+  margin: 4px 0 24px; font-weight: 600;
 }
+.hwell-count-row strong { color: var(--lime); font-size: 15px; }
+
+.activeness-scale { display: flex; gap: 8px; margin-bottom: 12px; }
+.activeness-btn {
+  flex: 1; padding: 10px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--card2); color: var(--muted);
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+}
+.activeness-btn:hover { border-color: var(--primary); color: var(--text); }
+.activeness-btn.active { background: var(--primary-l); border-color: var(--primary); color: var(--primary-h); }
 
 /* ══ 100 Days Challenge ══════════════════════════════════════════════════════ */
 #tab-challenge100 { overflow-x: clip; }
@@ -1169,16 +1121,6 @@ textarea#fm-notes:focus {
   }
   tr.row-total td:first-child { background: #0D1628 !important; }
   td.yearly-comment-cell { min-width: 100px; max-width: 150px; font-size: 11px; }
-
-  /* ── Habits table: compact day cells ─────────────────────────────────────── */
-  .habits-table { width: max-content; min-width: 100%; }
-  .habit-name-col { min-width: 120px; max-width: 120px; }
-  .habit-day-col  { min-width: 38px; }
-  .habit-check-cell { padding: 8px 2px; }
-  .habits-table th { padding: 7px 4px; font-size: 10px; }
-  .habit-name-cell { padding: 10px 8px; }
-  .habit-name-text { font-size: 12px; }
-  .btn-habit-del { width: 22px; height: 22px; font-size: 11px; }
 
   /* ── Planner: wrap text in cells ─────────────────────────────────────────── */
   .planner-block table td,

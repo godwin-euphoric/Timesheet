@@ -51,6 +51,9 @@ const state = {
   regMonthCache:    {},
   regMode:          'pro+',
   regProteinSources: null,
+  // Habits tab
+  habitsDate:       todayStr(),
+  habitsMonthCache: {},
   userRole:         null,
   // Summary tab
   weightEntries:    null,
@@ -1841,207 +1844,262 @@ document.getElementById('yearly-year').addEventListener('change', async function
 //  HABITS TAB
 // ══════════════════════════════════════════════════════════════════════════
 
+// Fixed checklist items — not user-editable, per the redesigned tab's spec.
+const HABITS_FIXED = [
+  { id: 'office_timesheet', label: 'Office Timesheet' },
+  { id: 'meditation',       label: 'Meditation' },
+  { id: 'night_entry',      label: 'Night Entry (Timesheet, Diet, Calculator)' },
+];
+const WELLNESS_FIXED = [
+  { id: 'a1',  label: 'Slept by 11:30–12:30 pm (or correct room based on sleep time)' },
+  { id: 'a2',  label: 'Got 6.5 hrs sleep' },
+  { id: 'a3',  label: 'Diet: stayed within 1800 cal, 40g+ protein' },
+  { id: 'a4',  label: 'No heavy meals' },
+  { id: 'a5',  label: 'Finished 3L water' },
+  { id: 'a6',  label: 'Social media sessions had a stop clause (followed it)' },
+  { id: 'a7',  label: 'No work done in bed' },
+  { id: 'a8',  label: 'Morning exercise / gym' },
+  { id: 'a9',  label: 'Spent time outside in the morning (WFH days)' },
+  { id: 'a10', label: 'Limited WFH office hours to once/week' },
+  { id: 'a11', label: 'Took BP tablet on time' },
+  { id: 'a12', label: 'Did meditation (5–10 min)' },
+  { id: 'a13', label: 'Books / YouTube / Movie — alone in rest room' },
+];
+const HWELL_TOTAL = HABITS_FIXED.length + WELLNESS_FIXED.length; // 16
+
+// ── Firestore (per-month doc, same pattern as the Diet/Regimen tab) ────────
+
+function habitsMonthRef(month) {
+  return db.collection('users').doc(state.user.uid).collection('habits_months').doc(month);
+}
+
+async function getHabitsMonthData(month) {
+  if (state.habitsMonthCache[month]) return state.habitsMonthCache[month];
+  const doc  = await habitsMonthRef(month).get();
+  const data = doc.exists ? doc.data() : { days: {} };
+  if (!data.days) data.days = {};
+  state.habitsMonthCache[month] = data;
+  return data;
+}
+
+async function saveHabitsMonthData(month, data) {
+  await habitsMonthRef(month).set(data);
+  state.habitsMonthCache[month] = data;
+}
+
+function habitsDayState(mData, dateStr) {
+  if (!mData.days[dateStr]) mData.days[dateStr] = {};
+  const d = mData.days[dateStr];
+  if (!d.habits)           d.habits = {};
+  if (!d.wellness)         d.wellness = {};
+  if (!d.activeness)       d.activeness = null;
+  if (!d.activenessNotes)  d.activenessNotes = '';
+  if (!d.dailyJudgement)   d.dailyJudgement = '';
+  return d;
+}
+
+function hwellAchievedCount(day) {
+  const h = Object.values(day.habits || {}).filter(Boolean).length;
+  const w = Object.values(day.wellness || {}).filter(Boolean).length;
+  return h + w;
+}
+
+// ── Tab load ───────────────────────────────────────────────────────────────
+
 async function loadHabitsTab() {
-  if (!state.habitsMonth) state.habitsMonth = currentMonth();
-  document.getElementById('habits-month').value = state.habitsMonth;
-  const userData = await getUserData();
-  renderHabitsTable(userData.habits, userData.habitLog, state.habitsMonth);
+  if (!state.habitsDate) state.habitsDate = todayStr();
+  if (!state.dietSettings) await loadDietSettings(); // Gemini key, needed by the Judgement buttons
+  await renderHwellDay(state.habitsDate);
+  await renderHwellMonthAvg();
 }
 
-async function onHabitsMonthChange(month) {
-  state.habitsMonth = month;
-  const userData = await getUserData();
-  renderHabitsTable(userData.habits, userData.habitLog, month);
+async function renderHwellDay(dateStr) {
+  const month = dateStr.slice(0, 7);
+  const mData = await getHabitsMonthData(month);
+  const day   = habitsDayState(mData, dateStr);
+
+  document.getElementById('hwell-date-label').textContent = formatDietDateLabel(dateStr);
+
+  document.getElementById('hwell-habits-list').innerHTML = HABITS_FIXED.map(item => `
+    <button type="button" class="hwell-toggle ${day.habits[item.id] ? 'done' : ''}"
+      onclick="toggleHwellItem('habits','${item.id}')">
+      <span class="hwell-toggle-mark">${day.habits[item.id] ? '✓' : ''}</span>
+      <span class="hwell-toggle-label">${escHtml(item.label)}</span>
+    </button>`).join('');
+
+  document.getElementById('hwell-wellness-list').innerHTML = WELLNESS_FIXED.map(item => `
+    <button type="button" class="hwell-toggle ${day.wellness[item.id] ? 'done' : ''}"
+      onclick="toggleHwellItem('wellness','${item.id}')">
+      <span class="hwell-toggle-mark">${day.wellness[item.id] ? '✓' : ''}</span>
+      <span class="hwell-toggle-label">${escHtml(item.label)}</span>
+    </button>`).join('');
+
+  document.getElementById('hwell-count-num').textContent = hwellAchievedCount(day);
+
+  document.querySelectorAll('#hwell-activeness-scale .activeness-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === day.activeness);
+  });
+  document.getElementById('hwell-activeness-notes').value = day.activenessNotes || '';
+  document.getElementById('hwell-daily-judgement').value  = day.dailyJudgement || '';
 }
 
-function renderHabitsTable(habits, habitLog, month) {
-  if (!month) month = state.habitsMonth || currentMonth();
-  const [year, mon] = month.split('-').map(Number);
-  const totalDays = daysInMonth(year, mon);
-  const today     = todayStr();
-  const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const table     = document.getElementById('habits-table');
+async function renderHwellMonthAvg() {
+  const month = state.habitsDate.slice(0, 7);
+  const mData = await getHabitsMonthData(month);
+  const days  = Object.values(mData.days || {}).filter(d => d.habits || d.wellness);
+  const el    = document.getElementById('hwell-month-avg');
+  if (!days.length) { el.textContent = '—'; return; }
+  const total = days.reduce((sum, d) => sum + hwellAchievedCount(d), 0);
+  const avg   = total / days.length;
+  el.textContent = `${avg.toFixed(1)} / ${HWELL_TOTAL} (${Math.round(avg / HWELL_TOTAL * 100)}%)`;
+  document.getElementById('hwell-monthly-judgement').value = mData.monthlyJudgement || '';
+}
 
-  // All days of the month
-  const days = [];
-  for (let d = 1; d <= totalDays; d++) {
-    days.push(`${month}-${String(d).padStart(2,'0')}`);
+// ── Toggles (single click = done; click again = undone) ────────────────────
+
+async function toggleHwellItem(section, id) {
+  const dateStr = state.habitsDate;
+  const month   = dateStr.slice(0, 7);
+  const mData   = await getHabitsMonthData(month);
+  const day     = habitsDayState(mData, dateStr);
+  day[section][id] = !day[section][id];
+  await saveHabitsMonthData(month, mData);
+  await renderHwellDay(dateStr);
+  await renderHwellMonthAvg();
+}
+
+// ── Activeness ───────────────────────────────────────────────────────────
+
+async function setHwellActiveness(val) {
+  const dateStr = state.habitsDate;
+  const month   = dateStr.slice(0, 7);
+  const mData   = await getHabitsMonthData(month);
+  const day     = habitsDayState(mData, dateStr);
+  day.activeness = day.activeness === val ? null : val;
+  await saveHabitsMonthData(month, mData);
+  document.querySelectorAll('#hwell-activeness-scale .activeness-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === day.activeness);
+  });
+}
+
+async function saveHwellActiveness(silent) {
+  const dateStr = state.habitsDate;
+  const month   = dateStr.slice(0, 7);
+  const mData   = await getHabitsMonthData(month);
+  const day     = habitsDayState(mData, dateStr);
+  day.activenessNotes = document.getElementById('hwell-activeness-notes').value;
+  await saveHabitsMonthData(month, mData);
+  if (!silent) showToast('Activeness saved');
+}
+
+// ── Daily Judgement (AI) ─────────────────────────────────────────────────
+
+async function saveHwellDailyJudgement(silent) {
+  const dateStr = state.habitsDate;
+  const month   = dateStr.slice(0, 7);
+  const mData   = await getHabitsMonthData(month);
+  const day     = habitsDayState(mData, dateStr);
+  day.dailyJudgement = document.getElementById('hwell-daily-judgement').value;
+  await saveHabitsMonthData(month, mData);
+  if (!silent) showToast('Daily Judgement saved');
+}
+
+function hwellDayPromptSummary(day) {
+  const doneList = (fixedList, obj) => fixedList
+    .map(item => `${obj[item.id] ? '✅' : '❌'} ${item.label}`)
+    .join('\n');
+  return `Habits:\n${doneList(HABITS_FIXED, day.habits)}\n\n` +
+    `Daily Wellness:\n${doneList(WELLNESS_FIXED, day.wellness)}\n\n` +
+    `Activeness: ${day.activeness || 'not set'}${day.activenessNotes ? ` — notes: ${day.activenessNotes}` : ''}`;
+}
+
+async function generateHwellDailyJudgement() {
+  const dateStr = state.habitsDate;
+  const month   = dateStr.slice(0, 7);
+  const mData   = await getHabitsMonthData(month);
+  const day     = habitsDayState(mData, dateStr);
+
+  const spinner = document.getElementById('hwell-daily-judgement-spinner');
+  const ta      = document.getElementById('hwell-daily-judgement');
+  spinner.classList.remove('hidden');
+  ta.disabled = true;
+  try {
+    const prompt = `You are a supportive but honest personal-habits coach. Below is one day's tracked data ` +
+      `(Habits, Daily Wellness checklist, and self-rated Activeness). Give a short (3-5 sentence) judgement/insight ` +
+      `on how the day went — call out what went well and what to improve. Plain text, no markdown, no headings.\n\n` +
+      hwellDayPromptSummary(day);
+    const result = await callGemini(prompt);
+    day.dailyJudgement = result.trim();
+    ta.value = day.dailyJudgement;
+    await saveHabitsMonthData(month, mData);
+  } catch (e) {
+    showDietError(e, `Daily Judgement for ${dateStr}`);
+  } finally {
+    spinner.classList.add('hidden');
+    ta.disabled = false;
   }
-
-  const headCells = days.map(d => {
-    const dt  = new Date(d + 'T00:00:00');
-    const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
-    const lbl = `${String(dt.getDate()).padStart(2,'0')}<br><small>${dayNames[dt.getDay()]}</small>`;
-    return `<th class="habit-day-col${d === today ? ' col-today' : ''}${isWeekend ? ' col-weekend' : ''}">${lbl}</th>`;
-  }).join('');
-
-  const thead = `
-    <thead>
-      <tr>
-        <th class="habit-name-col">Habit</th>
-        ${headCells}
-      </tr>
-    </thead>`;
-
-  let bodyRows = '';
-  habits.forEach((habit, i) => {
-    const cells = days.map(d => {
-      const st = (habitLog[d] || {})[habit]; // true=done, 'missed'=missed, else blank
-      const stateCls = st === true ? 'hs-done' : st === 'missed' ? 'hs-missed' : 'hs-none';
-      const mark     = st === true ? '✓' : st === 'missed' ? '✗' : '';
-      const dt = new Date(d + 'T00:00:00');
-      const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
-      return `<td class="habit-check-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
-        <button class="habit-tri ${stateCls}" onclick="cycleHabit(this,'${d}','${encodeURIComponent(habit)}')">${mark}</button>
-      </td>`;
-    }).join('');
-    bodyRows += `
-      <tr class="habit-row" draggable="true"
-        ondragstart="habitDragStart(event,${i})"
-        ondragover="habitDragOver(event,${i})"
-        ondrop="habitDrop(event,${i})"
-        ondragend="habitDragEnd(event)">
-        <td class="habit-name-cell" onclick="startEditHabit(this, ${i})">
-          <span class="drag-handle" title="Drag to reorder">⠿</span>
-          <span class="habit-name-text" title="Click to edit">${habit}</span>
-          <button class="btn-habit-del" onclick="event.stopPropagation();deleteHabit(${i})" title="Remove habit">✕</button>
-        </td>
-        ${cells}
-      </tr>`;
-  });
-
-  bodyRows += `
-    <tr class="habit-add-row">
-      <td colspan="${days.length + 1}">
-        <div class="habit-add-inline">
-          <span class="habit-plus">+</span>
-          <input type="text" id="new-habit-input" class="habit-add-input" placeholder="Type a habit and press Enter or click Add..."
-            onkeydown="if(event.key==='Enter') addHabit()">
-          <button class="btn-primary" style="height:34px;padding:0 16px;font-size:13px" onclick="addHabit()">Add</button>
-        </div>
-      </td>
-    </tr>`;
-
-  table.innerHTML = thead + `<tbody>${bodyRows}</tbody>`;
 }
 
-// Tri-state cycle: blank → done (✓) → missed (✗) → blank
-async function cycleHabit(btn, date, encodedHabit) {
-  const habit    = decodeURIComponent(encodedHabit);
-  const userData = await getUserData();
-  if (!userData.habitLog[date]) userData.habitLog[date] = {};
-  const cur = userData.habitLog[date][habit];
-  let next;
-  if (cur === true)        next = 'missed';
-  else if (cur === 'missed') next = null;
-  else                     next = true;
+// ── Monthly Judgement (AI) ───────────────────────────────────────────────
 
-  if (!next) delete userData.habitLog[date][habit];
-  else       userData.habitLog[date][habit] = next;
-  if (!Object.keys(userData.habitLog[date]).length) delete userData.habitLog[date];
-  await saveUserData({ habitLog: userData.habitLog });
-
-  btn.classList.remove('hs-done', 'hs-missed', 'hs-none');
-  if (next === true)          { btn.classList.add('hs-done');   btn.textContent = '✓'; }
-  else if (next === 'missed') { btn.classList.add('hs-missed'); btn.textContent = '✗'; }
-  else                        { btn.classList.add('hs-none');   btn.textContent = ''; }
+async function saveHwellMonthlyJudgement(silent) {
+  const month = state.habitsDate.slice(0, 7);
+  const mData = await getHabitsMonthData(month);
+  mData.monthlyJudgement = document.getElementById('hwell-monthly-judgement').value;
+  await saveHabitsMonthData(month, mData);
+  if (!silent) showToast('Monthly Judgement saved');
 }
 
-async function addHabit() {
-  const input = document.getElementById('new-habit-input');
-  const name  = input.value.trim();
-  if (!name) return;
-  const userData = await getUserData();
-  if (userData.habits.includes(name)) { showToast('Already exists'); return; }
-  userData.habits.push(name);
-  await saveUserData({ habits: userData.habits });
-  showToast(`"${name}" added`);
-  renderHabitsTable(userData.habits, userData.habitLog, state.habitsMonth);
-  document.getElementById('new-habit-input')?.focus();
-}
+async function generateHwellMonthlyJudgement() {
+  const month = state.habitsDate.slice(0, 7);
+  const mData = await getHabitsMonthData(month);
+  const days  = Object.entries(mData.days || {}).filter(([, d]) => d.habits || d.wellness);
 
-async function deleteHabit(index) {
-  if (!confirm('Remove this habit?')) return;
-  const userData = await getUserData();
-  userData.habits.splice(index, 1);
-  await saveUserData({ habits: userData.habits });
-  renderHabitsTable(userData.habits, userData.habitLog, state.habitsMonth);
-}
+  const spinner = document.getElementById('hwell-monthly-judgement-spinner');
+  const ta      = document.getElementById('hwell-monthly-judgement');
+  if (!days.length) { showToast('No days logged yet this month'); return; }
 
-function habitDragStart(e, index) {
-  dragSrcHabitIdx = index;
-  e.dataTransfer.effectAllowed = 'move';
-  setTimeout(() => e.currentTarget.classList.add('dragging'), 0);
-}
-
-function habitDragOver(e, index) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  document.querySelectorAll('.habit-row').forEach((r, i) => {
-    r.classList.toggle('drag-over', i === index && i !== dragSrcHabitIdx);
-  });
-}
-
-function habitDragEnd(e) {
-  document.querySelectorAll('.habit-row').forEach(r => r.classList.remove('dragging', 'drag-over'));
-  dragSrcHabitIdx = null;
-}
-
-async function habitDrop(e, index) {
-  e.preventDefault();
-  if (dragSrcHabitIdx === null || dragSrcHabitIdx === index) return;
-  const userData = await getUserData();
-  const habits   = userData.habits;
-  const [moved]  = habits.splice(dragSrcHabitIdx, 1);
-  habits.splice(index, 0, moved);
-  await saveUserData({ habits });
-  renderHabitsTable(habits, userData.habitLog, state.habitsMonth);
-}
-
-function startEditHabit(td, index) {
-  if (td.querySelector('input.habit-edit-input')) return;
-  const span  = td.querySelector('.habit-name-text');
-  const oldName = span.textContent;
-
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.value = oldName;
-  input.className = 'habit-edit-input';
-  span.replaceWith(input);
-  input.focus(); input.select();
-
-  let saved = false;
-  async function commitRename() {
-    if (saved) return;
-    saved = true;
-    const newName = input.value.trim();
-    if (!newName || newName === oldName) {
-      renderHabitsTable((await getUserData()).habits, (await getUserData()).habitLog, state.habitsMonth);
-      return;
-    }
-    const userData = await getUserData();
-    if (userData.habits.includes(newName)) {
-      showToast('Habit name already exists'); saved = false;
-      input.focus(); return;
-    }
-    userData.habits[index] = newName;
-    // Rename in habitLog too
-    Object.keys(userData.habitLog).forEach(date => {
-      if (userData.habitLog[date][oldName] !== undefined) {
-        userData.habitLog[date][newName] = userData.habitLog[date][oldName];
-        delete userData.habitLog[date][oldName];
-      }
-    });
-    await saveUserData({ habits: userData.habits, habitLog: userData.habitLog });
-    showToast('Habit renamed');
-    renderHabitsTable(userData.habits, userData.habitLog, state.habitsMonth);
+  spinner.classList.remove('hidden');
+  ta.disabled = true;
+  try {
+    const daySummaries = days
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([ds, d]) => `${ds} (${hwellAchievedCount(d)}/${HWELL_TOTAL}):\n${hwellDayPromptSummary(d)}`)
+      .join('\n\n');
+    const prompt = `You are a supportive but honest personal-habits coach. Below is a month of daily tracked data ` +
+      `(Habits, Daily Wellness checklist, and self-rated Activeness). Give a short (4-6 sentence) overall judgement ` +
+      `for the month — call out patterns, what's working, and what to improve. Plain text, no markdown, no headings.\n\n` +
+      daySummaries;
+    const result = await callGemini(prompt);
+    mData.monthlyJudgement = result.trim();
+    ta.value = mData.monthlyJudgement;
+    await saveHabitsMonthData(month, mData);
+  } catch (e) {
+    showDietError(e, `Monthly Judgement for ${month}`);
+  } finally {
+    spinner.classList.add('hidden');
+    ta.disabled = false;
   }
+}
 
-  input.addEventListener('blur', commitRename);
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter')  input.blur();
-    if (e.key === 'Escape') { saved = true; renderHabitsTable; input.blur(); }
-  });
+// ── Date navigation ──────────────────────────────────────────────────────
+
+async function habitsPrevDay() {
+  const [y, m, d] = state.habitsDate.split('-').map(Number);
+  const dt  = new Date(y, m - 1, d - 1);
+  state.habitsDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  await renderHwellDay(state.habitsDate);
+  await renderHwellMonthAvg();
+}
+
+async function habitsNextDay() {
+  const [y, m, d] = state.habitsDate.split('-').map(Number);
+  const dt   = new Date(y, m - 1, d + 1);
+  const next = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  if (next > todayStr()) { showToast("Can't go to a future date"); return; }
+  state.habitsDate = next;
+  await renderHwellDay(state.habitsDate);
+  await renderHwellMonthAvg();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -4515,7 +4573,6 @@ async function emailReport() {
 let swInterval = null;
 let swElapsed  = 0;   // ms
 
-let dragSrcHabitIdx = null;
 let swRunning  = false;
 let swStarted  = 0;   // Date.now() when last started
 

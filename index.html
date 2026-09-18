@@ -532,18 +532,80 @@
 
   <!-- ══ HABITS ═══════════════════════════════════════════════════════════ -->
   <div id="tab-habits" class="tab-content">
-    <div class="card">
-      <div class="summary-card-header">
-        <div class="card-title" style="margin-bottom:0">Habit Tracker</div>
-        <div class="field-group">
-          <label>Month</label>
-          <input type="month" id="habits-month" onchange="onHabitsMonthChange(this.value)">
-        </div>
+
+    <!-- Monthly average -->
+    <div class="hwell-avg-card">
+      <span class="hwell-avg-label">Monthly Average</span>
+      <span class="hwell-avg-value" id="hwell-month-avg">—</span>
+    </div>
+
+    <!-- Date navigation -->
+    <div class="diet-date-nav">
+      <button class="diet-date-arrow" onclick="habitsPrevDay()">&#8592;</button>
+      <span id="hwell-date-label">MON, JUN 8</span>
+      <button class="diet-date-arrow" onclick="habitsNextDay()">&#8594;</button>
+    </div>
+
+    <!-- Habits -->
+    <div class="diet-log-section">
+      <div class="diet-log-label">HABITS</div>
+      <div class="hwell-list" id="hwell-habits-list"></div>
+    </div>
+
+    <!-- Daily Wellness -->
+    <div class="diet-log-section">
+      <div class="diet-log-label">DAILY WELLNESS</div>
+      <div class="hwell-list" id="hwell-wellness-list"></div>
+    </div>
+
+    <div class="hwell-count-row">Achieved <strong id="hwell-count-num">0</strong> out of 16.</div>
+
+    <!-- Activeness -->
+    <div class="diet-log-section">
+      <div class="diet-log-label">ACTIVENESS</div>
+      <div class="activeness-scale" id="hwell-activeness-scale">
+        <button type="button" class="activeness-btn" data-val="low" onclick="setHwellActiveness('low')">Low</button>
+        <button type="button" class="activeness-btn" data-val="medium" onclick="setHwellActiveness('medium')">Medium</button>
+        <button type="button" class="activeness-btn" data-val="high" onclick="setHwellActiveness('high')">High</button>
       </div>
-      <div class="table-scroll">
-        <table class="habits-table" id="habits-table"></table>
+      <textarea id="hwell-activeness-notes" class="reg-summary-textarea" rows="3"
+                placeholder="Notes about today's activeness..."
+                onblur="saveHwellActiveness(true)"></textarea>
+      <div class="reg-summary-actions">
+        <button class="btn-secondary" onclick="saveHwellActiveness()">Save</button>
       </div>
     </div>
+
+    <!-- Daily Judgement -->
+    <div class="diet-log-section">
+      <div class="diet-log-label">DAILY JUDGEMENT</div>
+      <textarea id="hwell-daily-judgement" class="reg-summary-textarea" rows="5"
+                placeholder="Click Generate to get an AI verdict on today's Habits, Daily Wellness and Activeness..."
+                onblur="saveHwellDailyJudgement(true)"></textarea>
+      <div id="hwell-daily-judgement-spinner" class="diet-ai-spinner hidden">
+        <div class="diet-spinner"></div> Analyzing with AI...
+      </div>
+      <div class="reg-summary-actions">
+        <button class="btn-secondary" onclick="saveHwellDailyJudgement()">Save</button>
+        <button class="btn-primary" onclick="generateHwellDailyJudgement()">Generate</button>
+      </div>
+    </div>
+
+    <!-- Monthly Judgement -->
+    <div class="diet-log-section">
+      <div class="diet-log-label">MONTHLY JUDGEMENT</div>
+      <textarea id="hwell-monthly-judgement" class="reg-summary-textarea" rows="6"
+                placeholder="Click Generate to get an AI verdict on this month's Habits, Daily Wellness and Activeness..."
+                onblur="saveHwellMonthlyJudgement(true)"></textarea>
+      <div id="hwell-monthly-judgement-spinner" class="diet-ai-spinner hidden">
+        <div class="diet-spinner"></div> Analyzing with AI...
+      </div>
+      <div class="reg-summary-actions">
+        <button class="btn-secondary" onclick="saveHwellMonthlyJudgement()">Save</button>
+        <button class="btn-primary" onclick="generateHwellMonthlyJudgement()">Generate</button>
+      </div>
+    </div>
+
   </div>
 
   <!-- ══ 100 DAYS CHALLENGE ═══════════════════════════════════════════════════ -->
