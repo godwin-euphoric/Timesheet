@@ -55,6 +55,7 @@ const state = {
   habitsDate:       todayStr(),
   habitsMonth:      currentMonth(),
   habitsMonthCache: {},
+  habitsCustom:     { habits: [], wellness: [] },
   userRole:         null,
   // Summary tab
   weightEntries:    null,
@@ -1866,11 +1867,20 @@ const WELLNESS_FIXED = [
   { id: 'a12', label: 'Did meditation (5–10 min)' },
   { id: 'a13', label: 'Books / YouTube / Movie — alone in rest room' },
 ];
-const HWELL_TOTAL = HABITS_FIXED.length + WELLNESS_FIXED.length; // 16
-
 const ACTIVENESS_FIXED = [
   { id: 'active', label: 'Activeness' },
 ];
+
+// Fixed items plus any user-added custom rows for that section ('habits' or 'wellness').
+function hwellItems(section) {
+  const fixed  = section === 'habits' ? HABITS_FIXED : WELLNESS_FIXED;
+  const custom = state.habitsCustom[section] || [];
+  return [...fixed, ...custom];
+}
+
+function hwellTotal() {
+  return hwellItems('habits').length + hwellItems('wellness').length;
+}
 
 // ── Firestore (per-month doc, same pattern as the Diet/Regimen tab) ────────
 
@@ -1916,6 +1926,9 @@ async function loadHabitsTab() {
   if (!state.habitsMonth) state.habitsMonth = currentMonth();
   document.getElementById('habits-grid-month').value = state.habitsMonth;
   if (!state.dietSettings) await loadDietSettings(); // Gemini key, needed by the Judgement buttons
+  const ud = await getUserData();
+  const custom = ud.habitsCustomItems || {};
+  state.habitsCustom = { habits: custom.habits || [], wellness: custom.wellness || [] };
   await renderHwellGrid(state.habitsMonth);
   await renderHwellMonthAvg(state.habitsMonth);
   await renderHwellDayPanel(state.habitsDate);
@@ -1927,8 +1940,9 @@ async function onHabitsMonthChange(month) {
   await renderHwellMonthAvg(month);
 }
 
-// Builds one row (row label + one toggle cell per date of the month) for a single fixed item.
-function hwellBuildRow(item, section, days, mData, today) {
+// Builds one row (row label + one toggle cell per date of the month) for a single item.
+// Custom (user-added) rows get a small remove button next to the label; fixed rows don't.
+function hwellBuildRow(item, section, days, mData, today, isCustom) {
   const cells = days.map(d => {
     const day  = mData.days[d] || {};
     const done = !!(day[section] || {})[item.id];
@@ -1939,7 +1953,18 @@ function hwellBuildRow(item, section, days, mData, today) {
         onclick="toggleHwellItem('${section}','${item.id}','${d}')">${done ? '✓' : ''}</button>
     </td>`;
   }).join('');
-  return `<tr><td class="hwell-row-label" title="${escHtml(item.label)}">${escHtml(item.label)}</td>${cells}</tr>`;
+  const removeBtn = isCustom
+    ? `<button type="button" class="hwell-row-remove" title="Remove row" onclick="removeHwellCustomItem('${section}','${item.id}')">&times;</button>`
+    : '';
+  return `<tr><td class="hwell-row-label" title="${escHtml(item.label)}">${removeBtn}${escHtml(item.label)}</td>${cells}</tr>`;
+}
+
+function hwellBuildAddRow(section, days) {
+  const label = section === 'habits' ? '+ Add habit' : '+ Add wellness item';
+  const emptyCells = days.map(() => `<td class="hwell-cell"></td>`).join('');
+  return `<tr class="hwell-add-row"><td class="hwell-row-label">
+      <button type="button" class="hwell-add-btn" onclick="addHwellCustomItem('${section}')">${label}</button>
+    </td>${emptyCells}</tr>`;
 }
 
 async function renderHwellGrid(month) {
@@ -1962,21 +1987,26 @@ async function renderHwellGrid(month) {
 
   const groupRow = label => `<tr class="hwell-group-row"><td colspan="${days.length + 1}">${label}</td></tr>`;
 
-  const habitsRows   = HABITS_FIXED.map(item => hwellBuildRow(item, 'habits', days, mData, today)).join('');
-  const wellnessRows = WELLNESS_FIXED.map(item => hwellBuildRow(item, 'wellness', days, mData, today)).join('');
+  const habitsFixedRows  = HABITS_FIXED.map(item => hwellBuildRow(item, 'habits', days, mData, today, false)).join('');
+  const habitsCustomRows = state.habitsCustom.habits.map(item => hwellBuildRow(item, 'habits', days, mData, today, true)).join('');
+  const wellnessFixedRows  = WELLNESS_FIXED.map(item => hwellBuildRow(item, 'wellness', days, mData, today, false)).join('');
+  const wellnessCustomRows = state.habitsCustom.wellness.map(item => hwellBuildRow(item, 'wellness', days, mData, today, true)).join('');
 
+  const total = hwellTotal();
   const totalCells = days.map(d => {
     const day   = mData.days[d];
     const count = day ? hwellAchievedCount(day) : 0;
-    return `<td class="hwell-cell hwell-total-cell${d === today ? ' cell-today' : ''}">${count}/${HWELL_TOTAL}</td>`;
+    return `<td class="hwell-cell hwell-total-cell${d === today ? ' cell-today' : ''}">${count}/${total}</td>`;
   }).join('');
   const totalsRow = `<tr class="hwell-totals-row"><td class="hwell-row-label">Achieved</td>${totalCells}</tr>`;
 
-  const activenessRows = ACTIVENESS_FIXED.map(item => hwellBuildRow(item, 'activeness', days, mData, today)).join('');
+  const activenessRows = ACTIVENESS_FIXED.map(item => hwellBuildRow(item, 'activeness', days, mData, today, false)).join('');
 
   document.getElementById('hwell-grid-table').innerHTML =
-    thead + `<tbody>${groupRow('HABITS')}${habitsRows}${groupRow('DAILY WELLNESS')}${wellnessRows}${totalsRow}` +
-    `${groupRow('ACTIVENESS')}${activenessRows}</tbody>`;
+    thead +
+    `<tbody>${groupRow('HABITS')}${habitsFixedRows}${habitsCustomRows}${hwellBuildAddRow('habits', days)}` +
+    `${groupRow('DAILY WELLNESS')}${wellnessFixedRows}${wellnessCustomRows}${hwellBuildAddRow('wellness', days)}` +
+    `${totalsRow}${groupRow('ACTIVENESS')}${activenessRows}</tbody>`;
 }
 
 async function renderHwellMonthAvg(month) {
@@ -1985,9 +2015,10 @@ async function renderHwellMonthAvg(month) {
   const el    = document.getElementById('hwell-month-avg');
   if (!days.length) { el.textContent = '—'; }
   else {
-    const total = days.reduce((sum, d) => sum + hwellAchievedCount(d), 0);
-    const avg   = total / days.length;
-    el.textContent = `${avg.toFixed(1)} / ${HWELL_TOTAL} (${Math.round(avg / HWELL_TOTAL * 100)}%)`;
+    const grandTotal = hwellTotal();
+    const sum = days.reduce((s, d) => s + hwellAchievedCount(d), 0);
+    const avg = sum / days.length;
+    el.textContent = `${avg.toFixed(1)} / ${grandTotal} (${Math.round(avg / grandTotal * 100)}%)`;
   }
   document.getElementById('hwell-monthly-judgement').value = mData.monthlyJudgement || '';
 }
@@ -2013,6 +2044,25 @@ async function toggleHwellItem(section, id, dateStr) {
   await renderHwellGrid(state.habitsMonth);
   await renderHwellMonthAvg(state.habitsMonth);
   if (dateStr === state.habitsDate) await renderHwellDayPanel(dateStr);
+}
+
+// ── Custom rows (user-added, on top of the fixed Habits/Daily Wellness items) ──
+
+async function addHwellCustomItem(section) {
+  const label = prompt(section === 'habits' ? 'Habit name:' : 'Wellness item name:');
+  if (!label?.trim()) return;
+  const id = `custom_${Date.now()}`;
+  state.habitsCustom[section].push({ id, label: label.trim() });
+  await saveUserData({ habitsCustomItems: state.habitsCustom });
+  await renderHwellGrid(state.habitsMonth);
+  await renderHwellMonthAvg(state.habitsMonth);
+}
+
+async function removeHwellCustomItem(section, id) {
+  state.habitsCustom[section] = state.habitsCustom[section].filter(item => item.id !== id);
+  await saveUserData({ habitsCustomItems: state.habitsCustom });
+  await renderHwellGrid(state.habitsMonth);
+  await renderHwellMonthAvg(state.habitsMonth);
 }
 
 // ── Activeness ───────────────────────────────────────────────────────────
@@ -2044,8 +2094,8 @@ function hwellDayPromptSummary(day) {
   const doneList = (fixedList, obj) => fixedList
     .map(item => `${obj[item.id] ? '✅' : '❌'} ${item.label}`)
     .join('\n');
-  return `Habits:\n${doneList(HABITS_FIXED, day.habits)}\n\n` +
-    `Daily Wellness:\n${doneList(WELLNESS_FIXED, day.wellness)}\n\n` +
+  return `Habits:\n${doneList(hwellItems('habits'), day.habits)}\n\n` +
+    `Daily Wellness:\n${doneList(hwellItems('wellness'), day.wellness)}\n\n` +
     `Activeness: ${day.activeness && day.activeness.active ? 'Yes' : 'No'}` +
     `${day.activenessNotes ? ` — notes: ${day.activenessNotes}` : ''}`;
 }
@@ -2101,7 +2151,7 @@ async function generateHwellMonthlyJudgement() {
   try {
     const daySummaries = days
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([ds, d]) => `${ds} (${hwellAchievedCount(d)}/${HWELL_TOTAL}):\n${hwellDayPromptSummary(d)}`)
+      .map(([ds, d]) => `${ds} (${hwellAchievedCount(d)}/${hwellTotal()}):\n${hwellDayPromptSummary(d)}`)
       .join('\n\n');
     const prompt = `You are a supportive but honest personal-habits coach. Below is a month of daily tracked data ` +
       `(Habits, Daily Wellness checklist, and self-rated Activeness). Give a short (4-6 sentence) overall judgement ` +
