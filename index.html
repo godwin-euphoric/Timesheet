@@ -701,7 +701,10 @@
   <!-- ══ GOAL TRACKER ═══════════════════════════════════════════════════════ -->
   <div id="tab-excelimport" class="tab-content">
     <div class="card hidden" id="excelimport-sheets-card">
-      <div class="planner-sub-tabs" id="excelimport-sub-tabs"></div>
+      <div class="planner-nav">
+        <div class="planner-sub-tabs" id="excelimport-sub-tabs"></div>
+        <button class="btn-secondary planner-new-btn" onclick="addExcelImportSheet()">+ New Tab</button>
+      </div>
       <div id="excelimport-filter-bar"></div>
       <div class="table-scroll" style="margin-top:12px">
         <table class="planner-table" id="excelimport-sheet-table"></table>

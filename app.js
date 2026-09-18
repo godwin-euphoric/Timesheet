@@ -2362,9 +2362,18 @@ function renderExcelImportUI() {
 
 function renderExcelImportSubTabs() {
   const nav = document.getElementById('excelimport-sub-tabs');
-  nav.innerHTML = state.excelImport.sheets.map(s => `
-    <button class="planner-sub-tab${s.name === state.excelImportActiveSheet ? ' active' : ''}"
-      onclick="switchExcelImportSheet('${encodeURIComponent(s.name)}')">${escHtml(s.name)}</button>
+  nav.innerHTML = state.excelImport.sheets.map((s, i) => `
+    <button class="planner-sub-tab${s.name === state.excelImportActiveSheet ? ' active' : ''}" data-idx="${i}"
+      draggable="true"
+      ondragstart="excelImportTabDragStart(event,${i})"
+      ondragover="excelImportTabDragOver(event,${i})"
+      ondrop="excelImportTabDrop(event,${i})"
+      ondragend="excelImportTabDragEnd(event)"
+      onclick="switchExcelImportSheet('${encodeURIComponent(s.name)}')">
+      <span class="planner-tab-name" ondblclick="event.stopPropagation();startRenameExcelImportSheet(${i})">${escHtml(s.name)}</span>
+      ${s.name === state.excelImportActiveSheet ? `<span class="planner-tab-rename-btn" onclick="event.stopPropagation();startRenameExcelImportSheet(${i})" title="Rename">✎</span>` : ''}
+      ${state.excelImport.sheets.length > 1 ? `<span class="planner-tab-del" onclick="event.stopPropagation();deleteExcelImportSheet(${i})" title="Delete">✕</span>` : ''}
+    </button>
   `).join('');
 }
 
@@ -2372,6 +2381,81 @@ function switchExcelImportSheet(encodedName) {
   state.excelImportActiveSheet = decodeURIComponent(encodedName);
   renderExcelImportSubTabs();
   renderExcelImportSheetTable();
+}
+
+async function addExcelImportSheet() {
+  const name = prompt('Tab name:');
+  if (!name || !name.trim()) return;
+  state.excelImport.sheets.push({ name: name.trim(), rows: [{ r: ['Goal', 'Status'] }] });
+  state.excelImportActiveSheet = name.trim();
+  await saveUserData({ excelImport: state.excelImport });
+  renderExcelImportUI();
+}
+
+async function deleteExcelImportSheet(idx) {
+  if (state.excelImport.sheets.length <= 1) return;
+  if (!confirm(`Delete tab "${state.excelImport.sheets[idx].name}"?`)) return;
+  state.excelImport.sheets.splice(idx, 1);
+  state.excelImportActiveSheet = state.excelImport.sheets[0].name;
+  await saveUserData({ excelImport: state.excelImport });
+  renderExcelImportUI();
+}
+
+function startRenameExcelImportSheet(idx) {
+  const nameEl = document.querySelector(`#excelimport-sub-tabs .planner-sub-tab[data-idx="${idx}"] .planner-tab-name`);
+  if (!nameEl) return;
+  const original = state.excelImport.sheets[idx].name;
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = original;
+  inp.className = 'planner-tab-rename-input';
+  inp.onclick = e => e.stopPropagation();
+  nameEl.replaceWith(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const commit = async () => {
+    if (done) return; done = true;
+    const name = inp.value.trim() || original;
+    state.excelImport.sheets[idx].name = name;
+    if (state.excelImportActiveSheet === original) state.excelImportActiveSheet = name;
+    await saveUserData({ excelImport: state.excelImport });
+    renderExcelImportUI();
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  inp.blur();
+    if (e.key === 'Escape') { inp.value = original; inp.blur(); }
+  });
+}
+
+let _excelImportTabDragSrc = null;
+
+function excelImportTabDragStart(e, i) {
+  _excelImportTabDragSrc = i;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => document.querySelectorAll('#excelimport-sub-tabs .planner-sub-tab')[i]?.classList.add('dragging'), 0);
+}
+
+function excelImportTabDragOver(e, i) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('#excelimport-sub-tabs .planner-sub-tab').forEach((t, idx) => {
+    t.classList.toggle('drag-over', idx === i && idx !== _excelImportTabDragSrc);
+  });
+}
+
+function excelImportTabDragEnd() {
+  document.querySelectorAll('#excelimport-sub-tabs .planner-sub-tab').forEach(t => t.classList.remove('dragging', 'drag-over'));
+  _excelImportTabDragSrc = null;
+}
+
+async function excelImportTabDrop(e, i) {
+  e.preventDefault();
+  if (_excelImportTabDragSrc === null || _excelImportTabDragSrc === i) return;
+  const [moved] = state.excelImport.sheets.splice(_excelImportTabDragSrc, 1);
+  state.excelImport.sheets.splice(i, 0, moved);
+  await saveUserData({ excelImport: state.excelImport });
+  renderExcelImportUI();
 }
 
 function excelImportActiveSheet() {
