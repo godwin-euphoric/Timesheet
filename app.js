@@ -1874,11 +1874,13 @@ const ACTIVENESS_LEVELS = [
   { id: 'L', label: 'Low Active' },
 ];
 
-// Fixed items plus any user-added custom rows for that section ('habits' or 'wellness').
+// Habits: fixed items plus any user-added custom rows.
+// Wellness: fully user-editable — the whole list lives in state.habitsCustom.wellness
+// (seeded from WELLNESS_FIXED once, see loadHabitsTab), so it can be renamed/deleted/reordered freely.
 function hwellItems(section) {
-  const fixed  = section === 'habits' ? HABITS_FIXED : WELLNESS_FIXED;
-  const custom = state.habitsCustom[section] || [];
-  return [...fixed, ...custom];
+  if (section === 'wellness') return state.habitsCustom.wellness || [];
+  const custom = state.habitsCustom.habits || [];
+  return [...HABITS_FIXED, ...custom];
 }
 
 function hwellTotal() {
@@ -1931,7 +1933,16 @@ async function loadHabitsTab() {
   if (!state.dietSettings) await loadDietSettings(); // Gemini key, needed by the Judgement buttons
   const ud = await getUserData();
   const custom = ud.habitsCustomItems || {};
-  state.habitsCustom = { habits: custom.habits || [], wellness: custom.wellness || [] };
+  let wellness = custom.wellness || [];
+  // One-time migration: fold the old hardcoded WELLNESS_FIXED list into the user's own
+  // editable list, so existing users don't lose their 13 items when they become editable/deletable.
+  if (!ud.habitsWellnessMigrated) {
+    const existingIds = new Set(wellness.map(i => i.id));
+    const toPrepend = WELLNESS_FIXED.filter(item => !existingIds.has(item.id)).map(item => ({ ...item }));
+    wellness = [...toPrepend, ...wellness];
+    await saveUserData({ habitsWellnessMigrated: true, habitsCustomItems: { habits: custom.habits || [], wellness } });
+  }
+  state.habitsCustom = { habits: custom.habits || [], wellness };
   await renderHwellGrid(state.habitsMonth);
   await renderHwellMonthAvg(state.habitsMonth);
   await renderHwellDayPanel(state.habitsDate);
@@ -1944,7 +1955,8 @@ async function onHabitsMonthChange(month) {
 }
 
 // Builds one row (row label + one toggle cell per date of the month) for a single item.
-// Custom (user-added) rows get a small remove button next to the label; fixed rows don't.
+// Manageable rows (all Wellness rows, and user-added Habit rows) get a drag handle to reorder,
+// a click-to-rename label, and a × remove button; fixed Habit rows get none of that.
 function hwellBuildRow(item, section, days, mData, today, isCustom) {
   const cells = days.map(d => {
     const day  = mData.days[d] || {};
@@ -1956,10 +1968,15 @@ function hwellBuildRow(item, section, days, mData, today, isCustom) {
         onclick="toggleHwellItem('${section}','${item.id}','${d}')">${done ? '✓' : ''}</button>
     </td>`;
   }).join('');
-  const removeBtn = isCustom
-    ? `<button type="button" class="hwell-row-remove" title="Remove row" onclick="removeHwellCustomItem('${section}','${item.id}')">&times;</button>`
-    : '';
-  return `<tr><td class="hwell-row-label" title="${escHtml(item.label)}">${removeBtn}${escHtml(item.label)}</td>${cells}</tr>`;
+  if (!isCustom) {
+    return `<tr><td class="hwell-row-label" title="${escHtml(item.label)}">${escHtml(item.label)}</td>${cells}</tr>`;
+  }
+  const dragHandle = `<span class="hwell-row-drag" draggable="true" title="Drag to reorder"
+      ondragstart="hwellRowDragStart(event,'${section}','${item.id}')">⠿</span>`;
+  const removeBtn = `<button type="button" class="hwell-row-remove" title="Remove row" onclick="removeHwellCustomItem('${section}','${item.id}')">&times;</button>`;
+  const labelText = `<span class="hwell-row-label-text editable" title="Click to rename" onclick="renameHwellItem('${section}','${item.id}')">${escHtml(item.label)}</span>`;
+  return `<tr class="hwell-row-manageable" ondragover="hwellRowDragOver(event)" ondrop="hwellRowDrop(event,'${section}','${item.id}')">
+    <td class="hwell-row-label" title="${escHtml(item.label)}">${dragHandle}${removeBtn}${labelText}</td>${cells}</tr>`;
 }
 
 // Activeness: one row, but each cell holds 3 mini letter-buttons (A/M/L) — clicking the
@@ -2011,8 +2028,7 @@ async function renderHwellGrid(month) {
 
   const habitsFixedRows  = HABITS_FIXED.map(item => hwellBuildRow(item, 'habits', days, mData, today, false)).join('');
   const habitsCustomRows = state.habitsCustom.habits.map(item => hwellBuildRow(item, 'habits', days, mData, today, true)).join('');
-  const wellnessFixedRows  = WELLNESS_FIXED.map(item => hwellBuildRow(item, 'wellness', days, mData, today, false)).join('');
-  const wellnessCustomRows = state.habitsCustom.wellness.map(item => hwellBuildRow(item, 'wellness', days, mData, today, true)).join('');
+  const wellnessRows     = state.habitsCustom.wellness.map(item => hwellBuildRow(item, 'wellness', days, mData, today, true)).join('');
 
   const total = hwellTotal();
   const totalCells = days.map(d => {
@@ -2027,7 +2043,7 @@ async function renderHwellGrid(month) {
   document.getElementById('hwell-grid-table').innerHTML =
     thead +
     `<tbody>${groupRow('HABITS')}${habitsFixedRows}${habitsCustomRows}${hwellBuildAddRow('habits', days)}` +
-    `${groupRow('DAILY WELLNESS')}${wellnessFixedRows}${wellnessCustomRows}${hwellBuildAddRow('wellness', days)}` +
+    `${groupRow('DAILY WELLNESS')}${wellnessRows}${hwellBuildAddRow('wellness', days)}` +
     `${totalsRow}${groupRow('ACTIVENESS')}${activenessRows}</tbody>`;
 }
 
@@ -2094,6 +2110,44 @@ async function removeHwellCustomItem(section, id) {
   await saveUserData({ habitsCustomItems: state.habitsCustom });
   await renderHwellGrid(state.habitsMonth);
   await renderHwellMonthAvg(state.habitsMonth);
+}
+
+async function renameHwellItem(section, id) {
+  const item = state.habitsCustom[section].find(i => i.id === id);
+  if (!item) return;
+  const label = prompt('Edit item name:', item.label);
+  if (!label?.trim()) return;
+  item.label = label.trim();
+  await saveUserData({ habitsCustomItems: state.habitsCustom });
+  await renderHwellGrid(state.habitsMonth);
+}
+
+// Drag-to-reorder for manageable rows (all Wellness rows, custom Habit rows).
+let hwellDragItem = null;
+
+function hwellRowDragStart(e, section, id) {
+  hwellDragItem = { section, id };
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function hwellRowDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+async function hwellRowDrop(e, section, targetId) {
+  e.preventDefault();
+  const dragged = hwellDragItem;
+  hwellDragItem = null;
+  if (!dragged || dragged.section !== section || dragged.id === targetId) return;
+  const list = state.habitsCustom[section];
+  const fromIdx = list.findIndex(i => i.id === dragged.id);
+  const toIdx   = list.findIndex(i => i.id === targetId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  const [moved] = list.splice(fromIdx, 1);
+  list.splice(toIdx, 0, moved);
+  await saveUserData({ habitsCustomItems: state.habitsCustom });
+  await renderHwellGrid(state.habitsMonth);
 }
 
 // ── Activeness ───────────────────────────────────────────────────────────
