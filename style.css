@@ -576,31 +576,50 @@ td.sleep-cell:hover { background: #16243f !important; }
 .hwell-avg-label { font-size: 13px; color: var(--muted); font-weight: 600; }
 .hwell-avg-value { font-size: 20px; font-weight: 800; color: var(--lime); }
 
-.hwell-list { display: flex; flex-direction: column; gap: 8px; }
-.hwell-toggle {
-  display: flex; align-items: center; gap: 12px;
-  width: 100%; text-align: left; cursor: pointer;
-  background: var(--card2); border: 1px solid var(--border); border-radius: 10px;
-  padding: 12px 14px; font-family: inherit; transition: all 0.15s;
+/* Month grid (columns = every date of the month, rows = fixed checklist items) */
+#tab-habits { overflow-x: clip; }
+.hwell-grid-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 13px; }
+.hwell-grid-table th {
+  padding: 10px 12px; font-size: 11px; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px;
+  background: #0D1628; border-bottom: 2px solid var(--border);
+  text-align: center;
 }
-.hwell-toggle:hover { border-color: var(--primary); }
-.hwell-toggle-mark {
-  width: 22px; height: 22px; flex-shrink: 0;
-  border: 2px solid var(--border); border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 900; color: #0B1120;
-  transition: all 0.15s;
+.hwell-name-col {
+  text-align: left !important; min-width: 220px;
+  position: sticky; left: 0; z-index: 20; background: #0D1628;
 }
-.hwell-toggle-label { font-size: 14px; color: var(--text); }
-.hwell-toggle.done { border-color: var(--green); background: rgba(74,222,128,0.08); }
-.hwell-toggle.done .hwell-toggle-mark { background: var(--green); border-color: var(--green); }
-.hwell-toggle.done .hwell-toggle-label { color: var(--green); font-weight: 600; }
+.hwell-day-col { min-width: 46px; }
+.hwell-grid-table th.col-today   { color: var(--amber); border-bottom-color: var(--amber); }
+.hwell-grid-table th.col-weekend { color: var(--muted); opacity: 0.6; }
 
-.hwell-count-row {
-  font-size: 13px; color: var(--muted); text-align: center;
-  margin: 4px 0 24px; font-weight: 600;
+.hwell-grid-table td { border-bottom: 1px solid var(--border); }
+.hwell-row-label {
+  padding: 10px 12px; font-size: 13px; font-weight: 600; color: var(--text);
+  position: sticky; left: 0; z-index: 10; background: var(--card);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px;
 }
-.hwell-count-row strong { color: var(--lime); font-size: 15px; }
+.hwell-group-row td {
+  padding: 8px 12px; font-size: 11px; font-weight: 700; color: var(--lime);
+  letter-spacing: 1px; background: rgba(200,255,0,0.05);
+  position: sticky; left: 0;
+}
+.hwell-cell { text-align: center; padding: 8px 6px; }
+.hwell-cell.cell-today { background: rgba(252,211,77,0.05); }
+.hwell-cell.cell-weekend { background: rgba(255,255,255,0.02); }
+
+.hwell-grid-toggle {
+  width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 6px;
+  background: var(--card2); cursor: pointer; transition: all 0.15s;
+  display: block; margin: 0 auto; font-size: 13px; font-weight: 900; line-height: 1;
+  color: #0B1120; padding: 0;
+}
+.hwell-grid-toggle:hover { border-color: var(--primary); }
+.hwell-grid-toggle.done { background: var(--green); border-color: var(--green); }
+
+.hwell-totals-row td { border-top: 2px solid var(--border); font-weight: 700; }
+.hwell-totals-row .hwell-row-label { color: var(--lime); }
+.hwell-total-cell { font-size: 11px; color: var(--muted); font-weight: 700; }
 
 .activeness-scale { display: flex; gap: 8px; margin-bottom: 12px; }
 .activeness-btn {

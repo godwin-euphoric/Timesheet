@@ -539,26 +539,28 @@
       <span class="hwell-avg-value" id="hwell-month-avg">—</span>
     </div>
 
-    <!-- Date navigation -->
+    <!-- Month picker -->
+    <div class="top-controls">
+      <div class="field-group">
+        <label>Month</label>
+        <input type="month" id="habits-grid-month" onchange="onHabitsMonthChange(this.value)">
+      </div>
+    </div>
+
+    <!-- Habits + Daily Wellness grid — one column per date of the month -->
+    <div class="card">
+      <div class="table-scroll">
+        <table class="hwell-grid-table" id="hwell-grid-table"></table>
+      </div>
+    </div>
+
+    <!-- Date navigation (drives Activeness / Daily Judgement below) -->
+    <div class="diet-log-label" style="margin-top:24px">ACTIVENESS &amp; DAILY JUDGEMENT FOR</div>
     <div class="diet-date-nav">
       <button class="diet-date-arrow" onclick="habitsPrevDay()">&#8592;</button>
       <span id="hwell-date-label">MON, JUN 8</span>
       <button class="diet-date-arrow" onclick="habitsNextDay()">&#8594;</button>
     </div>
-
-    <!-- Habits -->
-    <div class="diet-log-section">
-      <div class="diet-log-label">HABITS</div>
-      <div class="hwell-list" id="hwell-habits-list"></div>
-    </div>
-
-    <!-- Daily Wellness -->
-    <div class="diet-log-section">
-      <div class="diet-log-label">DAILY WELLNESS</div>
-      <div class="hwell-list" id="hwell-wellness-list"></div>
-    </div>
-
-    <div class="hwell-count-row">Achieved <strong id="hwell-count-num">0</strong> out of 16.</div>
 
     <!-- Activeness -->
     <div class="diet-log-section">

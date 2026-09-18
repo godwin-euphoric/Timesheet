@@ -53,6 +53,7 @@ const state = {
   regProteinSources: null,
   // Habits tab
   habitsDate:       todayStr(),
+  habitsMonth:      currentMonth(),
   habitsMonthCache: {},
   userRole:         null,
   // Summary tab
@@ -1907,35 +1908,89 @@ function hwellAchievedCount(day) {
 // ── Tab load ───────────────────────────────────────────────────────────────
 
 async function loadHabitsTab() {
-  if (!state.habitsDate) state.habitsDate = todayStr();
+  if (!state.habitsDate)  state.habitsDate  = todayStr();
+  if (!state.habitsMonth) state.habitsMonth = currentMonth();
+  document.getElementById('habits-grid-month').value = state.habitsMonth;
   if (!state.dietSettings) await loadDietSettings(); // Gemini key, needed by the Judgement buttons
-  await renderHwellDay(state.habitsDate);
-  await renderHwellMonthAvg();
+  await renderHwellGrid(state.habitsMonth);
+  await renderHwellMonthAvg(state.habitsMonth);
+  await renderHwellDayPanel(state.habitsDate);
 }
 
-async function renderHwellDay(dateStr) {
+async function onHabitsMonthChange(month) {
+  state.habitsMonth = month;
+  await renderHwellGrid(month);
+  await renderHwellMonthAvg(month);
+}
+
+// Builds one row (row label + one toggle cell per date of the month) for a single fixed item.
+function hwellBuildRow(item, section, days, mData, today) {
+  const cells = days.map(d => {
+    const day  = mData.days[d] || {};
+    const done = !!(day[section] || {})[item.id];
+    const dt   = new Date(d + 'T00:00:00');
+    const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+    return `<td class="hwell-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
+      <button type="button" class="hwell-grid-toggle ${done ? 'done' : ''}"
+        onclick="toggleHwellItem('${section}','${item.id}','${d}')">${done ? '✓' : ''}</button>
+    </td>`;
+  }).join('');
+  return `<tr><td class="hwell-row-label" title="${escHtml(item.label)}">${escHtml(item.label)}</td>${cells}</tr>`;
+}
+
+async function renderHwellGrid(month) {
+  const mData     = await getHabitsMonthData(month);
+  const [year, mon] = month.split('-').map(Number);
+  const totalDays = daysInMonth(year, mon);
+  const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const today     = todayStr();
+
+  const days = [];
+  for (let d = 1; d <= totalDays; d++) days.push(`${month}-${String(d).padStart(2,'0')}`);
+
+  const headCells = days.map(d => {
+    const dt = new Date(d + 'T00:00:00');
+    const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+    const lbl = `${String(dt.getDate()).padStart(2,'0')}<br><small>${dayNames[dt.getDay()]}</small>`;
+    return `<th class="hwell-day-col${d === today ? ' col-today' : ''}${isWeekend ? ' col-weekend' : ''}">${lbl}</th>`;
+  }).join('');
+  const thead = `<thead><tr><th class="hwell-name-col">Item</th>${headCells}</tr></thead>`;
+
+  const groupRow = label => `<tr class="hwell-group-row"><td colspan="${days.length + 1}">${label}</td></tr>`;
+
+  const habitsRows   = HABITS_FIXED.map(item => hwellBuildRow(item, 'habits', days, mData, today)).join('');
+  const wellnessRows = WELLNESS_FIXED.map(item => hwellBuildRow(item, 'wellness', days, mData, today)).join('');
+
+  const totalCells = days.map(d => {
+    const day   = mData.days[d];
+    const count = day ? hwellAchievedCount(day) : 0;
+    return `<td class="hwell-cell hwell-total-cell${d === today ? ' cell-today' : ''}">${count}/${HWELL_TOTAL}</td>`;
+  }).join('');
+  const totalsRow = `<tr class="hwell-totals-row"><td class="hwell-row-label">Achieved</td>${totalCells}</tr>`;
+
+  document.getElementById('hwell-grid-table').innerHTML =
+    thead + `<tbody>${groupRow('HABITS')}${habitsRows}${groupRow('DAILY WELLNESS')}${wellnessRows}${totalsRow}</tbody>`;
+}
+
+async function renderHwellMonthAvg(month) {
+  const mData = await getHabitsMonthData(month);
+  const days  = Object.values(mData.days || {}).filter(d => d.habits || d.wellness);
+  const el    = document.getElementById('hwell-month-avg');
+  if (!days.length) { el.textContent = '—'; }
+  else {
+    const total = days.reduce((sum, d) => sum + hwellAchievedCount(d), 0);
+    const avg   = total / days.length;
+    el.textContent = `${avg.toFixed(1)} / ${HWELL_TOTAL} (${Math.round(avg / HWELL_TOTAL * 100)}%)`;
+  }
+  document.getElementById('hwell-monthly-judgement').value = mData.monthlyJudgement || '';
+}
+
+async function renderHwellDayPanel(dateStr) {
   const month = dateStr.slice(0, 7);
   const mData = await getHabitsMonthData(month);
   const day   = habitsDayState(mData, dateStr);
 
   document.getElementById('hwell-date-label').textContent = formatDietDateLabel(dateStr);
-
-  document.getElementById('hwell-habits-list').innerHTML = HABITS_FIXED.map(item => `
-    <button type="button" class="hwell-toggle ${day.habits[item.id] ? 'done' : ''}"
-      onclick="toggleHwellItem('habits','${item.id}')">
-      <span class="hwell-toggle-mark">${day.habits[item.id] ? '✓' : ''}</span>
-      <span class="hwell-toggle-label">${escHtml(item.label)}</span>
-    </button>`).join('');
-
-  document.getElementById('hwell-wellness-list').innerHTML = WELLNESS_FIXED.map(item => `
-    <button type="button" class="hwell-toggle ${day.wellness[item.id] ? 'done' : ''}"
-      onclick="toggleHwellItem('wellness','${item.id}')">
-      <span class="hwell-toggle-mark">${day.wellness[item.id] ? '✓' : ''}</span>
-      <span class="hwell-toggle-label">${escHtml(item.label)}</span>
-    </button>`).join('');
-
-  document.getElementById('hwell-count-num').textContent = hwellAchievedCount(day);
-
   document.querySelectorAll('#hwell-activeness-scale .activeness-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.val === day.activeness);
   });
@@ -1943,29 +1998,17 @@ async function renderHwellDay(dateStr) {
   document.getElementById('hwell-daily-judgement').value  = day.dailyJudgement || '';
 }
 
-async function renderHwellMonthAvg() {
-  const month = state.habitsDate.slice(0, 7);
-  const mData = await getHabitsMonthData(month);
-  const days  = Object.values(mData.days || {}).filter(d => d.habits || d.wellness);
-  const el    = document.getElementById('hwell-month-avg');
-  if (!days.length) { el.textContent = '—'; return; }
-  const total = days.reduce((sum, d) => sum + hwellAchievedCount(d), 0);
-  const avg   = total / days.length;
-  el.textContent = `${avg.toFixed(1)} / ${HWELL_TOTAL} (${Math.round(avg / HWELL_TOTAL * 100)}%)`;
-  document.getElementById('hwell-monthly-judgement').value = mData.monthlyJudgement || '';
-}
-
 // ── Toggles (single click = done; click again = undone) ────────────────────
 
-async function toggleHwellItem(section, id) {
-  const dateStr = state.habitsDate;
-  const month   = dateStr.slice(0, 7);
-  const mData   = await getHabitsMonthData(month);
-  const day     = habitsDayState(mData, dateStr);
+async function toggleHwellItem(section, id, dateStr) {
+  const month = dateStr.slice(0, 7);
+  const mData = await getHabitsMonthData(month);
+  const day   = habitsDayState(mData, dateStr);
   day[section][id] = !day[section][id];
   await saveHabitsMonthData(month, mData);
-  await renderHwellDay(dateStr);
-  await renderHwellMonthAvg();
+  await renderHwellGrid(state.habitsMonth);
+  await renderHwellMonthAvg(state.habitsMonth);
+  if (dateStr === state.habitsDate) await renderHwellDayPanel(dateStr);
 }
 
 // ── Activeness ───────────────────────────────────────────────────────────
@@ -2043,7 +2086,7 @@ async function generateHwellDailyJudgement() {
 // ── Monthly Judgement (AI) ───────────────────────────────────────────────
 
 async function saveHwellMonthlyJudgement(silent) {
-  const month = state.habitsDate.slice(0, 7);
+  const month = state.habitsMonth;
   const mData = await getHabitsMonthData(month);
   mData.monthlyJudgement = document.getElementById('hwell-monthly-judgement').value;
   await saveHabitsMonthData(month, mData);
@@ -2051,7 +2094,7 @@ async function saveHwellMonthlyJudgement(silent) {
 }
 
 async function generateHwellMonthlyJudgement() {
-  const month = state.habitsDate.slice(0, 7);
+  const month = state.habitsMonth;
   const mData = await getHabitsMonthData(month);
   const days  = Object.entries(mData.days || {}).filter(([, d]) => d.habits || d.wellness);
 
@@ -2088,8 +2131,7 @@ async function habitsPrevDay() {
   const [y, m, d] = state.habitsDate.split('-').map(Number);
   const dt  = new Date(y, m - 1, d - 1);
   state.habitsDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-  await renderHwellDay(state.habitsDate);
-  await renderHwellMonthAvg();
+  await renderHwellDayPanel(state.habitsDate);
 }
 
 async function habitsNextDay() {
@@ -2098,8 +2140,7 @@ async function habitsNextDay() {
   const next = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
   if (next > todayStr()) { showToast("Can't go to a future date"); return; }
   state.habitsDate = next;
-  await renderHwellDay(state.habitsDate);
-  await renderHwellMonthAvg();
+  await renderHwellDayPanel(state.habitsDate);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
