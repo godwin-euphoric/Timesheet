@@ -55,7 +55,7 @@ const state = {
   habitsDate:       todayStr(),
   habitsMonth:      currentMonth(),
   habitsMonthCache: {},
-  habitsCustom:     { habits: [], wellness: [] },
+  habitsCustom:     { wellness: [] },
   userRole:         null,
   // Summary tab
   weightEntries:    null,
@@ -1846,12 +1846,7 @@ document.getElementById('yearly-year').addEventListener('change', async function
 //  HABITS TAB
 // ══════════════════════════════════════════════════════════════════════════
 
-// Fixed checklist items — not user-editable, per the redesigned tab's spec.
-const HABITS_FIXED = [
-  { id: 'office_timesheet', label: 'Office Timesheet' },
-  { id: 'meditation',       label: 'Meditation' },
-  { id: 'night_entry',      label: 'Night Entry (Timesheet, Diet, Calculator)' },
-];
+// Fixed checklist items — seed data for the one-time migration into the user's editable list.
 const WELLNESS_FIXED = [
   { id: 'a1',  label: 'Slept by 11:30–12:30 pm (or correct room based on sleep time)' },
   { id: 'a2',  label: 'Got 6.5 hrs sleep' },
@@ -1874,15 +1869,15 @@ const ACTIVENESS_LEVELS = [
   { id: 'L', label: 'Low Active' },
 ];
 
-// Both Habits and Wellness are fully user-editable — the whole list for each lives in
-// state.habitsCustom[section] (seeded from HABITS_FIXED/WELLNESS_FIXED once, see loadHabitsTab),
+// Habits (formerly "Daily Wellness") is fully user-editable — the whole list lives in
+// state.habitsCustom[section] (seeded from WELLNESS_FIXED once, see loadHabitsTab),
 // so items can be renamed/deleted/reordered freely.
 function hwellItems(section) {
   return state.habitsCustom[section] || [];
 }
 
 function hwellTotal() {
-  return hwellItems('habits').length + hwellItems('wellness').length;
+  return hwellItems('wellness').length;
 }
 
 // ── Firestore (per-month doc, same pattern as the Diet/Regimen tab) ────────
@@ -1908,7 +1903,6 @@ async function saveHabitsMonthData(month, data) {
 function habitsDayState(mData, dateStr) {
   if (!mData.days[dateStr]) mData.days[dateStr] = {};
   const d = mData.days[dateStr];
-  if (!d.habits)                   d.habits = {};
   if (!d.wellness)                 d.wellness = {};
   if (d.activeness === undefined)  d.activeness = null; // 'A' | 'M' | 'L' | null
   if (!d.activenessNotes)          d.activenessNotes = '';
@@ -1917,9 +1911,7 @@ function habitsDayState(mData, dateStr) {
 }
 
 function hwellAchievedCount(day) {
-  const h = Object.values(day.habits || {}).filter(Boolean).length;
-  const w = Object.values(day.wellness || {}).filter(Boolean).length;
-  return h + w;
+  return Object.values(day.wellness || {}).filter(Boolean).length;
 }
 
 // ── Tab load ───────────────────────────────────────────────────────────────
@@ -1931,17 +1923,10 @@ async function loadHabitsTab() {
   if (!state.dietSettings) await loadDietSettings(); // Gemini key, needed by the Judgement buttons
   const ud = await getUserData();
   const custom = ud.habitsCustomItems || {};
-  let habits   = custom.habits || [];
   let wellness = custom.wellness || [];
-  // One-time migration: fold the old hardcoded HABITS_FIXED/WELLNESS_FIXED lists into the user's
-  // own editable lists, so existing users don't lose their items when they become editable/deletable.
+  // One-time migration: fold the old hardcoded WELLNESS_FIXED list into the user's own editable
+  // list, so existing users don't lose their items when they become editable/deletable.
   let migrated = false;
-  if (!ud.habitsHabitsMigrated) {
-    const existingIds = new Set(habits.map(i => i.id));
-    const toPrepend = HABITS_FIXED.filter(item => !existingIds.has(item.id)).map(item => ({ ...item }));
-    habits = [...toPrepend, ...habits];
-    migrated = true;
-  }
   if (!ud.habitsWellnessMigrated) {
     const existingIds = new Set(wellness.map(i => i.id));
     const toPrepend = WELLNESS_FIXED.filter(item => !existingIds.has(item.id)).map(item => ({ ...item }));
@@ -1949,9 +1934,9 @@ async function loadHabitsTab() {
     migrated = true;
   }
   if (migrated) {
-    await saveUserData({ habitsHabitsMigrated: true, habitsWellnessMigrated: true, habitsCustomItems: { habits, wellness } });
+    await saveUserData({ habitsWellnessMigrated: true, habitsCustomItems: { wellness } });
   }
-  state.habitsCustom = { habits, wellness };
+  state.habitsCustom = { wellness };
   await renderHwellGrid(state.habitsMonth);
   await renderHwellMonthAvg(state.habitsMonth);
   await renderHwellDayPanel(state.habitsDate);
@@ -2005,10 +1990,9 @@ function hwellBuildActivenessRow(days, mData, today) {
 }
 
 function hwellBuildAddRow(section, days) {
-  const label = section === 'habits' ? '+ Add habit' : '+ Add wellness item';
   const emptyCells = days.map(() => `<td class="hwell-cell"></td>`).join('');
   return `<tr class="hwell-add-row"><td class="hwell-row-label">
-      <button type="button" class="hwell-add-btn" onclick="addHwellCustomItem('${section}')">${label}</button>
+      <button type="button" class="hwell-add-btn" onclick="addHwellCustomItem('${section}')">+ Add habit</button>
     </td>${emptyCells}</tr>`;
 }
 
@@ -2032,7 +2016,6 @@ async function renderHwellGrid(month) {
 
   const groupRow = label => `<tr class="hwell-group-row"><td colspan="${days.length + 1}">${label}</td></tr>`;
 
-  const habitsRows   = state.habitsCustom.habits.map(item => hwellBuildRow(item, 'habits', days, mData, today)).join('');
   const wellnessRows = state.habitsCustom.wellness.map(item => hwellBuildRow(item, 'wellness', days, mData, today)).join('');
 
   const total = hwellTotal();
@@ -2047,14 +2030,13 @@ async function renderHwellGrid(month) {
 
   document.getElementById('hwell-grid-table').innerHTML =
     thead +
-    `<tbody>${groupRow('HABITS')}${habitsRows}${hwellBuildAddRow('habits', days)}` +
-    `${groupRow('DAILY WELLNESS')}${wellnessRows}${hwellBuildAddRow('wellness', days)}` +
+    `<tbody>${groupRow('HABITS')}${wellnessRows}${hwellBuildAddRow('wellness', days)}` +
     `${totalsRow}${groupRow('ACTIVENESS')}${activenessRows}</tbody>`;
 }
 
 async function renderHwellMonthAvg(month) {
   const mData = await getHabitsMonthData(month);
-  const days  = Object.values(mData.days || {}).filter(d => d.habits || d.wellness);
+  const days  = Object.values(mData.days || {}).filter(d => d.wellness);
   const el    = document.getElementById('hwell-month-avg');
   if (!days.length) { el.textContent = '—'; }
   else {
@@ -2101,7 +2083,7 @@ async function toggleHwellActivenessLevel(level, dateStr) {
 // ── Custom rows (user-added, on top of the fixed Habits/Daily Wellness items) ──
 
 async function addHwellCustomItem(section) {
-  const label = prompt(section === 'habits' ? 'Habit name:' : 'Wellness item name:');
+  const label = prompt('Habit name:');
   if (!label?.trim()) return;
   const id = `custom_${Date.now()}`;
   state.habitsCustom[section].push({ id, label: label.trim() });
@@ -2185,8 +2167,7 @@ function hwellDayPromptSummary(day) {
     .map(item => `${obj[item.id] ? '✅' : '❌'} ${item.label}`)
     .join('\n');
   const activenessLabel = ACTIVENESS_LEVELS.find(lv => lv.id === day.activeness)?.label || 'not set';
-  return `Habits:\n${doneList(hwellItems('habits'), day.habits)}\n\n` +
-    `Daily Wellness:\n${doneList(hwellItems('wellness'), day.wellness)}\n\n` +
+  return `Habits:\n${doneList(hwellItems('wellness'), day.wellness)}\n\n` +
     `Activeness: ${activenessLabel}` +
     `${day.activenessNotes ? ` — notes: ${day.activenessNotes}` : ''}`;
 }
@@ -2203,7 +2184,7 @@ async function generateHwellDailyJudgement() {
   ta.disabled = true;
   try {
     const prompt = `You are a supportive but honest personal-habits coach. Below is one day's tracked data ` +
-      `(Habits, Daily Wellness checklist, and self-rated Activeness). Give a short (3-5 sentence) judgement/insight ` +
+      `(a Habits checklist and self-rated Activeness). Give a short (3-5 sentence) judgement/insight ` +
       `on how the day went — call out what went well and what to improve. Plain text, no markdown, no headings.\n\n` +
       hwellDayPromptSummary(day);
     const result = await callGemini(prompt);
@@ -2231,7 +2212,7 @@ async function saveHwellMonthlyJudgement(silent) {
 async function generateHwellMonthlyJudgement() {
   const month = state.habitsMonth;
   const mData = await getHabitsMonthData(month);
-  const days  = Object.entries(mData.days || {}).filter(([, d]) => d.habits || d.wellness);
+  const days  = Object.entries(mData.days || {}).filter(([, d]) => d.wellness);
 
   const spinner = document.getElementById('hwell-monthly-judgement-spinner');
   const ta      = document.getElementById('hwell-monthly-judgement');
@@ -2245,7 +2226,7 @@ async function generateHwellMonthlyJudgement() {
       .map(([ds, d]) => `${ds} (${hwellAchievedCount(d)}/${hwellTotal()}):\n${hwellDayPromptSummary(d)}`)
       .join('\n\n');
     const prompt = `You are a supportive but honest personal-habits coach. Below is a month of daily tracked data ` +
-      `(Habits, Daily Wellness checklist, and self-rated Activeness). Give a short (4-6 sentence) overall judgement ` +
+      `(a Habits checklist and self-rated Activeness). Give a short (4-6 sentence) overall judgement ` +
       `for the month — call out patterns, what's working, and what to improve. Plain text, no markdown, no headings.\n\n` +
       daySummaries;
     const result = await callGemini(prompt);
