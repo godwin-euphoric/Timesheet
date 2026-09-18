@@ -1867,8 +1867,11 @@ const WELLNESS_FIXED = [
   { id: 'a12', label: 'Did meditation (5–10 min)' },
   { id: 'a13', label: 'Books / YouTube / Movie — alone in rest room' },
 ];
-const ACTIVENESS_FIXED = [
-  { id: 'active', label: 'Activeness' },
+// Activeness is a single row, but each cell cycles through 3 levels instead of a plain checkbox.
+const ACTIVENESS_LEVELS = [
+  { id: 'A', label: 'Active' },
+  { id: 'M', label: 'Mild Active' },
+  { id: 'L', label: 'Low Active' },
 ];
 
 // Fixed items plus any user-added custom rows for that section ('habits' or 'wellness').
@@ -1905,10 +1908,10 @@ async function saveHabitsMonthData(month, data) {
 function habitsDayState(mData, dateStr) {
   if (!mData.days[dateStr]) mData.days[dateStr] = {};
   const d = mData.days[dateStr];
-  if (!d.habits)           d.habits = {};
-  if (!d.wellness)         d.wellness = {};
-  if (!d.activeness)       d.activeness = {};
-  if (!d.activenessNotes)  d.activenessNotes = '';
+  if (!d.habits)                   d.habits = {};
+  if (!d.wellness)                 d.wellness = {};
+  if (d.activeness === undefined)  d.activeness = null; // 'A' | 'M' | 'L' | null
+  if (!d.activenessNotes)          d.activenessNotes = '';
   if (!d.dailyJudgement)   d.dailyJudgement = '';
   return d;
 }
@@ -1959,6 +1962,25 @@ function hwellBuildRow(item, section, days, mData, today, isCustom) {
   return `<tr><td class="hwell-row-label" title="${escHtml(item.label)}">${removeBtn}${escHtml(item.label)}</td>${cells}</tr>`;
 }
 
+// Activeness: one row, but each cell holds 3 mini letter-buttons (A/M/L) — clicking the
+// already-selected letter clears it, clicking another switches to it (single-select per date).
+function hwellBuildActivenessRow(days, mData, today) {
+  const cells = days.map(d => {
+    const day   = mData.days[d] || {};
+    const level = day.activeness || null;
+    const dt    = new Date(d + 'T00:00:00');
+    const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+    const btns = ACTIVENESS_LEVELS.map(lv =>
+      `<button type="button" class="hwell-act-btn lvl-${lv.id.toLowerCase()}${level === lv.id ? ' active' : ''}"
+        title="${escHtml(lv.label)}" onclick="toggleHwellActivenessLevel('${lv.id}','${d}')">${lv.id}</button>`
+    ).join('');
+    return `<td class="hwell-cell hwell-act-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
+      <div class="hwell-act-group">${btns}</div>
+    </td>`;
+  }).join('');
+  return `<tr><td class="hwell-row-label">Activeness</td>${cells}</tr>`;
+}
+
 function hwellBuildAddRow(section, days) {
   const label = section === 'habits' ? '+ Add habit' : '+ Add wellness item';
   const emptyCells = days.map(() => `<td class="hwell-cell"></td>`).join('');
@@ -2000,7 +2022,7 @@ async function renderHwellGrid(month) {
   }).join('');
   const totalsRow = `<tr class="hwell-totals-row"><td class="hwell-row-label">Achieved</td>${totalCells}</tr>`;
 
-  const activenessRows = ACTIVENESS_FIXED.map(item => hwellBuildRow(item, 'activeness', days, mData, today, false)).join('');
+  const activenessRows = hwellBuildActivenessRow(days, mData, today);
 
   document.getElementById('hwell-grid-table').innerHTML =
     thead +
@@ -2044,6 +2066,15 @@ async function toggleHwellItem(section, id, dateStr) {
   await renderHwellGrid(state.habitsMonth);
   await renderHwellMonthAvg(state.habitsMonth);
   if (dateStr === state.habitsDate) await renderHwellDayPanel(dateStr);
+}
+
+async function toggleHwellActivenessLevel(level, dateStr) {
+  const month = dateStr.slice(0, 7);
+  const mData = await getHabitsMonthData(month);
+  const day   = habitsDayState(mData, dateStr);
+  day.activeness = day.activeness === level ? null : level;
+  await saveHabitsMonthData(month, mData);
+  await renderHwellGrid(state.habitsMonth);
 }
 
 // ── Custom rows (user-added, on top of the fixed Habits/Daily Wellness items) ──
@@ -2094,9 +2125,10 @@ function hwellDayPromptSummary(day) {
   const doneList = (fixedList, obj) => fixedList
     .map(item => `${obj[item.id] ? '✅' : '❌'} ${item.label}`)
     .join('\n');
+  const activenessLabel = ACTIVENESS_LEVELS.find(lv => lv.id === day.activeness)?.label || 'not set';
   return `Habits:\n${doneList(hwellItems('habits'), day.habits)}\n\n` +
     `Daily Wellness:\n${doneList(hwellItems('wellness'), day.wellness)}\n\n` +
-    `Activeness: ${day.activeness && day.activeness.active ? 'Yes' : 'No'}` +
+    `Activeness: ${activenessLabel}` +
     `${day.activenessNotes ? ` — notes: ${day.activenessNotes}` : ''}`;
 }
 
