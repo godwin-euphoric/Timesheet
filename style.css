@@ -640,8 +640,6 @@ td.sleep-cell:hover { background: #16243f !important; }
   background: var(--card2); color: var(--text); font-size: 11px; padding: 3px 2px;
 }
 .hwell-sleep-input:focus { border-color: var(--primary); outline: none; }
-.hwell-sleep-input::-webkit-inner-spin-button,
-.hwell-sleep-input::-webkit-outer-spin-button { opacity: 0.4; }
 
 .hwell-row-drag {
   display: inline-block; width: 14px; margin-right: 4px; cursor: grab; color: var(--muted);

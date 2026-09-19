@@ -333,6 +333,11 @@ async function loadMainTab() {
 // A dropdown of the site's visible tabs plus a free-text box, so a quick note about
 // any tab can be jotted from the Main tab without switching away. Stored keyed by
 // each tab's data-tab id (userData.tabNotes), independent of month/date.
+// EXTRA_TABNOTES_OPTIONS adds entries with no matching nav tab (e.g. a note category
+// that isn't a page of its own).
+const EXTRA_TABNOTES_OPTIONS = [
+  { value: 'fm-learning', label: 'FM - Learning' },
+];
 
 function populateMainTabNotesDropdown() {
   const sel = document.getElementById('main-tabnotes-select');
@@ -341,6 +346,8 @@ function populateMainTabNotesDropdown() {
   const options = [...document.querySelectorAll('.tab-btn')]
     .filter(btn => !btn.classList.contains('hidden'))
     .map(btn => `<option value="${btn.dataset.tab}">${escHtml(btn.textContent.trim())}</option>`)
+    .join('') + EXTRA_TABNOTES_OPTIONS
+    .map(o => `<option value="${o.value}">${escHtml(o.label)}</option>`)
     .join('');
   sel.innerHTML = '<option value="">-- Select --</option>' + options;
   if ([...sel.options].some(o => o.value === prevValue)) sel.value = prevValue;
@@ -2007,7 +2014,7 @@ function hwellBuildSleepRow(field, label, days, mData, today) {
     const dt  = new Date(d + 'T00:00:00');
     const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
     return `<td class="hwell-cell hwell-sleep-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
-      <input type="number" class="hwell-sleep-input" step="0.5" min="0" max="24" placeholder="—"
+      <input type="text" inputmode="decimal" class="hwell-sleep-input" placeholder="—"
         value="${val}" onchange="onHwellSleepInput('${field}','${d}',this.value)">
     </td>`;
   }).join('');
@@ -2015,11 +2022,13 @@ function hwellBuildSleepRow(field, label, days, mData, today) {
 }
 
 async function onHwellSleepInput(field, dateStr, value) {
-  const month = dateStr.slice(0, 7);
-  const mData = await getHabitsMonthData(month);
-  const day   = habitsDayState(mData, dateStr);
-  day[field]  = value === '' ? '' : Math.max(0, Math.min(24, parseFloat(value)));
+  const month  = dateStr.slice(0, 7);
+  const mData  = await getHabitsMonthData(month);
+  const day    = habitsDayState(mData, dateStr);
+  const parsed = parseFloat(value);
+  day[field]   = value === '' || isNaN(parsed) ? '' : Math.max(0, Math.min(24, parsed));
   await saveHabitsMonthData(month, mData);
+  await renderHwellGrid(state.habitsMonth); // reflect clamped/rejected value back into the box
   await syncHwellSleepToMain(dateStr, day);
 }
 
