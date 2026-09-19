@@ -616,6 +616,7 @@ td.sleep-cell:hover { background: #16243f !important; }
 }
 .hwell-grid-toggle:hover { border-color: var(--primary); }
 .hwell-grid-toggle.done { background: var(--green); border-color: var(--green); }
+.hwell-grid-toggle.wrong { background: #f87171; border-color: #f87171; color: #0B1120; }
 
 .hwell-totals-row td { border-top: 2px solid var(--border); font-weight: 700; }
 .hwell-totals-row .hwell-row-label { color: var(--lime); }
@@ -632,6 +633,15 @@ td.sleep-cell:hover { background: #16243f !important; }
 .hwell-act-btn.active.lvl-a { background: var(--green); border-color: var(--green); color: #0B1120; }
 .hwell-act-btn.active.lvl-m { background: var(--amber); border-color: var(--amber); color: #0B1120; }
 .hwell-act-btn.active.lvl-l { background: #f87171; border-color: #f87171; color: #0B1120; }
+
+.hwell-sleep-cell { padding: 6px 4px; }
+.hwell-sleep-input {
+  width: 42px; text-align: center; border: 1px solid var(--border); border-radius: 4px;
+  background: var(--card2); color: var(--text); font-size: 11px; padding: 3px 2px;
+}
+.hwell-sleep-input:focus { border-color: var(--primary); outline: none; }
+.hwell-sleep-input::-webkit-inner-spin-button,
+.hwell-sleep-input::-webkit-outer-spin-button { opacity: 0.4; }
 
 .hwell-row-drag {
   display: inline-block; width: 14px; margin-right: 4px; cursor: grab; color: var(--muted);

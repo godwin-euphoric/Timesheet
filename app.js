@@ -1849,7 +1849,6 @@ document.getElementById('yearly-year').addEventListener('change', async function
 // Fixed checklist items — seed data for the one-time migration into the user's editable list.
 const WELLNESS_FIXED = [
   { id: 'a1',  label: 'Slept by 11:30–12:30 pm (or correct room based on sleep time)' },
-  { id: 'a2',  label: 'Got 6.5 hrs sleep' },
   { id: 'a3',  label: 'Diet: stayed within 1800 cal, 40g+ protein' },
   { id: 'a4',  label: 'No heavy meals' },
   { id: 'a5',  label: 'Finished 3L water' },
@@ -1903,15 +1902,17 @@ async function saveHabitsMonthData(month, data) {
 function habitsDayState(mData, dateStr) {
   if (!mData.days[dateStr]) mData.days[dateStr] = {};
   const d = mData.days[dateStr];
-  if (!d.wellness)                 d.wellness = {};
-  if (d.activeness === undefined)  d.activeness = null; // 'A' | 'M' | 'L' | null
-  if (!d.activenessNotes)          d.activenessNotes = '';
-  if (!d.dailyJudgement)   d.dailyJudgement = '';
+  if (!d.wellness)                    d.wellness = {};
+  if (d.activeness === undefined)     d.activeness = null; // 'A' | 'M' | 'L' | null
+  if (!d.activenessNotes)             d.activenessNotes = '';
+  if (!d.dailyJudgement)              d.dailyJudgement = '';
+  if (d.sleepHoursNight === undefined) d.sleepHoursNight = '';
+  if (d.sleepHoursDay === undefined)   d.sleepHoursDay = '';
   return d;
 }
 
 function hwellAchievedCount(day) {
-  return Object.values(day.wellness || {}).filter(Boolean).length;
+  return Object.values(day.wellness || {}).filter(v => v === true).length;
 }
 
 // ── Tab load ───────────────────────────────────────────────────────────────
@@ -1933,8 +1934,14 @@ async function loadHabitsTab() {
     wellness = [...toPrepend, ...wellness];
     migrated = true;
   }
+  // One-time cleanup: "Got 6.5 hrs sleep" (id 'a2') is replaced by the dedicated Sleep Hours
+  // (Night/Day) number rows below — drop it from the checklist if a previous migration added it.
+  if (!ud.habitsSleepFieldMigrated) {
+    wellness = wellness.filter(item => item.id !== 'a2');
+    migrated = true;
+  }
   if (migrated) {
-    await saveUserData({ habitsWellnessMigrated: true, habitsCustomItems: { wellness } });
+    await saveUserData({ habitsWellnessMigrated: true, habitsSleepFieldMigrated: true, habitsCustomItems: { wellness } });
   }
   state.habitsCustom = { wellness };
   await renderHwellGrid(state.habitsMonth);
@@ -1954,12 +1961,14 @@ async function onHabitsMonthChange(month) {
 function hwellBuildRow(item, section, days, mData, today) {
   const cells = days.map(d => {
     const day  = mData.days[d] || {};
-    const done = !!(day[section] || {})[item.id];
+    const val  = (day[section] || {})[item.id]; // true | 'wrong' | undefined
+    const cls  = val === true ? 'done' : val === 'wrong' ? 'wrong' : '';
+    const mark = val === true ? '✓' : val === 'wrong' ? '✗' : '';
     const dt   = new Date(d + 'T00:00:00');
     const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
     return `<td class="hwell-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
-      <button type="button" class="hwell-grid-toggle ${done ? 'done' : ''}"
-        onclick="toggleHwellItem('${section}','${item.id}','${d}')">${done ? '✓' : ''}</button>
+      <button type="button" class="hwell-grid-toggle ${cls}"
+        onclick="toggleHwellItem('${section}','${item.id}','${d}')">${mark}</button>
     </td>`;
   }).join('');
   const dragHandle = `<span class="hwell-row-drag" draggable="true" title="Drag to reorder"
@@ -1987,6 +1996,54 @@ function hwellBuildActivenessRow(days, mData, today) {
     </td>`;
   }).join('');
   return `<tr><td class="hwell-row-label">Activeness</td>${cells}</tr>`;
+}
+
+// Sleep Hours: two free-entry number rows (Night / Day) instead of a plain checkbox —
+// not counted toward the Achieved total, same treatment as Activeness.
+function hwellBuildSleepRow(field, label, days, mData, today) {
+  const cells = days.map(d => {
+    const day = mData.days[d] || {};
+    const val = day[field] ?? '';
+    const dt  = new Date(d + 'T00:00:00');
+    const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+    return `<td class="hwell-cell hwell-sleep-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
+      <input type="number" class="hwell-sleep-input" step="0.5" min="0" max="24" placeholder="—"
+        value="${val}" onchange="onHwellSleepInput('${field}','${d}',this.value)">
+    </td>`;
+  }).join('');
+  return `<tr><td class="hwell-row-label">${label}</td>${cells}</tr>`;
+}
+
+async function onHwellSleepInput(field, dateStr, value) {
+  const month = dateStr.slice(0, 7);
+  const mData = await getHabitsMonthData(month);
+  const day   = habitsDayState(mData, dateStr);
+  day[field]  = value === '' ? '' : Math.max(0, Math.min(24, parseFloat(value)));
+  await saveHabitsMonthData(month, mData);
+  await syncHwellSleepToMain(dateStr, day);
+}
+
+// Combines the Habits tab's Sleep Hours (Night) + (Day) entries into the Main tab's
+// monthly sleep total for the "Avg Sleep / day (Month)" stat chip. The Habits-tab boxes
+// are the authoritative source for that date's tracked sleep, so this overwrites rather
+// than adds to any prior value.
+async function syncHwellSleepToMain(dateStr, day) {
+  const night = parseFloat(day.sleepHoursNight) || 0;
+  const dayHrs = parseFloat(day.sleepHoursDay) || 0;
+  const total = night + dayHrs;
+  const month = dateStr.slice(0, 7);
+  const mainData = await getMonthData(month);
+  if (!mainData.sleep) mainData.sleep = {};
+  if (total > 0) mainData.sleep[dateStr] = Math.round(total * 100) / 100;
+  else delete mainData.sleep[dateStr];
+  await saveMonthData(month, mainData);
+  // Only refresh the Main tab's sleep chip live if it's actually the visible tab showing this
+  // month — otherwise it'll pick up the new data next time the user opens it (avoids an
+  // unnecessary getAllMonths() Firestore fetch on every Habits-tab keystroke).
+  const mainTabVisible = document.getElementById('tab-main')?.classList.contains('active');
+  if (mainTabVisible && state.mainMonth === month) {
+    try { await renderSleepAverages(mainData); } catch (e) { console.error('Sleep averages refresh failed', e); }
+  }
 }
 
 function hwellBuildAddRow(section, days) {
@@ -2027,11 +2084,13 @@ async function renderHwellGrid(month) {
   const totalsRow = `<tr class="hwell-totals-row"><td class="hwell-row-label">Achieved</td>${totalCells}</tr>`;
 
   const activenessRows = hwellBuildActivenessRow(days, mData, today);
+  const sleepRows = hwellBuildSleepRow('sleepHoursNight', 'Sleep Hours (Night)', days, mData, today) +
+    hwellBuildSleepRow('sleepHoursDay', 'Sleep Hours (Day)', days, mData, today);
 
   document.getElementById('hwell-grid-table').innerHTML =
     thead +
     `<tbody>${groupRow('HABITS')}${wellnessRows}${hwellBuildAddRow('wellness', days)}` +
-    `${totalsRow}${groupRow('ACTIVENESS')}${activenessRows}</tbody>`;
+    `${totalsRow}${groupRow('SLEEP')}${sleepRows}${groupRow('ACTIVENESS')}${activenessRows}</tbody>`;
 }
 
 async function renderHwellMonthAvg(month) {
@@ -2064,7 +2123,11 @@ async function toggleHwellItem(section, id, dateStr) {
   const month = dateStr.slice(0, 7);
   const mData = await getHabitsMonthData(month);
   const day   = habitsDayState(mData, dateStr);
-  day[section][id] = !day[section][id];
+  const cur   = day[section][id];
+  // Cycle: empty -> tick (true) -> wrong ('wrong') -> empty
+  if (cur === true)       day[section][id] = 'wrong';
+  else if (cur === 'wrong') delete day[section][id];
+  else                     day[section][id] = true;
   await saveHabitsMonthData(month, mData);
   await renderHwellGrid(state.habitsMonth);
   await renderHwellMonthAvg(state.habitsMonth);
@@ -2164,10 +2227,11 @@ async function saveHwellDailyJudgement(silent) {
 
 function hwellDayPromptSummary(day) {
   const doneList = (fixedList, obj) => fixedList
-    .map(item => `${obj[item.id] ? '✅' : '❌'} ${item.label}`)
+    .map(item => `${obj[item.id] === true ? '✅' : obj[item.id] === 'wrong' ? '❌' : '⬜'} ${item.label}`)
     .join('\n');
   const activenessLabel = ACTIVENESS_LEVELS.find(lv => lv.id === day.activeness)?.label || 'not set';
   return `Habits:\n${doneList(hwellItems('wellness'), day.wellness)}\n\n` +
+    `Sleep Hours — Night: ${day.sleepHoursNight || 'not set'}, Day: ${day.sleepHoursDay || 'not set'}\n\n` +
     `Activeness: ${activenessLabel}` +
     `${day.activenessNotes ? ` — notes: ${day.activenessNotes}` : ''}`;
 }
@@ -2184,7 +2248,7 @@ async function generateHwellDailyJudgement() {
   ta.disabled = true;
   try {
     const prompt = `You are a supportive but honest personal-habits coach. Below is one day's tracked data ` +
-      `(a Habits checklist and self-rated Activeness). Give a short (3-5 sentence) judgement/insight ` +
+      `(a Habits checklist, Sleep Hours, and self-rated Activeness). Give a short (3-5 sentence) judgement/insight ` +
       `on how the day went — call out what went well and what to improve. Plain text, no markdown, no headings.\n\n` +
       hwellDayPromptSummary(day);
     const result = await callGemini(prompt);
@@ -2226,7 +2290,7 @@ async function generateHwellMonthlyJudgement() {
       .map(([ds, d]) => `${ds} (${hwellAchievedCount(d)}/${hwellTotal()}):\n${hwellDayPromptSummary(d)}`)
       .join('\n\n');
     const prompt = `You are a supportive but honest personal-habits coach. Below is a month of daily tracked data ` +
-      `(a Habits checklist and self-rated Activeness). Give a short (4-6 sentence) overall judgement ` +
+      `(a Habits checklist, Sleep Hours, and self-rated Activeness). Give a short (4-6 sentence) overall judgement ` +
       `for the month — call out patterns, what's working, and what to improve. Plain text, no markdown, no headings.\n\n` +
       daySummaries;
     const result = await callGemini(prompt);
