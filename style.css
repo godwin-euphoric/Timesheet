@@ -1118,9 +1118,6 @@ textarea#fm-notes:focus {
   #tab-main > .top-controls                  { order: 1; }
   #tab-main > #main-summary-card             { order: 2; }
   #tab-main > #main-typepie-card             { order: 2; }
-  #tab-main > #main-prodpie-card             { order: 2; }
-  #tab-main > #main-officeprodpie-card       { order: 2; }
-  #tab-main > #main-wastepie-card            { order: 2; }
   #tab-main > #main-monthdate-row            { order: 3; }
   #tab-main > .log-row                       { order: 4; }
   #tab-main > #main-media-container          { order: 5; }
@@ -2151,7 +2148,14 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .type-pie-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .type-pie-hrs { color: var(--text); font-variant-numeric: tabular-nums; }
 .type-pie-pct { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Four pies in one card: 2 per row on wide screens, 1 per row on phones */
+.pie-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 28px 36px; }
+.pie-cell { min-width: 0; }
+.pie-cell-title { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+.pie-cell .type-pie-wrap { gap: 20px; }
+.pie-cell .type-pie-svg { width: 160px; height: 160px; }
+.pie-cell .type-pie-legend { min-width: 180px; }
 @media (max-width: 600px) {
-  .type-pie-wrap { justify-content: center; }
-  .type-pie-svg { width: 170px; height: 170px; }
+  .pie-cell .type-pie-wrap { justify-content: center; }
 }
