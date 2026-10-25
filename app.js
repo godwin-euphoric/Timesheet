@@ -564,6 +564,7 @@ async function loadMonthlySummary(data) {
   let fmssCompleted  = null;
 
   data.categories.forEach((c, ci) => {
+    if ((c.daily_target || 0) === 0) return;   // no target → not shown in the summary
     let completed = 0;
     Object.values(entries).forEach(dayE => { completed += dayE[c.category] || 0; });
     completed        = Math.round(completed * 100) / 100;
@@ -580,6 +581,7 @@ async function loadMonthlySummary(data) {
     const focused = (data.focusedCategories || []).includes(c.category);
     const tr = document.createElement('tr');
     tr.className = `cat-row${focused ? ' row-focused' : ''}`;
+    tr.dataset.ci = ci;
     tr.draggable = true;
     tr.ondragstart = (e) => catDragStart(e, ci);
     tr.ondragover  = (e) => catDragOver(e, ci);
@@ -723,7 +725,9 @@ function catDragStart(e, index) {
 function catDragOver(e, index) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
-  document.querySelectorAll('#entries-tbody .cat-row').forEach((r, i) => {
+  // Rows carry their index into data.categories (zero-target ones are skipped)
+  document.querySelectorAll('#entries-tbody .cat-row').forEach(r => {
+    const i = +r.dataset.ci;
     r.classList.toggle('drag-over', i === index && i !== dragSrcCatIdx);
   });
 }
