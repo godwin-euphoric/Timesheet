@@ -540,9 +540,60 @@ function renderTypePie(data) {
     g.hrs += hrs; g.cats.push(c.category);
     groups.set(name, g);
   });
-  let slices = [...groups.values()].filter(g => g.hrs > 0);
+  drawDonut(box, [...groups.values()], 'Hours by type this month');
+}
+
+// Per-type split pies: hours of each category inside one Type.
+// Type names match loosely (case, spaces and hyphens ignored).
+const TYPE_SPLIT_PIES = [
+  { type: 'PROD',        boxId: 'prod-pie' },
+  { type: 'Office Prod', boxId: 'officeprod-pie' },
+];
+const normType = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function renderTypeSplitPies(data) {
+  TYPE_SPLIT_PIES.forEach(({ type, boxId }) => {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    const cats = (data.categories || []).filter(c => normType(c.type) === normType(type));
+    if (!cats.length) {
+      box.innerHTML = `<span class="empty-inline">No categories have Type "${type}" — set it in Settings.</span>`;
+      return;
+    }
+    const groups = cats.map(c => {
+      let hrs = 0;
+      Object.values(data.entries || {}).forEach(dayE => { hrs += dayE[c.category] || 0; });
+      return { name: c.category, hrs, cats: [c.category] };
+    });
+    drawDonut(box, groups, `${type} hours by category this month`, `No ${type} hours logged this month`);
+  });
+}
+
+// Waste pie: month's Social + Unwanted hours split by sub-category
+function renderWastePie(data) {
+  const box = document.getElementById('waste-pie');
+  if (!box) return;
+  const bd = data.wastedBreakdown || {};
+  const sums = Object.fromEntries(WASTED_SUBS.map(k => [k, 0]));
+  let unspecified = 0;
+  Object.entries(data.wastedEntries || {}).forEach(([date, arr]) => {
+    const dayBd = bd[date];
+    if (dayBd) WASTED_SUBS.forEach(k => { sums[k] += dayBd[k] || 0; });
+    else arr.forEach(e => { unspecified += e.hours || 0; });   // older days stored only a total
+  });
+  const groups = WASTED_SUBS.map(k => ({ name: k, hrs: sums[k], cats: [k] }));
+  if (unspecified > 0) groups.push({ name: 'Unspecified', hrs: unspecified, cats: ['Unspecified'] });
+  drawDonut(box, groups, 'Social and unwanted hours this month', 'No waste logged this month');
+}
+
+// Donut chart + legend. groups: [{ name, hrs, cats }] in a stable order.
+function drawDonut(box, groups, ariaLabel, emptyMsg = 'No hours logged this month') {
+  // Colour follows the group's position, so a 0-hour group doesn't repaint the rest
+  const fixed = groups.length <= TYPE_PIE_COLORS.length;
+  groups.forEach((g, i) => { g.slot = i; });
+  let slices = groups.filter(g => g.hrs > 0);
   const total = slices.reduce((s, g) => s + g.hrs, 0);
-  if (!total) { box.innerHTML = '<span class="empty-inline">No hours logged this month</span>'; return; }
+  if (!total) { box.innerHTML = `<span class="empty-inline">${emptyMsg}</span>`; return; }
 
   // At most 6 coloured slices; the smallest of the rest fold into "Other"
   if (slices.length > TYPE_PIE_COLORS.length) {
@@ -551,7 +602,7 @@ function renderTypePie(data) {
     slices = slices.filter(g => keep.has(g));
     slices.push({ name: 'Other', hrs: rest.reduce((s, g) => s + g.hrs, 0), cats: rest.map(g => g.name), other: true });
   }
-  slices.forEach((g, i) => { g.color = g.other ? TYPE_PIE_OTHER : TYPE_PIE_COLORS[i]; });
+  slices.forEach((g, i) => { g.color = g.other ? TYPE_PIE_OTHER : TYPE_PIE_COLORS[fixed ? g.slot : i]; });
 
   const r2 = n => Math.round(n * 100) / 100;
   const pct = h => Math.round(h / total * 100);
@@ -582,7 +633,7 @@ function renderTypePie(data) {
 
   box.innerHTML = `
     <div class="type-pie-wrap">
-      <svg class="type-pie-svg" viewBox="0 0 200 200" role="img" aria-label="Hours by type this month">
+      <svg class="type-pie-svg" viewBox="0 0 200 200" role="img" aria-label="${ariaLabel}">
         ${paths}
         <text x="100" y="98" text-anchor="middle" class="type-pie-total">${r2(total)}</text>
         <text x="100" y="118" text-anchor="middle" class="type-pie-total-lbl">hrs</text>
@@ -622,6 +673,7 @@ async function loadMonthlySummary(data) {
   totalProductive = Math.round(totalProductive * 100) / 100;
   document.getElementById('productive-hours-chip').textContent = totalProductive + ' hrs';
   renderTypePie(data);
+  renderTypeSplitPies(data);
 
   const tbody = document.getElementById('entries-tbody');
   tbody.innerHTML = '';
@@ -1026,6 +1078,7 @@ async function logWastedTime() {
 
 function renderWastedMonthSummary(data) {
   if (!data) return;
+  renderWastePie(data);
   const wastedEntries = data.wastedEntries || {};
   let total = 0;
   Object.values(wastedEntries).forEach(arr => arr.forEach(e => { total += e.hours || 0; }));

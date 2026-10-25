@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=101">
+  <link rel="stylesheet" href="style.css?v=103">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -187,6 +187,22 @@
     <div class="card" id="main-typepie-card">
       <div class="card-title">Hours by Type</div>
       <div id="type-pie"></div>
+    </div>
+
+    <!-- Category split inside the PROD and Office Prod types -->
+    <div class="card" id="main-prodpie-card">
+      <div class="card-title">PROD Split</div>
+      <div id="prod-pie"></div>
+    </div>
+    <div class="card" id="main-officeprodpie-card">
+      <div class="card-title">Office Prod Split</div>
+      <div id="officeprod-pie"></div>
+    </div>
+
+    <!-- Month's Social + Unwanted hours split by sub-category -->
+    <div class="card" id="main-wastepie-card">
+      <div class="card-title">Waste Pie Chart</div>
+      <div id="waste-pie"></div>
     </div>
 
     <div class="monthdate-row" id="main-monthdate-row">
@@ -937,7 +953,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=131"></script>
+<script src="app.js?v=133"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
