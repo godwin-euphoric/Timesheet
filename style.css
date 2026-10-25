@@ -2143,11 +2143,9 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .type-pie-total { fill: var(--text); font-size: 26px; font-weight: 700; }
 .type-pie-total-lbl { fill: var(--muted); font-size: 12px; }
 .type-pie-legend { flex: 1; min-width: 200px; max-width: 380px; display: flex; flex-direction: column; gap: 8px; }
-.type-pie-row { display: grid; grid-template-columns: 12px 1fr auto 44px; align-items: center; gap: 10px; font-size: 14px; }
+.type-pie-row { display: grid; grid-template-columns: 12px 1fr; align-items: center; gap: 10px; font-size: 14px; }
 .type-pie-swatch { width: 12px; height: 12px; border-radius: 3px; }
 .type-pie-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.type-pie-hrs { color: var(--text); font-variant-numeric: tabular-nums; }
-.type-pie-pct { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Four pies in one card: 2 per row on wide screens, 1 per row on phones */
 .pie-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 28px 36px; }
@@ -2159,3 +2157,16 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 @media (max-width: 600px) {
   .pie-cell .type-pie-wrap { justify-content: center; }
 }
+
+/* FM - SS weekly line (inside the pie card, full width) */
+.wl-cell { margin-top: 32px; }
+.wl-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.wl-grid { stroke: var(--border); stroke-width: 1; }
+.wl-axis { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.wl-line { fill: none; stroke: #3987e5; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.wl-dot { fill: #3987e5; stroke: var(--card); stroke-width: 2; }
+.wl-val { fill: var(--text); font-size: 12px; font-weight: 600; }
+.wl-hit { fill: transparent; }
+.wl-cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; }
+.wl-pt:hover .wl-cross { opacity: .6; }
+.wl-pt:hover .wl-dot { r: 6; }

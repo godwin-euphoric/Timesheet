@@ -540,7 +540,11 @@ function renderTypePie(data) {
     g.hrs += hrs; g.cats.push(c.category);
     groups.set(name, g);
   });
-  drawDonut(box, [...groups.values()], 'Hours by type this month');
+  // Overall Social + Unwanted hours as its own slice
+  let waste = 0;
+  Object.values(data.wastedEntries || {}).forEach(arr => arr.forEach(e => { waste += e.hours || 0; }));
+  groups.set('Waste', { name: 'Waste', hrs: waste, cats: ['Social + Unwanted'] });
+  drawDonut(box, [...groups.values()], 'Hours by type and waste this month');
 }
 
 // Per-type split pies: hours of each category inside one Type.
@@ -567,6 +571,73 @@ function renderTypeSplitPies(data) {
     });
     drawDonut(box, groups, `${type} hours by category this month`, `No ${type} hours logged this month`);
   });
+}
+
+// ── FM - SS weekly hours line (last 12 weeks, Mon–Sun) ───────────────────
+const FMSS_WEEKS = 12;
+
+async function renderFmssWeeklyLine() {
+  const box = document.getElementById('fmss-weekly-line');
+  if (!box) return;
+  const allMonths = await getAllMonths();
+
+  const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const thisMon = new Date(today); thisMon.setDate(today.getDate() - (today.getDay() + 6) % 7);
+  const weeks = [];
+  for (let i = FMSS_WEEKS - 1; i >= 0; i--) {
+    const start = new Date(thisMon); start.setDate(thisMon.getDate() - i * 7);
+    const end   = new Date(start);   end.setDate(start.getDate() + 6);
+    weeks.push({ start: ymd(start), end: ymd(end), startD: start, hrs: 0, current: i === 0 });
+  }
+
+  // The FM - SS category name can differ per month, so find it in each month
+  Object.values(allMonths).forEach(data => {
+    const ss = (data.categories || []).find(c => /fm\s*-?\s*ss/i.test(c.category));
+    if (!ss) return;
+    Object.entries(data.entries || {}).forEach(([ds, dayE]) => {
+      const w = weeks.find(w => ds >= w.start && ds <= w.end);
+      if (w) w.hrs += dayE[ss.category] || 0;
+    });
+  });
+  weeks.forEach(w => { w.hrs = Math.round(w.hrs * 100) / 100; });
+
+  const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const lbl = d => `${d.getDate()} ${mon[d.getMonth()]}`;
+
+  // Geometry (viewBox units); y-axis always starts at 0 with a "nice" top
+  // Draw at the box's real width so text stays at its CSS size
+  const W = Math.max(box.clientWidth || 720, 300), H = 220, pl = 34, pr = 28, pt = 16, pb = 28;
+  const max = Math.max(...weeks.map(w => w.hrs));
+  const step = [1, 2, 2.5, 5, 10, 15, 20, 25, 50].find(s => s * 4 >= max) || Math.ceil(max / 4);
+  const top = step * 4;
+  const x = i => pl + i * (W - pl - pr) / (weeks.length - 1);
+  const y = v => pt + (1 - v / top) * (H - pt - pb);
+
+  const grid = [0, 1, 2, 3, 4].map(k => `
+    <line x1="${pl}" x2="${W - pr}" y1="${y(k * step)}" y2="${y(k * step)}" class="wl-grid"/>
+    <text x="${pl - 6}" y="${y(k * step) + 4}" text-anchor="end" class="wl-axis">${k * step}</text>`).join('');
+  const every = W < 520 ? 3 : 2;   // fewer date labels on narrow screens
+  const xLabels = weeks.map((w, i) => (weeks.length - 1 - i) % every === 0
+    ? `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" class="wl-axis">${lbl(w.startD)}</text>` : '').join('');
+  const line = weeks.map((w, i) => `${i ? 'L' : 'M'} ${x(i).toFixed(1)} ${y(w.hrs).toFixed(1)}`).join(' ');
+  const last = weeks[weeks.length - 1];
+  const band = (W - pl - pr) / (weeks.length - 1);
+  const hits = weeks.map((w, i) => `
+    <g class="wl-pt">
+      <rect x="${x(i) - band / 2}" y="${pt}" width="${band}" height="${H - pt - pb}" class="wl-hit"/>
+      <line x1="${x(i)}" x2="${x(i)}" y1="${pt}" y2="${H - pb}" class="wl-cross"/>
+      <circle cx="${x(i)}" cy="${y(w.hrs)}" r="4" class="wl-dot"/>
+      <title>Week of ${lbl(w.startD)}${w.current ? ' (this week, so far)' : ''}: ${w.hrs} hrs</title>
+    </g>`).join('');
+
+  box.innerHTML = `
+    <svg class="wl-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="FM - SS hours per week, last ${FMSS_WEEKS} weeks">
+      ${grid}${xLabels}
+      <path d="${line}" class="wl-line"/>
+      <text x="${x(weeks.length - 1) - 8}" y="${y(last.hrs) - 10}" text-anchor="end" class="wl-val">${last.hrs} hrs this week</text>
+      ${hits}
+    </svg>`;
 }
 
 // Waste pie: month's Social + Unwanted hours split by sub-category
@@ -627,8 +698,6 @@ function drawDonut(box, groups, ariaLabel, emptyMsg = 'No hours logged this mont
     <div class="type-pie-row" title="${escHtml(tip(g))}">
       <span class="type-pie-swatch" style="background:${g.color}"></span>
       <span class="type-pie-name">${escHtml(g.name)}</span>
-      <span class="type-pie-hrs">${r2(g.hrs)} hrs</span>
-      <span class="type-pie-pct">${pct(g.hrs)}%</span>
     </div>`).join('');
 
   box.innerHTML = `
@@ -674,6 +743,7 @@ async function loadMonthlySummary(data) {
   document.getElementById('productive-hours-chip').textContent = totalProductive + ' hrs';
   renderTypePie(data);
   renderTypeSplitPies(data);
+  renderFmssWeeklyLine().catch(e => console.error('FM - SS weekly chart failed', e));
 
   const tbody = document.getElementById('entries-tbody');
   tbody.innerHTML = '';
