@@ -36,7 +36,6 @@ const state = {
   yearlyYear:       new Date().getFullYear(),
   settingsMonth:    currentMonth(),
   settingsMetadata: [],
-  fmCatMeta:        [],   // FM categories being edited in settings
   monthlyLeaves:       [],
   monthlyLeaveReasons: {},
   cache:            {},   // month → data
@@ -288,7 +287,6 @@ function initApp() {
   document.getElementById('main-month').value     = month;
   document.getElementById('monthly-month').value  = month;
   document.getElementById('settings-month').value = month;
-  document.getElementById('fm-date').value        = todayStr();
   initYearSelector();
   loadMainTab();
   checkUserAccess();
@@ -303,7 +301,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, log: loadLogTab, excelimport: loadExcelImportTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, excelimport: loadExcelImportTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -321,8 +319,8 @@ async function loadMainTab() {
   await renderDayEntries();
   renderMainNotes(data);
   const ud = await getUserData();
-  populateMainFmDropdown(ud.fmCategories || []);
-  renderFmTablesMain(ud.fmCategories || [], ud.fmLog || []);
+  updateMediaFields();
+  renderMediaTables(ud.mediaLog || []);
   loadFMTracker();
   state.tabNotes = ud.tabNotes || {};
   populateMainTabNotesDropdown();
@@ -630,6 +628,12 @@ async function loadMonthlySummary(data) {
       if (/story/i.test(e.type || '')) storyCount++;
     }
   });
+  (ud.mediaLog || []).forEach(e => {
+    if (e.date && e.date.startsWith(month)) {
+      if (e.kind === 'movie') movieCount++;
+      if (e.kind === 'story') storyCount++;
+    }
+  });
   const movieEl = document.getElementById('movie-count-chip');
   const storyEl = document.getElementById('story-count-chip');
   if (movieEl) movieEl.textContent = movieCount;
@@ -775,6 +779,12 @@ async function logEntry() {
   if (!category)                                        { showToast('Select a category'); return; }
   if (!hoursVal || isNaN(+hoursVal) || +hoursVal <= 0) { showToast('Enter valid hours'); return; }
 
+  const kind = mediaKindFor(category);
+  const mediaName = kind ? document.getElementById('media-name').value.trim() : '';
+  const mediaBook = kind === 'story' ? document.getElementById('media-book').value.trim() : '';
+  if (kind && !mediaName)                    { showToast(`Enter the ${MEDIA_KINDS[kind].nameLabel}`); return; }
+  if (kind === 'story' && !mediaBook)        { showToast('Enter the Story Book name'); return; }
+
   state.mainDate = date;
   const month = date.slice(0, 7);
   const data = await getMonthData(month);
@@ -793,12 +803,108 @@ async function logEntry() {
     data.entries[date][category] = add(data.entries[date][category]);
   }
   await saveMonthData(month, data);
+  if (kind) await addMediaEntry(kind, mediaName, mediaBook, date);
 
   document.getElementById('main-hours').value = '';
+  updateMediaFields();
   showToast('Entry saved');
   await loadMonthlySummary(data);
   await renderDayEntries();
   refreshFMTrackerStats();
+}
+
+// ── Stories / Movies / Books (filled from Log Hours) ──────────────────────
+// Category names are user-defined, so match by keyword. Story is checked
+// before Book so a category like "Story Books" counts as a story.
+const MEDIA_KINDS = {
+  story: { title: '📖 Story Books', nameLabel: 'Story Name', namePh: 'e.g. The Gift of the Magi' },
+  movie: { title: '🎬 Movies',      nameLabel: 'Movie Name', namePh: 'e.g. Inception' },
+  book:  { title: '📚 Books',       nameLabel: 'Book Name',  namePh: 'e.g. Atomic Habits' },
+};
+
+function mediaKindFor(category) {
+  if (/story/i.test(category || '')) return 'story';
+  if (/movie/i.test(category || '')) return 'movie';
+  if (/book/i.test(category || ''))  return 'book';
+  return null;
+}
+
+function updateMediaFields() {
+  const box  = document.getElementById('main-media-fields');
+  const kind = mediaKindFor(document.getElementById('main-category').value);
+  if (!kind) { box.innerHTML = ''; box.classList.add('hidden'); return; }
+  const k = MEDIA_KINDS[kind];
+  box.innerHTML = `
+    <div class="field-group" style="flex:1">
+      <label>${k.nameLabel}</label>
+      <input type="text" id="media-name" placeholder="${k.namePh}">
+    </div>
+    ${kind === 'story' ? `
+    <div class="field-group" style="flex:1">
+      <label>Story Book</label>
+      <input type="text" id="media-book" placeholder="e.g. O. Henry Collection">
+    </div>` : ''}`;
+  box.classList.remove('hidden');
+}
+
+// A story/movie/book is recorded once, on the date it was first logged —
+// later hour entries for the same title don't add duplicates.
+async function addMediaEntry(kind, name, book, date) {
+  const ud  = await getUserData();
+  const log = ud.mediaLog || [];
+  const key = e => `${e.kind}|${e.name.toLowerCase()}|${(e.book || '').toLowerCase()}`;
+  const entry = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, kind, name, date };
+  if (book) entry.book = book;
+  const existing = log.find(e => key(e) === key(entry));
+  if (existing) {
+    if (date >= existing.date) return;   // keep the earliest date
+    existing.date = date;
+  } else {
+    log.push(entry);
+  }
+  await saveUserData({ mediaLog: log });
+  renderMediaTables(log);
+}
+
+async function deleteMediaEntry(id) {
+  if (!confirm('Delete this entry?')) return;
+  const ud = await getUserData();
+  const mediaLog = (ud.mediaLog || []).filter(e => e.id !== id);
+  await saveUserData({ mediaLog });
+  showToast('Entry deleted');
+  renderMediaTables(mediaLog);
+}
+
+function renderMediaTables(mediaLog) {
+  const container = document.getElementById('main-media-container');
+  if (!container) return;
+  container.innerHTML = Object.entries(MEDIA_KINDS).map(([kind, k]) => {
+    const entries = mediaLog.filter(e => e.kind === kind).sort((a, b) => b.date.localeCompare(a.date));
+    const isStory = kind === 'story';
+    const cols = isStory ? 4 : 3;
+    const rows = entries.length
+      ? entries.map(e => `
+          <tr>
+            <td style="font-weight:500">${escHtml(e.name)}</td>
+            ${isStory ? `<td>${escHtml(e.book || '')}</td>` : ''}
+            <td style="color:var(--muted);font-size:12px;white-space:nowrap">${formatDate(e.date)}</td>
+            <td><button class="btn-danger" onclick="deleteMediaEntry('${e.id}')">✕</button></td>
+          </tr>`).join('')
+      : `<tr><td colspan="${cols}" class="empty">No ${k.title.replace(/^\S+\s/, '')} entries yet</td></tr>`;
+    return `
+      <div class="card">
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+          <span>${k.title}</span>
+          <span class="fm-count-badge">${entries.length}</span>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr><th>${k.nameLabel}</th>${isStory ? '<th>Story Book</th>' : ''}<th>Date</th><th></th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 async function deleteEntryFromLog(date, category) {
@@ -3656,171 +3762,6 @@ async function challenge100SaveReviewEdit(monday, encName) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-//  LOG TAB (FM Log)
-// ══════════════════════════════════════════════════════════════════════════
-
-async function loadLogTab() {
-  const userData = await getUserData();
-  populateFmTypeDropdown(userData.fmCategories || []);
-  renderFmTables(userData.fmCategories || [], userData.fmLog || []);
-}
-
-function populateFmTypeDropdown(cats) {
-  const sel = document.getElementById('fm-type');
-  sel.innerHTML = '<option value="">-- Select --</option>';
-  cats.forEach(cat => {
-    const opt = document.createElement('option');
-    opt.value = cat; opt.textContent = cat;
-    sel.appendChild(opt);
-  });
-}
-
-function renderFmTables(cats, fmLog) {
-  const container = document.getElementById('fm-tables-container');
-
-  if (!cats.length) {
-    container.innerHTML = `
-      <div class="card">
-        <span class="empty-inline">No FM categories yet — add them in Settings.</span>
-      </div>`;
-    return;
-  }
-
-  container.innerHTML = '';
-
-  cats.forEach(cat => {
-    const entries = fmLog
-      .filter(e => e.type === cat)
-      .sort((a, b) => b.date.localeCompare(a.date));
-
-    const rows = entries.length
-      ? entries.map(e => `
-          <tr>
-            <td>
-              <div style="font-weight:500">${e.name}</div>
-              ${e.notes ? `<div style="font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5">${e.notes}</div>` : ''}
-            </td>
-            <td style="color:var(--muted);font-size:12px;white-space:nowrap">${formatDate(e.date)}</td>
-            <td><button class="btn-danger" onclick="deleteFmEntry('${e.id}')">✕</button></td>
-          </tr>`).join('')
-      : `<tr><td colspan="3" class="empty">No ${cat} entries yet</td></tr>`;
-
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
-      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
-        <span>${cat}</span>
-        <span class="fm-count-badge">${entries.length}</span>
-      </div>
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead><tr><th>Title / Name</th><th>Date</th><th></th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    `;
-    container.appendChild(card);
-  });
-}
-
-async function addFmEntry() {
-  const type  = document.getElementById('fm-type').value.trim();
-  const name  = document.getElementById('fm-name').value.trim();
-  const date  = document.getElementById('fm-date').value;
-  const notes = document.getElementById('fm-notes').value.trim();
-  if (!type) { showToast('Select a category'); return; }
-  if (!name) { showToast('Enter a title');     return; }
-  if (!date) { showToast('Select a date');     return; }
-
-  const userData = await getUserData();
-  const entry = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, name, date };
-  if (notes) entry.notes = notes;
-  const fmLog = [...(userData.fmLog || []), entry];
-  await saveUserData({ fmLog });
-
-  document.getElementById('fm-name').value  = '';
-  document.getElementById('fm-notes').value = '';
-  showToast(`${type} added`);
-  renderFmTables(userData.fmCategories || [], fmLog);
-  refreshFMTrackerStats();
-}
-
-async function deleteFmEntry(id) {
-  const userData = await getUserData();
-  const fmLog    = (userData.fmLog || []).filter(e => e.id !== id);
-  await saveUserData({ fmLog });
-  showToast('Entry deleted');
-  renderFmTables(userData.fmCategories || [], fmLog);
-  renderFmTablesMain(userData.fmCategories || [], fmLog);
-  refreshFMTrackerStats();
-}
-
-function populateMainFmDropdown(cats) {
-  const sel = document.getElementById('main-fm-type');
-  if (!sel) return;
-  const prev = sel.value;
-  sel.innerHTML = '<option value="">-- Select --</option>' +
-    cats.map(c => `<option value="${c}">${c}</option>`).join('');
-  if (prev) sel.value = prev;
-}
-
-function renderFmTablesMain(cats, fmLog) {
-  const container = document.getElementById('main-fm-tables-container');
-  if (!container) return;
-  if (!cats.length) { container.innerHTML = ''; return; }
-  container.innerHTML = '';
-  cats.forEach(cat => {
-    const entries = fmLog
-      .filter(e => e.type === cat)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    const rows = entries.length
-      ? entries.map(e => `
-          <tr>
-            <td>
-              <div style="font-weight:500">${escHtml(e.name)}</div>
-              ${e.notes ? `<div style="font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5">${escHtml(e.notes)}</div>` : ''}
-            </td>
-            <td style="color:var(--muted);font-size:12px;white-space:nowrap">${formatDate(e.date)}</td>
-            <td><button class="btn-danger" onclick="deleteFmEntry('${e.id}')">✕</button></td>
-          </tr>`).join('')
-      : `<tr><td colspan="3" class="empty">No ${escHtml(cat)} entries yet</td></tr>`;
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
-      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
-        <span>${escHtml(cat)}</span>
-        <span class="fm-count-badge">${entries.length}</span>
-      </div>
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead><tr><th>Title / Name</th><th>Date</th><th></th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
-    container.appendChild(card);
-  });
-}
-
-async function addFmEntryFromMain() {
-  const type = document.getElementById('main-fm-type').value.trim();
-  const name = document.getElementById('main-fm-name').value.trim();
-  const date = state.mainDate;
-  if (!type) { showToast('Select a category'); return; }
-  if (!name) { showToast('Enter a title');     return; }
-  if (!date) { showToast('Select a date from the date picker above'); return; }
-  const userData = await getUserData();
-  const entry = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, name, date };
-  const fmLog = [...(userData.fmLog || []), entry];
-  await saveUserData({ fmLog });
-  document.getElementById('main-fm-name').value = '';
-  showToast('Entry added');
-  renderFmTablesMain(userData.fmCategories || [], fmLog);
-  renderFmTables(userData.fmCategories || [], fmLog);
-  await loadMonthlySummary(await getMonthData(state.mainMonth));
-  refreshFMTrackerStats();
-}
-
-// ══════════════════════════════════════════════════════════════════════════
 //  SETTINGS TAB
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -3840,7 +3781,6 @@ async function loadSettingsTab() {
     }
     renderSettingsTable();
     await loadSettingsMonthTable();
-    await loadFmCategorySettings();
     setSaveState('settings-save-btn', false);
   }
   await populateDietSettingsFields();
@@ -3990,52 +3930,6 @@ document.getElementById('settings-month').addEventListener('change', async funct
   state.settingsMonth = this.value;
   await loadSettingsTab();
 });
-
-// ── FM Category Settings ───────────────────────────────────────────────────
-
-async function loadFmCategorySettings() {
-  const userData  = await getUserData();
-  state.fmCatMeta = [...(userData.fmCategories || [])];
-  renderFmCategoryTable();
-  setSaveState('fm-cat-save-btn', false);
-}
-
-function renderFmCategoryTable() {
-  const tbody = document.getElementById('fm-cat-tbody');
-  if (!state.fmCatMeta.length) {
-    tbody.innerHTML = '<tr><td colspan="2" class="empty">No FM categories yet — add one below.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = state.fmCatMeta.map((cat, i) => `
-    <tr>
-      <td style="font-weight:500">${cat}</td>
-      <td><button class="btn-danger" onclick="removeFmCategory(${i})">✕</button></td>
-    </tr>
-  `).join('');
-}
-
-function addFmCategory() {
-  const input = document.getElementById('new-fm-cat');
-  const name  = input.value.trim();
-  if (!name)                           { showToast('Enter a category name'); return; }
-  if (state.fmCatMeta.includes(name))  { showToast('Already exists');        return; }
-  state.fmCatMeta.push(name);
-  input.value = '';
-  renderFmCategoryTable();
-  setSaveState('fm-cat-save-btn', true);
-}
-
-function removeFmCategory(i) {
-  state.fmCatMeta.splice(i, 1);
-  renderFmCategoryTable();
-  setSaveState('fm-cat-save-btn', true);
-}
-
-async function saveFmCategories() {
-  await saveUserData({ fmCategories: [...state.fmCatMeta] });
-  showToast('FM categories saved');
-  setSaveState('fm-cat-save-btn', false);
-}
 
 // ── Data cleanup: find/remove entries under categories no longer in the list ──
 async function scanOrphans() {
@@ -7042,6 +6936,11 @@ async function refreshFMTrackerStats() {
     if (/movie/i.test(e.type || ''))  movies++;
     if (/story/i.test(e.type || ''))  stories++;
   });
+  (ud.mediaLog || []).forEach(e => {
+    if (!e.date || e.date < startDate || e.date > endDate) return;
+    if (e.kind === 'movie') movies++;
+    if (e.kind === 'story') stories++;
+  });
 
   document.getElementById('fm-tracker-fmss').textContent    = Math.round(fmSS * 100) / 100 + ' hrs';
   document.getElementById('fm-tracker-fmother').textContent = Math.round(fmOther * 100) / 100 + ' hrs';
@@ -7072,9 +6971,9 @@ async function shareFMTracker() {
 
 function applyRoleVisibility(role) {
   const showFor = {
-    timesheet: new Set(['main', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
+    timesheet: new Set(['main', 'monthly', 'yearly', 'habits', 'planner', 'settings', 'health']),
     diet:      new Set(['regimen', 'summary', 'settings', 'health']),
-    both:      new Set(['main', 'regimen', 'summary', 'monthly', 'yearly', 'habits', 'log', 'planner', 'settings', 'health']),
+    both:      new Set(['main', 'regimen', 'summary', 'monthly', 'yearly', 'habits', 'planner', 'settings', 'health']),
   };
   const visible = showFor[role] || showFor.both;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {

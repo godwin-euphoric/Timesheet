@@ -1119,8 +1119,7 @@ textarea#fm-notes:focus {
   #tab-main > #main-summary-card             { order: 2; }
   #tab-main > #main-monthdate-row            { order: 3; }
   #tab-main > .log-row                       { order: 4; }
-  #tab-main > #main-fm-card                  { order: 5; }
-  #tab-main > #main-fm-tables-container      { order: 6; }
+  #tab-main > #main-media-container          { order: 5; }
   #tab-main > #main-dayentries-card          { order: 7; }
   #tab-main > #main-notes-card               { order: 8; }
 
