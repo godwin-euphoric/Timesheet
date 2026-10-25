@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=100">
+  <link rel="stylesheet" href="style.css?v=101">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -181,6 +181,12 @@
         </table>
       </div>
       <div id="main-stats-row" class="main-stats-row"></div>
+    </div>
+
+    <!-- Month hours grouped by category Type (set in Settings) -->
+    <div class="card" id="main-typepie-card">
+      <div class="card-title">Hours by Type</div>
+      <div id="type-pie"></div>
     </div>
 
     <div class="monthdate-row" id="main-monthdate-row">
@@ -696,13 +702,15 @@
 
     <div class="card settings-ts-only">
       <div class="card-title">Categories &amp; Daily Targets</div>
-      <p class="hint">Set how many hours per day you aim to spend on each category this month.</p>
+      <p class="hint">Set how many hours per day you aim to spend on each category this month. Give categories the same <strong>Type</strong> to group them in the main tab's pie chart.</p>
       <table class="data-table" style="margin-bottom:12px">
-        <thead><tr><th>Category Name</th><th>Daily Target (hrs)</th><th></th></tr></thead>
-        <tbody id="settings-tbody"><tr><td colspan="3" class="empty">No categories yet</td></tr></tbody>
+        <thead><tr><th>Category Name</th><th>Type</th><th>Daily Target (hrs)</th><th></th></tr></thead>
+        <tbody id="settings-tbody"><tr><td colspan="4" class="empty">No categories yet</td></tr></tbody>
       </table>
+      <datalist id="category-type-list"></datalist>
       <div class="add-row">
         <input type="text" id="new-category" placeholder="Category name" style="flex:1">
+        <input type="text" id="new-type" placeholder="Type (optional)" list="category-type-list" style="width:150px">
         <input type="number" id="new-target" placeholder="Daily hrs" min="0" max="24" step="0.25" style="width:120px">
         <button class="btn-secondary" onclick="addCategory()">+ Add Category</button>
       </div>
@@ -929,7 +937,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=130"></script>
+<script src="app.js?v=131"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');

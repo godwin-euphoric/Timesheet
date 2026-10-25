@@ -1117,6 +1117,7 @@ textarea#fm-notes:focus {
   #tab-main.active { display: flex; flex-direction: column; }
   #tab-main > .top-controls                  { order: 1; }
   #tab-main > #main-summary-card             { order: 2; }
+  #tab-main > #main-typepie-card             { order: 2; }
   #tab-main > #main-monthdate-row            { order: 3; }
   #tab-main > .log-row                       { order: 4; }
   #tab-main > #main-media-container          { order: 5; }
@@ -2132,3 +2133,22 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 .weight-entry-del:hover { background: rgba(248,113,113,0.1); color: #f87171; border-color: #f87171; }
 
+
+/* ══ Hours by Type pie (main tab) ════════════════════════════════════════════ */
+.type-pie-wrap { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+.type-pie-svg { width: 200px; height: 200px; flex-shrink: 0; }
+.type-pie-slice { stroke: var(--card); stroke-width: 2; stroke-linejoin: round; transition: opacity .15s; }
+.type-pie-svg:hover .type-pie-slice { opacity: .55; }
+.type-pie-svg .type-pie-slice:hover { opacity: 1; }
+.type-pie-total { fill: var(--text); font-size: 26px; font-weight: 700; }
+.type-pie-total-lbl { fill: var(--muted); font-size: 12px; }
+.type-pie-legend { flex: 1; min-width: 200px; max-width: 380px; display: flex; flex-direction: column; gap: 8px; }
+.type-pie-row { display: grid; grid-template-columns: 12px 1fr auto 44px; align-items: center; gap: 10px; font-size: 14px; }
+.type-pie-swatch { width: 12px; height: 12px; border-radius: 3px; }
+.type-pie-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.type-pie-hrs { color: var(--text); font-variant-numeric: tabular-nums; }
+.type-pie-pct { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .type-pie-wrap { justify-content: center; }
+  .type-pie-svg { width: 170px; height: 170px; }
+}

@@ -520,6 +520,77 @@ async function renderSleepAverages(mainData) {
   paintChip('sleep-avg-year-chip', yAvg, yDays > 0);
 }
 
+// ── Hours by Type pie (categories grouped by their Settings "Type") ──────
+// Validated categorical colours for the dark card surface; slices keep the
+// order of the categories list so a type keeps its colour as hours change.
+const TYPE_PIE_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9'];
+const TYPE_PIE_OTHER  = '#5b6b85';
+
+function renderTypePie(data) {
+  const box = document.getElementById('type-pie');
+  if (!box) return;
+
+  // Sum the month's hours per type (an untyped category is its own group)
+  const groups = new Map();
+  (data.categories || []).forEach(c => {
+    const name = (c.type || '').trim() || c.category;
+    let hrs = 0;
+    Object.values(data.entries || {}).forEach(dayE => { hrs += dayE[c.category] || 0; });
+    const g = groups.get(name) || { name, hrs: 0, cats: [] };
+    g.hrs += hrs; g.cats.push(c.category);
+    groups.set(name, g);
+  });
+  let slices = [...groups.values()].filter(g => g.hrs > 0);
+  const total = slices.reduce((s, g) => s + g.hrs, 0);
+  if (!total) { box.innerHTML = '<span class="empty-inline">No hours logged this month</span>'; return; }
+
+  // At most 6 coloured slices; the smallest of the rest fold into "Other"
+  if (slices.length > TYPE_PIE_COLORS.length) {
+    const keep = new Set([...slices].sort((a, b) => b.hrs - a.hrs).slice(0, TYPE_PIE_COLORS.length - 1));
+    const rest = slices.filter(g => !keep.has(g));
+    slices = slices.filter(g => keep.has(g));
+    slices.push({ name: 'Other', hrs: rest.reduce((s, g) => s + g.hrs, 0), cats: rest.map(g => g.name), other: true });
+  }
+  slices.forEach((g, i) => { g.color = g.other ? TYPE_PIE_OTHER : TYPE_PIE_COLORS[i]; });
+
+  const r2 = n => Math.round(n * 100) / 100;
+  const pct = h => Math.round(h / total * 100);
+  const tip = g => `${g.name}: ${r2(g.hrs)} hrs (${pct(g.hrs)}%)` +
+    (g.cats.length > 1 || g.cats[0] !== g.name ? `\n${g.cats.join(', ')}` : '');
+
+  // Donut: outer radius 90, inner 56, 2px card-colour gaps between slices
+  const R = 90, r = 56, C = 100;
+  const pt = (rad, a) => `${(C + rad * Math.sin(a)).toFixed(2)} ${(C - rad * Math.cos(a)).toFixed(2)}`;
+  let a0 = 0;
+  const paths = slices.map(g => {
+    const a1 = a0 + g.hrs / total * 2 * Math.PI;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const d = slices.length === 1
+      ? `M ${pt(R, 0)} A ${R} ${R} 0 1 1 ${pt(R, Math.PI)} A ${R} ${R} 0 1 1 ${pt(R, 0)} M ${pt(r, 0)} A ${r} ${r} 0 1 0 ${pt(r, Math.PI)} A ${r} ${r} 0 1 0 ${pt(r, 0)} Z`
+      : `M ${pt(R, a0)} A ${R} ${R} 0 ${large} 1 ${pt(R, a1)} L ${pt(r, a1)} A ${r} ${r} 0 ${large} 0 ${pt(r, a0)} Z`;
+    a0 = a1;
+    return `<path class="type-pie-slice" d="${d}" fill="${g.color}" fill-rule="evenodd"><title>${escHtml(tip(g))}</title></path>`;
+  }).join('');
+
+  const legend = slices.map(g => `
+    <div class="type-pie-row" title="${escHtml(tip(g))}">
+      <span class="type-pie-swatch" style="background:${g.color}"></span>
+      <span class="type-pie-name">${escHtml(g.name)}</span>
+      <span class="type-pie-hrs">${r2(g.hrs)} hrs</span>
+      <span class="type-pie-pct">${pct(g.hrs)}%</span>
+    </div>`).join('');
+
+  box.innerHTML = `
+    <div class="type-pie-wrap">
+      <svg class="type-pie-svg" viewBox="0 0 200 200" role="img" aria-label="Hours by type this month">
+        ${paths}
+        <text x="100" y="98" text-anchor="middle" class="type-pie-total">${r2(total)}</text>
+        <text x="100" y="118" text-anchor="middle" class="type-pie-total-lbl">hrs</text>
+      </svg>
+      <div class="type-pie-legend">${legend}</div>
+    </div>`;
+}
+
 async function loadMonthlySummary(data) {
   if (!data) data = await getMonthData(state.mainMonth);
   const month = state.mainMonth;
@@ -550,6 +621,7 @@ async function loadMonthlySummary(data) {
   });
   totalProductive = Math.round(totalProductive * 100) / 100;
   document.getElementById('productive-hours-chip').textContent = totalProductive + ' hrs';
+  renderTypePie(data);
 
   const tbody = document.getElementById('entries-tbody');
   tbody.innerHTML = '';
@@ -3838,14 +3910,20 @@ function setSaveState(btnId, dirty) {
 function renderSettingsTable() {
   const tbody = document.getElementById('settings-tbody');
   const meta  = state.settingsMetadata;
+  // Suggest existing types so grouping stays consistent
+  const types = [...new Set(meta.map(c => (c.type || '').trim()).filter(Boolean))].sort();
+  document.getElementById('category-type-list').innerHTML =
+    types.map(t => `<option value="${escHtml(t)}"></option>`).join('');
   if (!meta.length) {
-    tbody.innerHTML = '<tr><td colspan="3" class="empty">No categories yet — add one below.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">No categories yet — add one below.</td></tr>';
     return;
   }
   tbody.innerHTML = meta.map((c, i) => `
     <tr>
       <td><input class="inline-input" type="text" value="${c.category}"
            oninput="state.settingsMetadata[${i}].category = this.value; setSaveState('settings-save-btn', true)"></td>
+      <td><input class="inline-input" type="text" value="${escHtml(c.type || '')}" list="category-type-list" placeholder="—"
+           oninput="state.settingsMetadata[${i}].type = this.value.trim(); setSaveState('settings-save-btn', true)"></td>
       <td><input class="inline-input sm" type="number" value="${c.daily_target}" step="0.25" min="0"
            oninput="state.settingsMetadata[${i}].daily_target = parseFloat(this.value)||0; setSaveState('settings-save-btn', true)"></td>
       <td><button class="btn-danger" onclick="removeSettingsCategory(${i})">✕</button></td>
@@ -3861,8 +3939,10 @@ function addCategory() {
   if (!name)                                                { showToast('Enter a category name');   return; }
   if (isNaN(target) || target < 0)                         { showToast('Enter valid target hours'); return; }
   if (state.settingsMetadata.some(c => c.category===name)) { showToast('Category already exists'); return; }
-  state.settingsMetadata.push({ category: name, daily_target: target });
-  nameEl.value = ''; targetEl.value = '';
+  const typeEl = document.getElementById('new-type');
+  const type   = typeEl.value.trim();
+  state.settingsMetadata.push(type ? { category: name, type, daily_target: target } : { category: name, daily_target: target });
+  nameEl.value = ''; targetEl.value = ''; typeEl.value = '';
   renderSettingsTable();
   setSaveState('settings-save-btn', true);
 }
