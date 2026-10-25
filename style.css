@@ -1117,7 +1117,7 @@ textarea#fm-notes:focus {
   #tab-main.active { display: flex; flex-direction: column; }
   #tab-main > .top-controls                  { order: 1; }
   #tab-main > #main-summary-card             { order: 2; }
-  #tab-main > #main-typepie-card             { order: 2; }
+  #tab-main > #main-typepie-card             { order: 0; }
   #tab-main > #main-monthdate-row            { order: 3; }
   #tab-main > .log-row                       { order: 4; }
   #tab-main > #main-media-container          { order: 5; }

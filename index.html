@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=106">
+  <link rel="stylesheet" href="style.css?v=107">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -118,6 +118,33 @@
       <div class="stat-chip" id="sleep-avg-month-chip"><span class="sl-full">Avg Sleep / day (Month)</span><span class="sl-short">Sleep (M)</span>&nbsp;&nbsp;<strong id="sleep-avg-month">—</strong><span id="sleep-miss-badge" class="sleep-miss-badge hidden"></span></div>
     </div>
 
+    <!-- Month pie charts: hours by Type, PROD / Office Prod splits, waste split -->
+    <div class="card" id="main-typepie-card">
+      <div class="card-title">Hours by Type</div>
+      <div class="pie-grid">
+        <div class="pie-cell">
+          <div class="pie-cell-title">Overall Split</div>
+          <div id="type-pie"></div>
+        </div>
+        <div class="pie-cell">
+          <div class="pie-cell-title">PROD Split</div>
+          <div id="prod-pie"></div>
+        </div>
+        <div class="pie-cell">
+          <div class="pie-cell-title">Office Prod Split</div>
+          <div id="officeprod-pie"></div>
+        </div>
+        <div class="pie-cell">
+          <div class="pie-cell-title">Waste Pie Chart</div>
+          <div id="waste-pie"></div>
+        </div>
+      </div>
+      <div class="pie-cell wl-cell">
+        <div class="pie-cell-title">FM - SS Weekly Hours · last 12 weeks</div>
+        <div id="fmss-weekly-line"></div>
+      </div>
+    </div>
+
     <!-- FM Tracker Summary (shareable) -->
     <div class="card fm-tracker-card" id="fm-tracker-card">
       <div class="fm-tracker-header">
@@ -183,32 +210,6 @@
       <div id="main-stats-row" class="main-stats-row"></div>
     </div>
 
-    <!-- Month pie charts: hours by Type, PROD / Office Prod splits, waste split -->
-    <div class="card" id="main-typepie-card">
-      <div class="card-title">Hours by Type</div>
-      <div class="pie-grid">
-        <div class="pie-cell">
-          <div class="pie-cell-title">Overall Split</div>
-          <div id="type-pie"></div>
-        </div>
-        <div class="pie-cell">
-          <div class="pie-cell-title">PROD Split</div>
-          <div id="prod-pie"></div>
-        </div>
-        <div class="pie-cell">
-          <div class="pie-cell-title">Office Prod Split</div>
-          <div id="officeprod-pie"></div>
-        </div>
-        <div class="pie-cell">
-          <div class="pie-cell-title">Waste Pie Chart</div>
-          <div id="waste-pie"></div>
-        </div>
-      </div>
-      <div class="pie-cell wl-cell">
-        <div class="pie-cell-title">FM - SS Weekly Hours · last 12 weeks</div>
-        <div id="fmss-weekly-line"></div>
-      </div>
-    </div>
 
     <div class="monthdate-row" id="main-monthdate-row">
       <div class="field-group">
@@ -958,7 +959,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=136"></script>
+<script src="app.js?v=137"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
