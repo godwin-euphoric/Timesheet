@@ -322,50 +322,6 @@ async function loadMainTab() {
   updateMediaFields();
   renderMediaTables(ud.mediaLog || []);
   loadFMTracker();
-  state.tabNotes = ud.tabNotes || {};
-  populateMainTabNotesDropdown();
-  loadMainTabNote();
-}
-
-// ── Per-tab notes ────────────────────────────────────────────────────────────
-// A dropdown of the site's visible tabs plus a free-text box, so a quick note about
-// any tab can be jotted from the Main tab without switching away. Stored keyed by
-// each tab's data-tab id (userData.tabNotes), independent of month/date.
-// EXTRA_TABNOTES_OPTIONS adds entries with no matching nav tab (e.g. a note category
-// that isn't a page of its own).
-const EXTRA_TABNOTES_OPTIONS = [
-  { value: 'fm-learning', label: 'FM - Learning' },
-];
-
-function populateMainTabNotesDropdown() {
-  const sel = document.getElementById('main-tabnotes-select');
-  if (!sel) return;
-  const prevValue = sel.value;
-  const options = [...document.querySelectorAll('.tab-btn')]
-    .filter(btn => !btn.classList.contains('hidden'))
-    .map(btn => `<option value="${btn.dataset.tab}">${escHtml(btn.textContent.trim())}</option>`)
-    .join('') + EXTRA_TABNOTES_OPTIONS
-    .map(o => `<option value="${o.value}">${escHtml(o.label)}</option>`)
-    .join('');
-  sel.innerHTML = '<option value="">-- Select --</option>' + options;
-  if ([...sel.options].some(o => o.value === prevValue)) sel.value = prevValue;
-}
-
-function loadMainTabNote() {
-  const sel = document.getElementById('main-tabnotes-select');
-  const ta  = document.getElementById('main-tabnotes-text');
-  if (!sel || !ta) return;
-  ta.value = sel.value ? (state.tabNotes?.[sel.value] || '') : '';
-}
-
-async function saveMainTabNote() {
-  const sel = document.getElementById('main-tabnotes-select');
-  if (!sel.value) { showToast('Select a tab first'); return; }
-  const ta = document.getElementById('main-tabnotes-text');
-  if (!state.tabNotes) state.tabNotes = {};
-  state.tabNotes[sel.value] = ta.value;
-  await saveUserData({ tabNotes: state.tabNotes });
-  showToast(`Note saved for ${sel.options[sel.selectedIndex].textContent}`);
 }
 
 let mainNotesTimer = null;

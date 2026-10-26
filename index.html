@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=110">
+  <link rel="stylesheet" href="style.css?v=113">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -98,7 +98,7 @@
       <div class="ctrl-pair ctrl-pair-chips">
         <div class="stat-chip stat-chip-green chip-card">
           <span class="chip-box chip-box-green"></span>
-          <span class="chip-label">Productive</span>
+          <span class="chip-label">PROD</span>
           <strong id="productive-hours-chip">—</strong>
         </div>
         <div class="stat-chip stat-chip-red chip-card">
@@ -109,10 +109,10 @@
       </div>
       <div class="stat-chip stat-chip-green chip-card" id="fmss-chip">
         <span class="chip-box chip-box-green"></span>
-        <span class="chip-label">📚 FM - SS</span>
+        <span class="chip-label">📚 SS</span>
         <strong id="fmss-hours-chip">—</strong>
       </div>
-      <div class="stat-chip" id="workdays-chip"><span class="wd-full">Working days so far</span><span class="wd-short">Workdays</span>&nbsp;&nbsp;<strong id="working-days-count">—</strong></div>
+      <div class="stat-chip" id="workdays-chip"><span class="wd-full">Working days</span><span class="wd-short">Workdays</span>&nbsp;&nbsp;<strong id="working-days-count">—</strong></div>
       <div class="stat-chip" id="sleep-avg-month-chip"><span class="sl-full">Avg Sleep (Mon)</span><span class="sl-short">Sleep (M)</span>&nbsp;&nbsp;<strong id="sleep-avg-month">—</strong><span id="sleep-miss-badge" class="sleep-miss-badge hidden"></span></div>
     </div>
 
@@ -121,22 +121,6 @@
       <div class="pie-cell-title">FM - SS Weekly Hours · last 12 weeks</div>
       <div id="fmss-weekly-line"></div>
     </div>
-
-    <!-- Month Summary — before log controls -->
-    <div class="card" id="main-summary-card">
-      <div class="summary-card-header">
-        <div class="entries-label" id="entries-date-label" style="margin-bottom:0">Month Summary</div>
-        <button id="main-undo-btn" class="btn-undo hidden" onclick="undoMainAdjustment()">↩ Undo Adjustment</button>
-      </div>
-      <div class="table-scroll">
-        <table class="mini-table">
-          <thead><tr><th class="cb-col"></th><th>Category</th><th>Done</th><th>Target</th><th>Adjust</th><th>Pending</th></tr></thead>
-          <tbody id="entries-tbody"><tr><td colspan="6" class="empty">No categories yet</td></tr></tbody>
-        </table>
-      </div>
-      <div id="main-stats-row" class="main-stats-row"></div>
-    </div>
-
 
     <div class="monthdate-row" id="main-monthdate-row">
       <div class="field-group">
@@ -192,6 +176,27 @@
       </div>
 
     </div><!-- end log-row -->
+
+    <div class="card" id="main-dayentries-card">
+      <div class="entries-label" id="day-entries-label">Today's Entries</div>
+      <div id="day-entries-list"><span class="empty-inline">No entries for this date</span></div>
+    </div>
+
+    <!-- Month Summary — below log controls -->
+    <div class="card" id="main-summary-card">
+      <div class="summary-card-header">
+        <div class="entries-label" id="entries-date-label" style="margin-bottom:0">Month Summary</div>
+        <button id="main-undo-btn" class="btn-undo hidden" onclick="undoMainAdjustment()">↩ Undo Adjustment</button>
+      </div>
+      <div class="table-scroll">
+        <table class="mini-table">
+          <thead><tr><th class="cb-col"></th><th>Category</th><th>Done</th><th>Target</th><th>Adjust</th><th>Pending</th></tr></thead>
+          <tbody id="entries-tbody"><tr><td colspan="6" class="empty">No categories yet</td></tr></tbody>
+        </table>
+      </div>
+      <div id="main-stats-row" class="main-stats-row"></div>
+    </div>
+
 
     <!-- Month pie charts: hours by Type, PROD / Office Prod splits, waste split -->
     <div class="card" id="main-typepie-card">
@@ -268,28 +273,6 @@
 
     <!-- Stories / Movies / Books logged via Log Hours (unique per name) -->
     <div id="main-media-container"></div>
-
-    <!-- Per-tab notes -->
-    <div class="card" id="main-tabnotes-card">
-      <div class="card-title">🗒 Tab Notes</div>
-      <div class="log-form">
-        <div class="field-group">
-          <label>Tab</label>
-          <select id="main-tabnotes-select" onchange="loadMainTabNote()">
-            <option value="">-- Select --</option>
-          </select>
-        </div>
-        <textarea id="main-tabnotes-text" class="main-notes-input" placeholder="Select a tab above, then jot a note for it here..."></textarea>
-        <div class="field-group form-action">
-          <button class="btn-primary" onclick="saveMainTabNote()">Save</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" id="main-dayentries-card">
-      <div class="entries-label" id="day-entries-label">Today's Entries</div>
-      <div id="day-entries-list"><span class="empty-inline">No entries for this date</span></div>
-    </div>
 
     <div class="card" id="main-notes-card">
       <div class="card-title">📝 Notes</div>
@@ -959,7 +942,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=140"></script>
+<script src="app.js?v=141"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
