@@ -2314,7 +2314,7 @@ async function onHwellSleepInput(field, dateStr, value) {
 }
 
 // Combines the Habits tab's Sleep Hours (Night) + (Day) entries into the Main tab's
-// monthly sleep total for the "Avg Sleep / day (Month)" stat chip. The Habits-tab boxes
+// monthly sleep total for the "Avg Sleep (Mon)" stat chip. The Habits-tab boxes
 // are the authoritative source for that date's tracked sleep, so this overwrites rather
 // than adds to any prior value.
 async function syncHwellSleepToMain(dateStr, day) {

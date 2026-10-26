@@ -1114,13 +1114,15 @@ textarea#fm-notes:focus {
   /* ── Main tab: summary first, then both logging sections below it ────────── */
   #tab-main.active { display: flex; flex-direction: column; }
   #tab-main > .top-controls                  { order: 1; }
-  #tab-main > #main-summary-card             { order: 2; }
-  #tab-main > #main-typepie-card             { order: 0; }
-  #tab-main > #main-monthdate-row            { order: 3; }
-  #tab-main > .log-row                       { order: 4; }
-  #tab-main > #main-media-container          { order: 5; }
-  #tab-main > #main-dayentries-card          { order: 7; }
-  #tab-main > #main-notes-card               { order: 8; }
+  #tab-main > #main-fmssline-card            { order: 2; }
+  #tab-main > #main-summary-card             { order: 3; }
+  #tab-main > #main-monthdate-row            { order: 4; }
+  #tab-main > .log-row                       { order: 5; }
+  #tab-main > #main-typepie-card             { order: 6; }
+  #tab-main > #fm-tracker-card               { order: 7; }
+  #tab-main > #main-media-container          { order: 8; }
+  #tab-main > #main-dayentries-card          { order: 9; }
+  #tab-main > #main-notes-card               { order: 10; }
 
   /* ── Summary card header (month picker + title row) ──────────────────────── */
   .summary-card-header { flex-wrap: wrap; gap: 8px; }
@@ -2159,9 +2161,8 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   .pie-cell .type-pie-svg { width: 130px; height: 130px; }
 }
 
-/* FM - SS weekly line (inside the pie card, full width) */
-.wl-cell { margin-top: 32px; }
-.wl-cell .pie-cell-title { text-align: left; }
+/* FM - SS weekly line (own card at the top of the main tab) */
+#main-fmssline-card .pie-cell-title { text-align: left; }
 .wl-svg { width: 100%; height: auto; display: block; overflow: visible; }
 .wl-grid { stroke: var(--border); stroke-width: 1; }
 .wl-axis { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }

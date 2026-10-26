@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=109">
+  <link rel="stylesheet" href="style.css?v=110">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -113,84 +113,13 @@
         <strong id="fmss-hours-chip">—</strong>
       </div>
       <div class="stat-chip" id="workdays-chip"><span class="wd-full">Working days so far</span><span class="wd-short">Workdays</span>&nbsp;&nbsp;<strong id="working-days-count">—</strong></div>
-      <div class="stat-chip" id="sleep-avg-month-chip"><span class="sl-full">Avg Sleep / day (Month)</span><span class="sl-short">Sleep (M)</span>&nbsp;&nbsp;<strong id="sleep-avg-month">—</strong><span id="sleep-miss-badge" class="sleep-miss-badge hidden"></span></div>
+      <div class="stat-chip" id="sleep-avg-month-chip"><span class="sl-full">Avg Sleep (Mon)</span><span class="sl-short">Sleep (M)</span>&nbsp;&nbsp;<strong id="sleep-avg-month">—</strong><span id="sleep-miss-badge" class="sleep-miss-badge hidden"></span></div>
     </div>
 
-    <!-- Month pie charts: hours by Type, PROD / Office Prod splits, waste split -->
-    <div class="card" id="main-typepie-card">
-      <div class="card-title">Hours by Type</div>
-      <div class="pie-grid">
-        <div class="pie-cell">
-          <div class="pie-cell-title">Overall Split</div>
-          <div id="type-pie"></div>
-        </div>
-        <div class="pie-cell">
-          <div class="pie-cell-title">PROD Split</div>
-          <div id="prod-pie"></div>
-        </div>
-        <div class="pie-cell">
-          <div class="pie-cell-title">Office Prod Split</div>
-          <div id="officeprod-pie"></div>
-        </div>
-        <div class="pie-cell">
-          <div class="pie-cell-title">Waste Pie Chart</div>
-          <div id="waste-pie"></div>
-        </div>
-      </div>
-      <div class="pie-cell wl-cell">
-        <div class="pie-cell-title">FM - SS Weekly Hours · last 12 weeks</div>
-        <div id="fmss-weekly-line"></div>
-      </div>
-    </div>
-
-    <!-- FM Tracker Summary (shareable) -->
-    <div class="card fm-tracker-card" id="fm-tracker-card">
-      <div class="fm-tracker-header">
-        <span class="fm-tracker-title">📊 FM Progress</span>
-      </div>
-      <div class="fm-tracker-period-block">
-        <div class="fm-period-row">
-          <span class="fm-period-lbl">From</span>
-          <input type="date" id="fm-tracker-start-date" onchange="saveFMTrackerPeriod()">
-          <div class="fm-time-picker" id="fm-tracker-start-time-picker">
-            <button type="button" class="fm-time-select-btn" id="fm-tracker-start-time" onclick="fmToggleTimeList('start')"></button>
-            <div class="fm-time-dropdown hidden" id="fm-tracker-start-time-list"></div>
-          </div>
-          <span class="fm-period-sep">→</span>
-          <span class="fm-period-lbl">To</span>
-          <input type="date" id="fm-tracker-end-date" onchange="saveFMTrackerPeriod()">
-          <div class="fm-time-picker" id="fm-tracker-end-time-picker">
-            <button type="button" class="fm-time-select-btn" id="fm-tracker-end-time" onclick="fmToggleTimeList('end')"></button>
-            <div class="fm-time-dropdown hidden" id="fm-tracker-end-time-list"></div>
-          </div>
-          <button class="fm-now-btn" onclick="fmSetNow()">Now</button>
-        </div>
-      </div>
-      <!-- Shareable stats sub-section -->
-      <div class="fm-stats-section" id="fm-stats-share">
-        <button class="fm-stats-share-btn" onclick="shareFMTracker()" title="Share">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
-          Share
-        </button>
-        <div class="fm-tracker-tiles">
-          <div class="fm-tile fm-tile-blue">
-            <strong id="fm-tracker-fmss">—</strong>
-            <small>Sivanthiyappan Short Film Script</small>
-          </div>
-          <div class="fm-tile fm-tile-teal">
-            <strong id="fm-tracker-fmother">—</strong>
-            <small>Filmmaking Other Works</small>
-          </div>
-          <div class="fm-tile fm-tile-orange">
-            <strong id="fm-tracker-movies">—</strong>
-            <small>🎬 Movies Watched</small>
-          </div>
-          <div class="fm-tile fm-tile-purple">
-            <strong id="fm-tracker-stories">—</strong>
-            <small>📖 Stories Read</small>
-          </div>
-        </div>
-      </div>
+    <!-- FM - SS weekly hours line chart -->
+    <div class="card" id="main-fmssline-card">
+      <div class="pie-cell-title">FM - SS Weekly Hours · last 12 weeks</div>
+      <div id="fmss-weekly-line"></div>
     </div>
 
     <!-- Month Summary — before log controls -->
@@ -263,6 +192,79 @@
       </div>
 
     </div><!-- end log-row -->
+
+    <!-- Month pie charts: hours by Type, PROD / Office Prod splits, waste split -->
+    <div class="card" id="main-typepie-card">
+      <div class="card-title">Hours by Type</div>
+      <div class="pie-grid">
+        <div class="pie-cell">
+          <div class="pie-cell-title">Overall Split</div>
+          <div id="type-pie"></div>
+        </div>
+        <div class="pie-cell">
+          <div class="pie-cell-title">Waste Pie Chart</div>
+          <div id="waste-pie"></div>
+        </div>
+        <div class="pie-cell">
+          <div class="pie-cell-title">PROD Split</div>
+          <div id="prod-pie"></div>
+        </div>
+        <div class="pie-cell">
+          <div class="pie-cell-title">Office Prod Split</div>
+          <div id="officeprod-pie"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FM Tracker Summary (shareable) -->
+    <div class="card fm-tracker-card" id="fm-tracker-card">
+      <div class="fm-tracker-header">
+        <span class="fm-tracker-title">📊 FM Progress</span>
+      </div>
+      <div class="fm-tracker-period-block">
+        <div class="fm-period-row">
+          <span class="fm-period-lbl">From</span>
+          <input type="date" id="fm-tracker-start-date" onchange="saveFMTrackerPeriod()">
+          <div class="fm-time-picker" id="fm-tracker-start-time-picker">
+            <button type="button" class="fm-time-select-btn" id="fm-tracker-start-time" onclick="fmToggleTimeList('start')"></button>
+            <div class="fm-time-dropdown hidden" id="fm-tracker-start-time-list"></div>
+          </div>
+          <span class="fm-period-sep">→</span>
+          <span class="fm-period-lbl">To</span>
+          <input type="date" id="fm-tracker-end-date" onchange="saveFMTrackerPeriod()">
+          <div class="fm-time-picker" id="fm-tracker-end-time-picker">
+            <button type="button" class="fm-time-select-btn" id="fm-tracker-end-time" onclick="fmToggleTimeList('end')"></button>
+            <div class="fm-time-dropdown hidden" id="fm-tracker-end-time-list"></div>
+          </div>
+          <button class="fm-now-btn" onclick="fmSetNow()">Now</button>
+        </div>
+      </div>
+      <!-- Shareable stats sub-section -->
+      <div class="fm-stats-section" id="fm-stats-share">
+        <button class="fm-stats-share-btn" onclick="shareFMTracker()" title="Share">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+          Share
+        </button>
+        <div class="fm-tracker-tiles">
+          <div class="fm-tile fm-tile-blue">
+            <strong id="fm-tracker-fmss">—</strong>
+            <small>Sivanthiyappan Short Film Script</small>
+          </div>
+          <div class="fm-tile fm-tile-teal">
+            <strong id="fm-tracker-fmother">—</strong>
+            <small>Filmmaking Other Works</small>
+          </div>
+          <div class="fm-tile fm-tile-orange">
+            <strong id="fm-tracker-movies">—</strong>
+            <small>🎬 Movies Watched</small>
+          </div>
+          <div class="fm-tile fm-tile-purple">
+            <strong id="fm-tracker-stories">—</strong>
+            <small>📖 Stories Read</small>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Stories / Movies / Books logged via Log Hours (unique per name) -->
     <div id="main-media-container"></div>
@@ -957,7 +959,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=139"></script>
+<script src="app.js?v=140"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
