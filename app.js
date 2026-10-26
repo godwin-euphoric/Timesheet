@@ -540,11 +540,7 @@ function renderTypePie(data) {
     g.hrs += hrs; g.cats.push(c.category);
     groups.set(name, g);
   });
-  // Overall Social + Unwanted hours as its own slice
-  let waste = 0;
-  Object.values(data.wastedEntries || {}).forEach(arr => arr.forEach(e => { waste += e.hours || 0; }));
-  groups.set('Waste', { name: 'Waste', hrs: waste, cats: ['Social + Unwanted'] });
-  drawDonut(box, [...groups.values()], 'Hours by type and waste this month');
+  drawDonut(box, [...groups.values()], 'Hours by type this month');
 }
 
 // Per-type split pies: hours of each category inside one Type.
@@ -814,26 +810,6 @@ async function loadMonthlySummary(data) {
   if (fmssEl) fmssEl.textContent = fmssCompleted !== null ? `${fmssCompleted} hrs` : '—';
 
   // AI pending chip (AI-Office + AI-Study), floored at 0
-
-  // Movie & Story counts for the month (from FM log)
-  const ud = await getUserData();
-  let movieCount = 0, storyCount = 0;
-  (ud.fmLog || []).forEach(e => {
-    if (e.date && e.date.startsWith(month)) {
-      if (/movie/i.test(e.type || '')) movieCount++;
-      if (/story/i.test(e.type || '')) storyCount++;
-    }
-  });
-  (ud.mediaLog || []).forEach(e => {
-    if (e.date && e.date.startsWith(month)) {
-      if (e.kind === 'movie') movieCount++;
-      if (e.kind === 'story') storyCount++;
-    }
-  });
-  const movieEl = document.getElementById('movie-count-chip');
-  const storyEl = document.getElementById('story-count-chip');
-  if (movieEl) movieEl.textContent = movieCount;
-  if (storyEl) storyEl.textContent = storyCount;
 
   // Stats row below table (wasted, working days, productive)
   const wastedEntries = data.wastedEntries || {};

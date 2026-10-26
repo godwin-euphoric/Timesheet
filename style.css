@@ -1095,13 +1095,11 @@ textarea#fm-notes:focus {
   .chip-card strong { font-size: 15px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
 
   /* Row: Movie + Story */
-  #movie-chip { order: 7; flex: 1 1 calc(50% - 4px); justify-content: center; }
-  #story-chip { order: 8; flex: 1 1 calc(50% - 4px); justify-content: center; }
 
   /* Row: Sleep (M) + AI — keep value on one line */
   #sleep-avg-month-chip { order: 9;  flex: 1 1 calc(50% - 4px); justify-content: center; gap: 6px; }
   #sleep-avg-month-chip strong { white-space: nowrap; }
-  #movie-chip strong, #story-chip strong, #workdays-chip strong { white-space: nowrap; }
+  #workdays-chip strong { white-space: nowrap; }
 
   /* short labels on mobile */
   .wd-full, .sl-full { display: none; }
@@ -2147,19 +2145,23 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .type-pie-swatch { width: 12px; height: 12px; border-radius: 3px; }
 .type-pie-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Four pies in one card: 2 per row on wide screens, 1 per row on phones */
-.pie-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 28px 36px; }
+/* Four pies in one card: all four in one row, legend under each pie; 2 per row on narrow screens */
+.pie-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 24px; }
 .pie-cell { min-width: 0; }
-.pie-cell-title { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
-.pie-cell .type-pie-wrap { gap: 20px; }
+.pie-cell-title { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; text-align: center; }
+.pie-cell .type-pie-wrap { flex-direction: column; flex-wrap: nowrap; align-items: center; gap: 16px; }
 .pie-cell .type-pie-svg { width: 160px; height: 160px; }
-.pie-cell .type-pie-legend { min-width: 180px; }
-@media (max-width: 600px) {
-  .pie-cell .type-pie-wrap { justify-content: center; }
+.pie-cell .type-pie-legend { flex: none; min-width: 0; max-width: 100%; width: fit-content; }
+@media (max-width: 900px) {
+  .pie-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) {
+  .pie-cell .type-pie-svg { width: 130px; height: 130px; }
 }
 
 /* FM - SS weekly line (inside the pie card, full width) */
 .wl-cell { margin-top: 32px; }
+.wl-cell .pie-cell-title { text-align: left; }
 .wl-svg { width: 100%; height: auto; display: block; overflow: visible; }
 .wl-grid { stroke: var(--border); stroke-width: 1; }
 .wl-axis { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
