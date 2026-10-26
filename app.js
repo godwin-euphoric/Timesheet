@@ -1194,6 +1194,7 @@ async function deleteSleepEntry(date) {
 
 async function loadMonthlyTab() {
   const data = await getMonthData(state.monthlyMonth);
+  if (migrateHiddenFitnessHours(data)) await saveMonthData(state.monthlyMonth, data);
   state.monthlyLeaves       = [...(data.leaves || [])];
   state.monthlyLeaveReasons = { ...(data.leaveReasons || {}) };
   renderLeaveTags();
@@ -1340,6 +1341,39 @@ function syncFitnessTotal(d, date) {
   if (!d.entries[date]) d.entries[date] = {};
   if (total > 0) d.entries[date][FITNESS_CAT] = total;
   else { delete d.entries[date][FITNESS_CAT]; if (!Object.keys(d.entries[date]).length) delete d.entries[date]; }
+}
+
+// When the month has no exact "Fitness" category but has a renamed one (e.g. "Fitness & Body"),
+// workout hours logged from the Diet tab are added to / removed from that column instead.
+// Applied as a delta so hours logged there by hand are kept.
+function addToRenamedFitnessColumn(d, date, deltaHrs) {
+  const cats = (d.categories || []).map(c => c.category);
+  if (cats.includes(FITNESS_CAT)) return;
+  const target = cats.find(c => /fitness/i.test(c));
+  if (!target) return;
+  if (!d.entries[date]) d.entries[date] = {};
+  delete d.entries[date][FITNESS_CAT]; // syncFitnessTotal's key has no column this month
+  const next = Math.max(0, Math.round(((d.entries[date][target] || 0) + deltaHrs) * 100) / 100);
+  if (next > 0) d.entries[date][target] = next;
+  else delete d.entries[date][target];
+  if (!Object.keys(d.entries[date]).length) delete d.entries[date];
+}
+
+// Workouts logged before the above existed were saved under the hidden "Fitness" key.
+// Move those hours into the renamed column. Returns true if anything changed.
+function migrateHiddenFitnessHours(d) {
+  const cats = (d.categories || []).map(c => c.category);
+  if (cats.includes(FITNESS_CAT) || !cats.some(c => /fitness/i.test(c))) return false;
+  let changed = false;
+  Object.keys(d.entries || {}).forEach(date => {
+    const hrs = d.entries[date][FITNESS_CAT] || 0;
+    if (!(FITNESS_CAT in d.entries[date])) return;
+    delete d.entries[date][FITNESS_CAT];
+    if (hrs > 0) addToRenamedFitnessColumn(d, date, hrs);
+    else if (!Object.keys(d.entries[date]).length) delete d.entries[date];
+    changed = true;
+  });
+  return changed;
 }
 
 // ── Mobile transposed monthly table (categories as rows, dates as columns) ──
@@ -2005,80 +2039,6 @@ async function loadYearlyTab() {
   } // end desktop else
 
   } // end months.length else
-
-  // FM count section
-  await renderYearlyFmCount(year, today);
-}
-
-async function renderYearlyFmCount(year, today) {
-  const userData = await getUserData();
-  const cats     = userData.fmCategories || [];
-  const fmLog    = userData.fmLog        || [];
-  const thead    = document.getElementById('yearly-fm-thead');
-  const tbody    = document.getElementById('yearly-fm-tbody');
-
-  if (!cats.length || !fmLog.length) {
-    thead.innerHTML = '';
-    tbody.innerHTML = '<tr><td colspan="2" class="empty">No FM log data yet</td></tr>';
-    return;
-  }
-
-  const yearEntries = fmLog.filter(e => e.date && e.date.startsWith(`${year}-`));
-  if (!yearEntries.length) {
-    thead.innerHTML = '';
-    tbody.innerHTML = `<tr><td colspan="${cats.length + 2}" class="empty">No FM entries for ${year}</td></tr>`;
-    return;
-  }
-
-  // Group by month
-  const byMonth = {};
-  yearEntries.forEach(e => {
-    const m = e.date.slice(0, 7);
-    if (!byMonth[m]) byMonth[m] = {};
-    byMonth[m][e.type] = (byMonth[m][e.type] || 0) + 1;
-  });
-
-  const months = Object.keys(byMonth).filter(m => m <= (today || todayStr()).slice(0, 7)).sort();
-
-  thead.innerHTML = `
-    <tr>
-      <th>Month</th>
-      ${cats.map(c => `<th>${c}</th>`).join('')}
-      <th>Total</th>
-    </tr>
-  `;
-  tbody.innerHTML = '';
-
-  const colTotals = Object.fromEntries(cats.map(c => [c, 0]));
-  let grandTotal = 0;
-
-  months.forEach(month => {
-    const row = byMonth[month] || {};
-    let mTotal = 0;
-    const cells = cats.map(cat => {
-      const count = row[cat] || 0;
-      colTotals[cat] += count;
-      mTotal += count;
-      return `<td${count > 0 ? ' class="cell-count"' : ''}>${count > 0 ? count : ''}</td>`;
-    });
-    grandTotal += mTotal;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><strong>${formatMonth(month)}</strong></td>
-      ${cells.join('')}
-      <td><strong>${mTotal > 0 ? mTotal : ''}</strong></td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  const totalTr = document.createElement('tr');
-  totalTr.className = 'row-total';
-  totalTr.innerHTML = `
-    <td>Total</td>
-    ${cats.map(c => `<td>${colTotals[c] > 0 ? colTotals[c] : ''}</td>`).join('')}
-    <td>${grandTotal}</td>
-  `;
-  tbody.appendChild(totalTr);
 }
 
 document.getElementById('yearly-year').addEventListener('change', async function () {
@@ -6659,11 +6619,14 @@ async function logRegWorkoutMinutes() {
   const mainData = await getMonthData(month);
   if (!mainData.fitnessBreakdown) mainData.fitnessBreakdown = {};
   if (!mainData.fitnessBreakdown[dateStr]) mainData.fitnessBreakdown[dateStr] = {};
+  let addedHrs = 0;
   entries.forEach(({ sub, mins }) => {
     const hrs = Math.round((mins / 60) * 100) / 100;
+    addedHrs += hrs;
     mainData.fitnessBreakdown[dateStr][sub] = Math.round(((mainData.fitnessBreakdown[dateStr][sub] || 0) + hrs) * 100) / 100;
   });
   syncFitnessTotal(mainData, dateStr);
+  addToRenamedFitnessColumn(mainData, dateStr, addedHrs);
   await saveMonthData(month, mainData);
 
   const regData = await getRegMonthData(month);
@@ -6696,6 +6659,7 @@ async function deleteRegWorkout(dateStr, id) {
       if (next > 0) mainData.fitnessBreakdown[dateStr][removed.sub] = next;
       else delete mainData.fitnessBreakdown[dateStr][removed.sub];
       syncFitnessTotal(mainData, dateStr);
+      addToRenamedFitnessColumn(mainData, dateStr, -(prev - next));
       await saveMonthData(month, mainData);
     }
   }
@@ -7464,9 +7428,6 @@ async function renderSummaryCalorieChart() {
 async function loadSummaryTab() {
   const monthEl = document.getElementById('summary-month');
   if (monthEl) monthEl.value = state.summaryMonth;
-  const dateEl = document.getElementById('summary-weight-date');
-  if (dateEl && !dateEl.value) dateEl.value = todayStr();
-  await renderWeightSection();
   await renderSummaryCalorieChart();
 }
 
@@ -7591,6 +7552,9 @@ async function loadHealthTab() {
   document.getElementById('health-bp-date').value = todayStr();
   const ud = await getUserData();
   renderBpTable(ud.bpLog || []);
+  const weightDateEl = document.getElementById('summary-weight-date');
+  if (weightDateEl && !weightDateEl.value) weightDateEl.value = todayStr();
+  await renderWeightSection();
 }
 
 function renderBpTable(log) {
