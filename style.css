@@ -1078,11 +1078,11 @@ textarea#fm-notes:focus {
     padding-left: 8px; padding-right: 4px;
   }
 
-  /* Row: stopwatch (left) + workdays (right) */
-  .stopwatch-chip { order: 2; flex: 1 1 calc(50% - 4px); width: auto; justify-content: center; }
-  #workdays-chip  { order: 3; flex: 1 1 calc(50% - 4px); justify-content: center; }
+  /* Same chip order as desktop: stopwatch, PROD / Social / SS, then Workdays + Sleep */
+  .stopwatch-chip { order: 1; flex: 1 1 100%; width: auto; justify-content: center; }
+  #workdays-chip  { order: 7; flex: 1 1 calc(50% - 4px); justify-content: center; }
 
-  /* Row: Productive + Social + FM-SS */
+  /* Row: PROD + Social + SS */
   .ctrl-pair-chips { display: contents; }
   .stat-chip-green { order: 4; flex: 1 1 calc(33.333% - 6px); }
   .stat-chip-red   { order: 5; flex: 1 1 calc(33.333% - 6px); }
@@ -1094,9 +1094,7 @@ textarea#fm-notes:focus {
   .chip-card .chip-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.75; white-space: normal; line-height: 1.25; }
   .chip-card strong { font-size: 15px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
 
-  /* Row: Movie + Story */
-
-  /* Row: Sleep (M) + AI — keep value on one line */
+  /* Row: Workdays + Sleep (M) — keep values on one line */
   #sleep-avg-month-chip { order: 9;  flex: 1 1 calc(50% - 4px); justify-content: center; gap: 6px; }
   #sleep-avg-month-chip strong { white-space: nowrap; }
   #workdays-chip strong { white-space: nowrap; }
