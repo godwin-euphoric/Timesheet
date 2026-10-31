@@ -590,6 +590,7 @@ td.sleep-cell:hover { background: #16243f !important; }
   position: sticky; left: 0; z-index: 20; background: #0D1628;
 }
 .hwell-day-col { min-width: 46px; }
+.hwell-day-pct { font-size: 11px; font-weight: 800; color: var(--lime); }
 .hwell-grid-table th.col-today   { color: var(--amber); border-bottom-color: var(--amber); }
 .hwell-grid-table th.col-weekend { color: var(--muted); opacity: 0.6; }
 
@@ -621,18 +622,6 @@ td.sleep-cell:hover { background: #16243f !important; }
 .hwell-totals-row td { border-top: 2px solid var(--border); font-weight: 700; }
 .hwell-totals-row .hwell-row-label { color: var(--lime); }
 .hwell-total-cell { font-size: 11px; color: var(--muted); font-weight: 700; }
-
-.hwell-act-cell { padding: 6px 4px; }
-.hwell-act-group { display: flex; gap: 3px; justify-content: center; }
-.hwell-act-btn {
-  width: 18px; height: 18px; border: 1px solid var(--border); border-radius: 4px;
-  background: var(--card2); cursor: pointer; transition: all 0.15s;
-  font-size: 10px; font-weight: 800; line-height: 1; color: var(--muted); padding: 0;
-}
-.hwell-act-btn:hover { border-color: var(--primary); color: var(--text); }
-.hwell-act-btn.active.lvl-a { background: var(--green); border-color: var(--green); color: #0B1120; }
-.hwell-act-btn.active.lvl-m { background: var(--amber); border-color: var(--amber); color: #0B1120; }
-.hwell-act-btn.active.lvl-l { background: #f87171; border-color: #f87171; color: #0B1120; }
 
 .hwell-sleep-cell { padding: 6px 4px; }
 .hwell-sleep-input {

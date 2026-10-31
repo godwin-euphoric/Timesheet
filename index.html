@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=114">
+  <link rel="stylesheet" href="style.css?v=116">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -520,55 +520,6 @@
       </div>
     </div>
 
-    <!-- Date navigation (drives Activeness / Daily Judgement below) -->
-    <div class="diet-log-label" style="margin-top:24px">ACTIVENESS &amp; DAILY JUDGEMENT FOR</div>
-    <div class="diet-date-nav">
-      <button class="diet-date-arrow" onclick="habitsPrevDay()">&#8592;</button>
-      <span id="hwell-date-label">MON, JUN 8</span>
-      <button class="diet-date-arrow" onclick="habitsNextDay()">&#8594;</button>
-    </div>
-
-    <!-- Activeness -->
-    <div class="diet-log-section">
-      <div class="diet-log-label">ACTIVENESS</div>
-      <textarea id="hwell-activeness-notes" class="reg-summary-textarea" rows="3"
-                placeholder="Notes about today's activeness..."
-                onblur="saveHwellActiveness(true)"></textarea>
-      <div class="reg-summary-actions">
-        <button class="btn-secondary" onclick="saveHwellActiveness()">Save</button>
-      </div>
-    </div>
-
-    <!-- Daily Judgement -->
-    <div class="diet-log-section">
-      <div class="diet-log-label">DAILY JUDGEMENT</div>
-      <textarea id="hwell-daily-judgement" class="reg-summary-textarea" rows="5"
-                placeholder="Click Generate to get an AI verdict on today's Habits and Activeness..."
-                onblur="saveHwellDailyJudgement(true)"></textarea>
-      <div id="hwell-daily-judgement-spinner" class="diet-ai-spinner hidden">
-        <div class="diet-spinner"></div> Analyzing with AI...
-      </div>
-      <div class="reg-summary-actions">
-        <button class="btn-secondary" onclick="saveHwellDailyJudgement()">Save</button>
-        <button class="btn-primary" onclick="generateHwellDailyJudgement()">Generate</button>
-      </div>
-    </div>
-
-    <!-- Monthly Judgement -->
-    <div class="diet-log-section">
-      <div class="diet-log-label">MONTHLY JUDGEMENT</div>
-      <textarea id="hwell-monthly-judgement" class="reg-summary-textarea" rows="6"
-                placeholder="Click Generate to get an AI verdict on this month's Habits and Activeness..."
-                onblur="saveHwellMonthlyJudgement(true)"></textarea>
-      <div id="hwell-monthly-judgement-spinner" class="diet-ai-spinner hidden">
-        <div class="diet-spinner"></div> Analyzing with AI...
-      </div>
-      <div class="reg-summary-actions">
-        <button class="btn-secondary" onclick="saveHwellMonthlyJudgement()">Save</button>
-        <button class="btn-primary" onclick="generateHwellMonthlyJudgement()">Generate</button>
-      </div>
-    </div>
-
   </div>
 
   <!-- ══ 100 DAYS CHALLENGE ═══════════════════════════════════════════════════ -->
@@ -931,7 +882,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=145"></script>
+<script src="app.js?v=147"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
