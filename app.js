@@ -55,9 +55,8 @@ const state = {
   habitsMonthCache: {},
   habitsCustom:     { wellness: [] },
   userRole:         null,
-  // Summary tab
+  // Health tab (weight log)
   weightEntries:    null,
-  summaryMonth:     currentMonth(),
   // 100 Days Challenge tab
   challenge100UploadTarget: null,
   challenge100EntryMode: 'upload', // 'upload' (default) or 'manual' — controls whether the current-week column is editable
@@ -180,7 +179,6 @@ auth.onAuthStateChanged(user => {
   state.regProteinSources = null;
   state.userRole         = null;
   state.weightEntries    = null;
-  state.summaryMonth     = currentMonth();
 
   if (user) {
     document.getElementById('pwa-signin-overlay')?.classList.add('hidden');
@@ -300,7 +298,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, excelimport: loadExcelImportTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, summary: loadSummaryTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, excelimport: loadExcelImportTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -1193,7 +1191,9 @@ async function deleteSleepEntry(date) {
 
 async function loadMonthlyTab() {
   const data = await getMonthData(state.monthlyMonth);
-  if (migrateHiddenFitnessHours(data)) await saveMonthData(state.monthlyMonth, data);
+  const fitnessMoved = migrateHiddenFitnessHours(data);
+  const sleepFilled  = await fillMonthlySleepFromHabits(state.monthlyMonth, data);
+  if (fitnessMoved || sleepFilled) await saveMonthData(state.monthlyMonth, data);
   state.monthlyLeaves       = [...(data.leaves || [])];
   state.monthlyLeaveReasons = { ...(data.leaveReasons || {}) };
   renderLeaveTags();
@@ -2169,7 +2169,7 @@ function hwellBuildRow(item, section, days, mData, today) {
     <td class="hwell-row-label" title="${escHtml(item.label)}">${dragHandle}${removeBtn}${labelText}</td>${cells}</tr>`;
 }
 
-// Sleep Hours: two free-entry number rows (Night / Day) instead of a plain checkbox —
+// Sleep Hours: two free-entry number rows (Prev Night / Day) instead of a plain checkbox —
 // not counted toward the Achieved total.
 function hwellBuildSleepRow(field, label, days, mData, today) {
   const cells = days.map(d => {
@@ -2196,7 +2196,7 @@ async function onHwellSleepInput(field, dateStr, value) {
   await syncHwellSleepToMain(dateStr, day);
 }
 
-// Combines the Habits tab's Sleep Hours (Night) + (Day) entries into the Main tab's
+// Combines the Habits tab's Sleep Hours (Prev Night) + (Day) entries into the Main tab's
 // monthly sleep total for the "Avg Sleep (Mon)" stat chip. The Habits-tab boxes
 // are the authoritative source for that date's tracked sleep, so this overwrites rather
 // than adds to any prior value.
@@ -2217,6 +2217,24 @@ async function syncHwellSleepToMain(dateStr, day) {
   if (mainTabVisible && state.mainMonth === month) {
     try { await renderSleepAverages(mainData); } catch (e) { console.error('Sleep averages refresh failed', e); }
   }
+  // Typing a value then clicking straight to the Monthly tab opens it before this save lands.
+  const monthlyTabVisible = document.getElementById('tab-monthly')?.classList.contains('active');
+  if (monthlyTabVisible && state.monthlyMonth === month) await loadMonthlyTab();
+}
+
+// Fills the Monthly sleep column for dates that have Habits sleep hours but no monthly value
+// (entries from before the sync above). Hours edited on the Monthly tab are left as they are.
+async function fillMonthlySleepFromHabits(month, data) {
+  const hData = await getHabitsMonthData(month);
+  let changed = false;
+  Object.entries(hData.days || {}).forEach(([date, day]) => {
+    const total = (parseFloat(day.sleepHoursNight) || 0) + (parseFloat(day.sleepHoursDay) || 0);
+    if (total <= 0 || (data.sleep || {})[date]) return;
+    if (!data.sleep) data.sleep = {};
+    data.sleep[date] = Math.round(total * 100) / 100;
+    changed = true;
+  });
+  return changed;
 }
 
 function hwellBuildAddRow(section, days) {
@@ -2258,7 +2276,7 @@ async function renderHwellGrid(month) {
   }).join('');
   const totalsRow = `<tr class="hwell-totals-row"><td class="hwell-row-label">Achieved</td>${totalCells}</tr>`;
 
-  const sleepRows = hwellBuildSleepRow('sleepHoursNight', 'Sleep Hours (Night)', days, mData, today) +
+  const sleepRows = hwellBuildSleepRow('sleepHoursNight', 'Sleep Hours (Prev Night)', days, mData, today) +
     hwellBuildSleepRow('sleepHoursDay', 'Sleep Hours (Day)', days, mData, today);
 
   document.getElementById('hwell-grid-table').innerHTML =
@@ -6919,8 +6937,8 @@ async function shareFMTracker() {
 function applyRoleVisibility(role) {
   const showFor = {
     timesheet: new Set(['main', 'monthly', 'yearly', 'habits', 'planner', 'settings', 'health']),
-    diet:      new Set(['regimen', 'summary', 'settings', 'health']),
-    both:      new Set(['main', 'regimen', 'summary', 'monthly', 'yearly', 'habits', 'planner', 'settings', 'health']),
+    diet:      new Set(['regimen', 'settings', 'health']),
+    both:      new Set(['main', 'regimen', 'monthly', 'yearly', 'habits', 'planner', 'settings', 'health']),
   };
   const visible = showFor[role] || showFor.both;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
@@ -7181,10 +7199,9 @@ async function removeUser(uid, email) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-//  SUMMARY TAB
+//  WEIGHT LOG (Health tab)
 // ══════════════════════════════════════════════════════════════════════════
-// Weight log + line chart, plus month-scoped calorie bar chart and macro pie
-// chart built from the Diet tab's own regimen_months data (getRegMonthData).
+// Weight log + line chart. Stored under summary_data, where the old Summary tab kept it.
 
 function summaryWeightRef() {
   return db.collection('users').doc(state.user.uid).collection('summary_data').doc('weight');
@@ -7246,35 +7263,6 @@ function renderWeightChart(entries) {
   drawLineChart(canvas, points, { color: '#C8FF00' });
 }
 
-async function changeSummaryMonth() {
-  const el = document.getElementById('summary-month');
-  if (el && el.value) state.summaryMonth = el.value;
-  await renderSummaryCalorieChart();
-}
-
-async function renderSummaryCalorieChart() {
-  const month  = state.summaryMonth;
-  const mData  = await getRegMonthData(month);
-  const [y, m] = month.split('-').map(Number);
-  const numDays = daysInMonth(y, m);
-  const values = [];
-  const labels = [];
-  for (let day = 1; day <= numDays; day++) {
-    const dateStr = `${month}-${String(day).padStart(2, '0')}`;
-    const foods = mData.days[dateStr]?.foods || [];
-    values.push(dietCalcTotals(foods).kcal);
-    labels.push(String(day));
-  }
-  const canvas = document.getElementById('summary-calorie-chart');
-  if (canvas) drawBarChart(canvas, values, labels, { color: '#C8FF00', target: getCalorieTarget() });
-}
-
-async function loadSummaryTab() {
-  const monthEl = document.getElementById('summary-month');
-  if (monthEl) monthEl.value = state.summaryMonth;
-  await renderSummaryCalorieChart();
-}
-
 // ── Generic canvas chart helpers ────────────────────────────────────────────
 
 function _chartSetup(canvas) {
@@ -7333,58 +7321,6 @@ function drawLineChart(canvas, points, opts = {}) {
     const x = pad.l + (i / (points.length - 1)) * plotW;
     const y = h - pad.b - ((p.y - minY) / range) * plotH;
     ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
-  });
-}
-
-function drawBarChart(canvas, values, labels, opts = {}) {
-  const { ctx, w, h } = _chartSetup(canvas);
-  const pad = { l: 34, r: 10, t: 12, b: 20 };
-  const plotW = w - pad.l - pad.r, plotH = h - pad.t - pad.b;
-  const color = opts.color || '#C8FF00';
-  const maxVal = Math.max(...values, opts.target || 0, 1);
-  const barGap = 2;
-  const barW = Math.max(plotW / values.length - barGap, 1);
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b);
-  ctx.stroke();
-
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.font = '10px sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(Math.round(maxVal), pad.l - 6, pad.t + 8);
-
-  values.forEach((v, i) => {
-    const barH = (v / maxVal) * plotH;
-    const x = pad.l + i * (barW + barGap);
-    const y = h - pad.b - barH;
-    ctx.fillStyle = color;
-    ctx.fillRect(x, y, barW, barH);
-    if (v > 0) {
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.font = '9px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(Math.round(v), x + barW / 2, Math.max(y - 3, pad.t + 8));
-    }
-  });
-
-  if (opts.target > 0) {
-    const ty = h - pad.b - (opts.target / maxVal) * plotH;
-    ctx.strokeStyle = '#F87171';
-    ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(pad.l, ty); ctx.lineTo(w - pad.r, ty); ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  ctx.fillStyle = 'rgba(255,255,255,0.4)';
-  ctx.textAlign = 'center';
-  const labelStep = Math.ceil(labels.length / 10);
-  labels.forEach((lb, i) => {
-    if (i % labelStep !== 0) return;
-    const x = pad.l + i * (barW + barGap) + barW / 2;
-    ctx.fillText(lb, x, h - 6);
   });
 }
 

@@ -2091,7 +2091,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   .table-scroll  { -webkit-overflow-scrolling: touch; }
 }
 
-/* ══ Summary tab ══════════════════════════════════════════════════════════ */
+/* ══ Chart cards (weight log) ═════════════════════════════════════════════ */
 .chart-card {
   background: var(--card2); border: 1px solid var(--border);
   border-radius: 10px; padding: 12px; margin-top: 10px;
