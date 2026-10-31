@@ -2314,7 +2314,7 @@ async function renderHwellMonthAvg(month) {
   else {
     const sum = completed.reduce((s, ds) => s + (mData.days[ds] ? hwellAchievedCount(mData.days[ds]) : 0), 0);
     const avg = sum / completed.length;
-    el.textContent = `${avg.toFixed(1)} / ${grandTotal} (${Math.round(avg / grandTotal * 100)}%)`;
+    el.textContent = `${Math.round(avg / grandTotal * 100)}%`;
   }
 }
 
