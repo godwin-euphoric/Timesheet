@@ -7276,16 +7276,15 @@ function saveWeightCell(dateStr, value) {
   return value.trim() === '' ? deleteWeightEntry(dateStr) : saveWeightEntry(dateStr, value);
 }
 
-// field is 'burnt' or 'eaten'. Clearing Eaten falls back to the Diet tab's total.
-async function saveWeightCalories(dateStr, field, value) {
+async function saveWeightBurnt(dateStr, value) {
   const clear = value.trim() === '';
   const num   = parseFloat(value);
   if (!clear && (isNaN(num) || num < 0)) { showToast('Enter a valid calorie amount'); return; }
   const stored = clear ? firebase.firestore.FieldValue.delete() : num;
-  await summaryWeightRef().set({ calories: { [dateStr]: { [field]: stored } } }, { merge: true });
+  await summaryWeightRef().set({ calories: { [dateStr]: { burnt: stored } } }, { merge: true });
   await getWeightEntries();
   const day = state.weightCalories[dateStr] || (state.weightCalories[dateStr] = {});
-  if (clear) delete day[field]; else day[field] = num;
+  if (clear) delete day.burnt; else day.burnt = num;
   renderWeightSection();
 }
 
@@ -7301,10 +7300,8 @@ async function buildWeightRows() {
   let prevWeight = WEIGHT_START_KG;
   for (let d = WEIGHT_START_DATE; d <= last; d = challenge100AddDays(d, 1)) {
     const mData   = await getRegMonthData(d.slice(0, 7));
-    const logged  = dietCalcTotals(mData.days[d]?.foods || []).kcal;
-    const cal     = state.weightCalories[d] || {};
-    const burnt   = cal.burnt ?? null;
-    const eaten   = cal.eaten ?? (logged || null);
+    const eaten   = dietCalcTotals(mData.days[d]?.foods || []).kcal || null;
+    const burnt   = state.weightCalories[d]?.burnt ?? null;
     const deficit = eaten === null ? null : WEIGHT_MAINTENANCE_KCAL - eaten;
     prevWeight -= ((deficit || 0) + (burnt || 0)) / WEIGHT_KCAL_PER_KG;
     rows.push({ date: d, burnt, eaten, deficit, calculated: prevWeight, entered: entries[d] ?? null });
@@ -7323,8 +7320,8 @@ async function renderWeightSection() {
     tbody.innerHTML = rows.length ? rows.map(r => `
       <tr>
         <td>${formatDietDateLabel(r.date)}</td>
-        <td>${cell(`weight-burnt-${r.date}`, r.burnt, `saveWeightCalories('${r.date}', 'burnt', this.value)`)}</td>
-        <td>${cell(`weight-eaten-${r.date}`, r.eaten, `saveWeightCalories('${r.date}', 'eaten', this.value)`)}</td>
+        <td>${cell(`weight-burnt-${r.date}`, r.burnt, `saveWeightBurnt('${r.date}', this.value)`)}</td>
+        <td>${r.eaten ?? '—'}</td>
         <td>${r.deficit ?? '—'}</td>
         <td>${r.calculated.toFixed(2)}</td>
         <td>${cell(`weight-entered-${r.date}`, r.entered, `saveWeightCell('${r.date}', this.value)`)}</td>
@@ -7415,6 +7412,7 @@ async function loadHealthTab() {
   renderBpTable(ud.bpLog || []);
   const weightDateEl = document.getElementById('summary-weight-date');
   if (weightDateEl && !weightDateEl.value) weightDateEl.value = todayStr();
+  state.regMonthCache = {}; // food may have been logged on another device
   await renderWeightSection();
   const weightScroll = document.getElementById('summary-weight-scroll');
   if (weightScroll) weightScroll.scrollTop = weightScroll.scrollHeight; // newest day is the last row
