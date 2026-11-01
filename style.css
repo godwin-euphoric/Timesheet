@@ -2099,13 +2099,15 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 .chart-canvas { width: 100%; height: 180px; display: block; }
 
-.weight-entries-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
-.weight-entry-row {
-  display: flex; align-items: center; gap: 8px;
-  background: var(--card2); border: 1px solid var(--border);
-  border-radius: 8px; padding: 8px 10px;
-}
-.weight-entry-date { flex: 1; font-size: 13px; color: var(--text); }
+.chart-legend { display: flex; gap: 16px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
+.chart-legend span { display: flex; align-items: center; gap: 6px; }
+.chart-legend i { width: 12px; height: 3px; border-radius: 2px; }
+
+.weight-table-scroll { margin-top: 10px; max-height: 360px; overflow-y: auto; }
+.weight-table-scroll th { position: sticky; top: 0; z-index: 1; }
+.weight-table th, .weight-table td { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.weight-table th:first-child, .weight-table td:first-child { text-align: left; }
+.weight-table .empty { text-align: center; }
 .weight-entry-input {
   width: 64px; background: var(--card); border: 1px solid var(--border);
   border-radius: 6px; padding: 4px 6px; color: var(--text); font-size: 13px; text-align: right;
@@ -2113,13 +2115,6 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .weight-entry-input:focus { border-color: var(--lime); outline: none; }
 .weight-entry-input::-webkit-outer-spin-button,
 .weight-entry-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.weight-entry-unit { font-size: 12px; color: var(--muted); }
-.weight-entry-del {
-  background: none; border: 1px solid rgba(248,113,113,0.3); border-radius: 6px;
-  color: rgba(248,113,113,0.6); cursor: pointer; font-size: 14px; line-height: 1;
-  padding: 4px 8px;
-}
-.weight-entry-del:hover { background: rgba(248,113,113,0.1); color: #f87171; border-color: #f87171; }
 
 
 /* ══ Hours by Type pie (main tab) ════════════════════════════════════════════ */

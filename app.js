@@ -57,6 +57,7 @@ const state = {
   userRole:         null,
   // Health tab (weight log)
   weightEntries:    null,
+  weightCalories:   null,
   // 100 Days Challenge tab
   challenge100UploadTarget: null,
   challenge100EntryMode: 'upload', // 'upload' (default) or 'manual' — controls whether the current-week column is editable
@@ -203,6 +204,7 @@ auth.onAuthStateChanged(user => {
   state.regProteinSources = null;
   state.userRole         = null;
   state.weightEntries    = null;
+  state.weightCalories   = null;
 
   if (user) {
     document.getElementById('pwa-signin-overlay')?.classList.add('hidden');
@@ -7225,7 +7227,11 @@ async function removeUser(uid, email) {
 // ══════════════════════════════════════════════════════════════════════════
 //  WEIGHT LOG (Health tab)
 // ══════════════════════════════════════════════════════════════════════════
-// Weight log + line chart. Stored under summary_data, where the old Summary tab kept it.
+// Weight log + calorie table + line chart. Stored under summary_data, where the old Summary tab kept it.
+
+const WEIGHT_START_KG         = 76.5;
+const WEIGHT_MAINTENANCE_KCAL = 2200;
+const WEIGHT_KCAL_PER_KG      = 7000;
 
 function summaryWeightRef() {
   return db.collection('users').doc(state.user.uid).collection('summary_data').doc('weight');
@@ -7233,8 +7239,10 @@ function summaryWeightRef() {
 
 async function getWeightEntries() {
   if (state.weightEntries) return state.weightEntries;
-  const doc = await summaryWeightRef().get();
-  state.weightEntries = doc.exists ? (doc.data().entries || {}) : {};
+  const doc  = await summaryWeightRef().get();
+  const data = doc.exists ? doc.data() : {};
+  state.weightEntries  = data.entries  || {};
+  state.weightCalories = data.calories || {};
   return state.weightEntries;
 }
 
@@ -7262,29 +7270,78 @@ async function addWeightEntry() {
   valEl.value = '';
 }
 
-async function renderWeightSection() {
-  const entries = await getWeightEntries();
-  const dates = Object.keys(entries).sort().reverse();
-  const listEl = document.getElementById('summary-weight-list');
-  if (listEl) {
-    listEl.innerHTML = dates.length ? dates.map(d => `
-      <div class="weight-entry-row">
-        <span class="weight-entry-date">${formatDietDateLabel(d)}</span>
-        <input type="number" step="0.1" class="weight-entry-input" value="${entries[d]}"
-               onblur="saveWeightEntry('${d}', this.value)">
-        <span class="weight-entry-unit">kg</span>
-        <button class="weight-entry-del" onclick="deleteWeightEntry('${d}')" title="Delete">&times;</button>
-      </div>`).join('') : '<div class="diet-empty">No weight entries yet</div>';
-  }
-  renderWeightChart(entries);
+// Clearing the Entered Weight cell removes that day's entry.
+function saveWeightCell(dateStr, value) {
+  return value.trim() === '' ? deleteWeightEntry(dateStr) : saveWeightEntry(dateStr, value);
 }
 
-function renderWeightChart(entries) {
+// field is 'burnt' or 'eaten'. Clearing Eaten falls back to the Diet tab's total.
+async function saveWeightCalories(dateStr, field, value) {
+  const clear = value.trim() === '';
+  const num   = parseFloat(value);
+  if (!clear && (isNaN(num) || num < 0)) { showToast('Enter a valid calorie amount'); return; }
+  const stored = clear ? firebase.firestore.FieldValue.delete() : num;
+  await summaryWeightRef().set({ calories: { [dateStr]: { [field]: stored } } }, { merge: true });
+  await getWeightEntries();
+  const day = state.weightCalories[dateStr] || (state.weightCalories[dateStr] = {});
+  if (clear) delete day[field]; else day[field] = num;
+  renderWeightSection();
+}
+
+// One row per day, first logged weight through today. A day with no calories logged
+// carries the previous calculated weight forward instead of counting as 0 eaten.
+async function buildWeightRows() {
+  const entries = await getWeightEntries();
+  const dates   = Object.keys(entries).sort();
+  if (!dates.length) return [];
+  const today = todayStr();
+  const last  = dates[dates.length - 1] > today ? dates[dates.length - 1] : today;
+
+  const rows = [];
+  let prevWeight = WEIGHT_START_KG;
+  for (let d = dates[0]; d <= last; d = challenge100AddDays(d, 1)) {
+    const mData   = await getRegMonthData(d.slice(0, 7));
+    const logged  = dietCalcTotals(mData.days[d]?.foods || []).kcal;
+    const cal     = state.weightCalories[d] || {};
+    const burnt   = cal.burnt ?? null;
+    const eaten   = cal.eaten ?? (logged || null);
+    const deficit = eaten === null ? null : WEIGHT_MAINTENANCE_KCAL - eaten;
+    prevWeight -= ((deficit || 0) + (burnt || 0)) / WEIGHT_KCAL_PER_KG;
+    rows.push({ date: d, burnt, eaten, deficit, calculated: prevWeight, entered: entries[d] ?? null });
+  }
+  return rows;
+}
+
+async function renderWeightSection() {
+  const rows  = await buildWeightRows();
+  const tbody = document.getElementById('summary-weight-tbody');
+  if (tbody) {
+    // Saving a cell re-renders the table, so put the cursor back where Tab moved it
+    const focusId = document.activeElement?.id;
+    const cell = (id, value, onchange) => `<input type="number" id="${id}" class="weight-entry-input"
+      value="${value ?? ''}" onchange="${onchange}">`;
+    tbody.innerHTML = rows.length ? rows.map(r => `
+      <tr>
+        <td>${formatDietDateLabel(r.date)}</td>
+        <td>${cell(`weight-burnt-${r.date}`, r.burnt, `saveWeightCalories('${r.date}', 'burnt', this.value)`)}</td>
+        <td>${cell(`weight-eaten-${r.date}`, r.eaten, `saveWeightCalories('${r.date}', 'eaten', this.value)`)}</td>
+        <td>${r.deficit ?? '—'}</td>
+        <td>${r.calculated.toFixed(2)}</td>
+        <td>${cell(`weight-entered-${r.date}`, r.entered, `saveWeightCell('${r.date}', this.value)`)}</td>
+      </tr>`).join('') : '<tr><td colspan="6" class="empty">No weight entries yet</td></tr>';
+    if (focusId) document.getElementById(focusId)?.focus();
+  }
+  renderWeightChart(rows);
+}
+
+function renderWeightChart(rows) {
   const canvas = document.getElementById('summary-weight-chart');
   if (!canvas) return;
-  const dates  = Object.keys(entries).sort();
-  const points = dates.map(d => ({ x: d, y: entries[d] }));
-  drawLineChart(canvas, points, { color: '#C8FF00' });
+  const toPoints = key => rows.flatMap((r, i) => r[key] === null ? [] : [{ i, y: r[key] }]);
+  drawLineChart(canvas, [
+    { color: '#C8FF00', points: toPoints('calculated') },
+    { color: '#3987E5', points: toPoints('entered'), dots: true },
+  ], rows.map(r => formatDietDateLabel(r.date)));
 }
 
 // ── Generic canvas chart helpers ────────────────────────────────────────────
@@ -7301,15 +7358,18 @@ function _chartSetup(canvas) {
   return { ctx, w, h };
 }
 
-function drawLineChart(canvas, points, opts = {}) {
+// series: [{ color, points: [{ i, y }], dots }], where i indexes into xLabels.
+// A series can skip days; its line joins the points it has.
+function drawLineChart(canvas, series, xLabels) {
   const { ctx, w, h } = _chartSetup(canvas);
-  if (points.length === 0) return;
+  const values = series.flatMap(s => s.points.map(p => p.y));
+  if (values.length === 0) return;
   const pad = { l: 36, r: 12, t: 12, b: 20 };
-  const values = points.map(p => p.y);
   const minY = Math.min(...values), maxY = Math.max(...values);
   const range = (maxY - minY) || 1;
   const plotW = w - pad.l - pad.r, plotH = h - pad.t - pad.b;
-  const color = opts.color || '#C8FF00';
+  const xAt = i => xLabels.length > 1 ? pad.l + (i / (xLabels.length - 1)) * plotW : pad.l + plotW / 2;
+  const yAt = y => h - pad.b - ((y - minY) / range) * plotH;
 
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
@@ -7320,31 +7380,28 @@ function drawLineChart(canvas, points, opts = {}) {
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText(maxY.toFixed(1), pad.l - 6, pad.t + 8);
-  ctx.fillText(minY.toFixed(1), pad.l - 6, h - pad.b);
-
-  if (points.length === 1) {
-    const x = pad.l + plotW / 2, y = h - pad.b - ((points[0].y - minY) / range) * plotH;
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
-    return;
+  ctx.fillText(maxY.toFixed(2), pad.l - 6, pad.t + 8);
+  ctx.fillText(minY.toFixed(2), pad.l - 6, h - pad.b);
+  ctx.fillText(xLabels[xLabels.length - 1], w - pad.r, h - 4);
+  if (xLabels.length > 1) {
+    ctx.textAlign = 'left';
+    ctx.fillText(xLabels[0], pad.l, h - 4);
   }
 
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  points.forEach((p, i) => {
-    const x = pad.l + (i / (points.length - 1)) * plotW;
-    const y = h - pad.b - ((p.y - minY) / range) * plotH;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
+  series.forEach(s => {
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    s.points.forEach((p, n) => {
+      if (n === 0) ctx.moveTo(xAt(p.i), yAt(p.y)); else ctx.lineTo(xAt(p.i), yAt(p.y));
+    });
+    ctx.stroke();
 
-  ctx.fillStyle = color;
-  points.forEach((p, i) => {
-    const x = pad.l + (i / (points.length - 1)) * plotW;
-    const y = h - pad.b - ((p.y - minY) / range) * plotH;
-    ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+    if (!s.dots && s.points.length > 1) return;
+    ctx.fillStyle = s.color;
+    s.points.forEach(p => {
+      ctx.beginPath(); ctx.arc(xAt(p.i), yAt(p.y), 2.5, 0, Math.PI * 2); ctx.fill();
+    });
   });
 }
 
@@ -7359,6 +7416,8 @@ async function loadHealthTab() {
   const weightDateEl = document.getElementById('summary-weight-date');
   if (weightDateEl && !weightDateEl.value) weightDateEl.value = todayStr();
   await renderWeightSection();
+  const weightScroll = document.getElementById('summary-weight-scroll');
+  if (weightScroll) weightScroll.scrollTop = weightScroll.scrollHeight; // newest day is the last row
 }
 
 function renderBpTable(log) {
