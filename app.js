@@ -119,6 +119,30 @@ function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
 
+// Android/desktop Chrome: the browser says when the app can be installed, and the
+// Install button replays that prompt. iOS has no equivalent, see ios-ath-banner.
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (!sessionStorage.getItem('install_dismissed')) document.getElementById('install-banner').classList.remove('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  document.getElementById('install-banner').classList.add('hidden');
+});
+
+async function installApp() {
+  if (!deferredInstallPrompt) return;
+  const promptEvent = deferredInstallPrompt;
+  deferredInstallPrompt = null; // a prompt can only be used once
+  document.getElementById('install-banner').classList.add('hidden');
+  promptEvent.prompt();
+  await promptEvent.userChoice;
+}
+
 // Fallback path — kept in case Google Identity Services hasn't taken over the
 // button (see initGoogleIdentityServices below). Both Firebase's own popup and
 // redirect helpers are unreliable across browsers: signInWithRedirect throws

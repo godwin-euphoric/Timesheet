@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=117">
+  <link rel="stylesheet" href="style.css?v=118">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -47,6 +47,12 @@
 
 <!-- ══ App ══════════════════════════════════════════════════════════════════ -->
 <div id="app" class="app hidden">
+
+  <div id="install-banner" class="ios-ath-banner hidden">
+    <span>Install <strong>Check-in</strong> on this device for the full app experience</span>
+    <button class="btn-primary install-btn" onclick="installApp()">Install</button>
+    <button class="ios-ath-dismiss" onclick="document.getElementById('install-banner').classList.add('hidden');sessionStorage.setItem('install_dismissed','1')">✕</button>
+  </div>
 
   <div id="ios-ath-banner" class="ios-ath-banner hidden">
     <span>Install: tap <strong>Share</strong> then <strong>Add to Home Screen</strong> for the full app experience</span>
@@ -860,7 +866,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=151"></script>
+<script src="app.js?v=152"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Timesheet/sw.js');
