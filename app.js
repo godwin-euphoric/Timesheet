@@ -152,6 +152,7 @@ async function installApp() {
 // because it polls popup.closed, which Chrome's Cross-Origin-Opener-Policy
 // enforcement silently blocks. Google Identity Services avoids both.
 function signInWithGoogle() {
+  if (isHomeScreenAppIOS()) { startSameWindowGoogleSignIn(); return; }
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   auth.signInWithPopup(provider).catch(e => {
@@ -164,11 +165,56 @@ const GOOGLE_OAUTH_CLIENT_ID = '1004023329023-9vqb3s7hsld3hodald9mghgloqfvuca2.a
 function handleGoogleCredential(response) {
   const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
   auth.signInWithCredential(credential).catch(e => {
+    document.getElementById('pwa-signin-overlay')?.classList.add('hidden');
     showToast('Sign-in failed: ' + (e.code || '?') + ' — ' + e.message, 0);
   });
 }
 
+// iOS home-screen apps: a sign-in popup can't hand its result back to the app, so Google's
+// page opens in the same window and returns the ID token in the URL fragment. The nonce is
+// kept in localStorage because sessionStorage doesn't survive that navigation (see above).
+// Needs GOOGLE_SIGNIN_RETURN_URL in the OAuth client's "Authorized redirect URIs".
+const GOOGLE_SIGNIN_RETURN_URL = 'https://godwin-euphoric.github.io/Timesheet/';
+
+function isHomeScreenAppIOS() {
+  return window.navigator.standalone === true;
+}
+
+function startSameWindowGoogleSignIn() {
+  const nonce = crypto.randomUUID();
+  localStorage.setItem('google_signin_nonce', nonce);
+  const params = new URLSearchParams({
+    client_id: GOOGLE_OAUTH_CLIENT_ID,
+    redirect_uri: GOOGLE_SIGNIN_RETURN_URL,
+    response_type: 'id_token',
+    scope: 'openid email profile',
+    prompt: 'select_account',
+    nonce,
+  });
+  location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+}
+
+function completeSameWindowGoogleSignIn() {
+  const params  = new URLSearchParams(location.hash.slice(1));
+  const idToken = params.get('id_token');
+  const error   = params.get('error');
+  if (!idToken && !error) return;
+  history.replaceState(null, '', location.pathname + location.search); // token out of the URL
+  const nonce = localStorage.getItem('google_signin_nonce');
+  localStorage.removeItem('google_signin_nonce');
+  if (error) {
+    if (error !== 'access_denied') showToast('Sign-in failed: ' + error, 0);
+    return;
+  }
+  const payload = JSON.parse(atob(idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+  if (!nonce || payload.nonce !== nonce) { showToast('Sign-in failed: please try again', 0); return; }
+  document.getElementById('pwa-signin-overlay')?.classList.remove('hidden');
+  handleGoogleCredential({ credential: idToken });
+}
+completeSameWindowGoogleSignIn();
+
 function initGoogleIdentityServices() {
+  if (isHomeScreenAppIOS()) return; // keeps the plain button, which uses the same-window flow
   if (!window.google?.accounts?.id) { setTimeout(initGoogleIdentityServices, 300); return; }
   const container = document.getElementById('gis-button-container');
   google.accounts.id.initialize({
