@@ -7229,6 +7229,7 @@ async function removeUser(uid, email) {
 // ══════════════════════════════════════════════════════════════════════════
 // Weight log + calorie table + line chart. Stored under summary_data, where the old Summary tab kept it.
 
+const WEIGHT_START_DATE       = '2026-10-31';
 const WEIGHT_START_KG         = 76.5;
 const WEIGHT_MAINTENANCE_KCAL = 2200;
 const WEIGHT_KCAL_PER_KG      = 7000;
@@ -7288,18 +7289,17 @@ async function saveWeightCalories(dateStr, field, value) {
   renderWeightSection();
 }
 
-// One row per day, first logged weight through today. A day with no calories logged
+// One row per day, WEIGHT_START_DATE through today. A day with no calories logged
 // carries the previous calculated weight forward instead of counting as 0 eaten.
 async function buildWeightRows() {
   const entries = await getWeightEntries();
   const dates   = Object.keys(entries).sort();
-  if (!dates.length) return [];
-  const today = todayStr();
-  const last  = dates[dates.length - 1] > today ? dates[dates.length - 1] : today;
+  const today   = todayStr();
+  const last    = dates[dates.length - 1] > today ? dates[dates.length - 1] : today;
 
   const rows = [];
   let prevWeight = WEIGHT_START_KG;
-  for (let d = dates[0]; d <= last; d = challenge100AddDays(d, 1)) {
+  for (let d = WEIGHT_START_DATE; d <= last; d = challenge100AddDays(d, 1)) {
     const mData   = await getRegMonthData(d.slice(0, 7));
     const logged  = dietCalcTotals(mData.days[d]?.foods || []).kcal;
     const cal     = state.weightCalories[d] || {};
