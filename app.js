@@ -3411,6 +3411,13 @@ function renderChallenge100Summary(participants, progress, frozen) {
   const daysLeftInfo = challenge100DaysLeftBreakdown();
   const overallDaysLeft = daysLeftInfo.total;
   const rankRows = s.ranked.map(r => {
+    if (r.cur >= 100) return `
+      <tr>
+        <td>${r.rank}</td>
+        <td>${r.name} 🏆</td>
+        <td></td>
+        <td></td>
+      </tr>`;
     const dot = r.diff >= 6 ? 'green' : r.diff === 5 ? 'yellow' : 'red';
     return `
       <tr>
@@ -3525,12 +3532,14 @@ function challenge100BuildDetailShareText(s) {
 
   const daysLeftInfo = challenge100DaysLeftBreakdown();
   const overallDaysLeft = daysLeftInfo.total;
-  const nameW = Math.max(4, ...s.ranked.map(r => r.name.length));
+  const nameW = Math.max(4, ...s.ranked.map(r => r.name.length + (r.cur >= 100 ? 3 : 0)));
   lines.push(
     '📋 Detailed Status',
     '```',
     `${'Rk'.padEnd(3)} ${'Name'.padEnd(nameW)} ${'Cnt'.padStart(4)}  Δ`,
-    ...s.ranked.map(r => `${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(r.cur).padStart(4)}  ${r.diff >= 0 ? '+' : ''}${r.diff}`),
+    ...s.ranked.map(r => r.cur >= 100
+      ? `${String(r.rank).padEnd(3)} ${r.name} 🏆`
+      : `${String(r.rank).padEnd(3)} ${r.name.padEnd(nameW)} ${String(r.cur).padStart(4)}  ${r.diff >= 0 ? '+' : ''}${r.diff}`),
     '```',
     '',
   );
@@ -7279,6 +7288,8 @@ const WEIGHT_START_DATE       = '2026-10-31';
 const WEIGHT_START_KG         = 76.5;
 const WEIGHT_MAINTENANCE_KCAL = 2200;
 const WEIGHT_KCAL_PER_KG      = 7000;
+// Estimated intensity per Diet tab workout: kcal = MET × kg × hours
+const WORKOUT_MET = { fitGYM: 5, fitMMA: 10, fitWalk: 3.5, fitCycle: 7, fitCricket: 5, fitSwim: 7, fitOthers: 4 };
 
 function summaryWeightRef() {
   return db.collection('users').doc(state.user.uid).collection('summary_data').doc('weight');
@@ -7322,16 +7333,22 @@ function saveWeightCell(dateStr, value) {
   return value.trim() === '' ? deleteWeightEntry(dateStr) : saveWeightEntry(dateStr, value);
 }
 
-async function saveWeightBurnt(dateStr, value) {
+// field is 'burnt' or 'eatenEdit'. Clearing the cell goes back to the Diet tab's figure.
+async function saveWeightCalories(dateStr, field, value) {
   const clear = value.trim() === '';
   const num   = parseFloat(value);
   if (!clear && (isNaN(num) || num < 0)) { showToast('Enter a valid calorie amount'); return; }
   const stored = clear ? firebase.firestore.FieldValue.delete() : num;
-  await summaryWeightRef().set({ calories: { [dateStr]: { burnt: stored } } }, { merge: true });
+  await summaryWeightRef().set({ calories: { [dateStr]: { [field]: stored } } }, { merge: true });
   await getWeightEntries();
   const day = state.weightCalories[dateStr] || (state.weightCalories[dateStr] = {});
-  if (clear) delete day.burnt; else day.burnt = num;
+  if (clear) delete day[field]; else day[field] = num;
   renderWeightSection();
+}
+
+function workoutKcal(workouts, weightKg) {
+  return Math.round(workouts.reduce((sum, w) =>
+    sum + (WORKOUT_MET[w.sub] || WORKOUT_MET.fitOthers) * weightKg * ((w.mins || 0) / 60), 0));
 }
 
 // One row per day, WEIGHT_START_DATE through today. A day with no calories logged
@@ -7346,8 +7363,10 @@ async function buildWeightRows() {
   let prevWeight = WEIGHT_START_KG;
   for (let d = WEIGHT_START_DATE; d <= last; d = challenge100AddDays(d, 1)) {
     const mData   = await getRegMonthData(d.slice(0, 7));
-    const eaten   = dietCalcTotals(mData.days[d]?.foods || []).kcal || null;
-    const burnt   = state.weightCalories[d]?.burnt ?? null;
+    const day     = mData.days[d] || {};
+    const cal     = state.weightCalories[d] || {};
+    const eaten   = cal.eatenEdit ?? (dietCalcTotals(day.foods || []).kcal || null);
+    const burnt   = cal.burnt ?? (workoutKcal(day.workouts || [], prevWeight) || null);
     const deficit = eaten === null ? null : WEIGHT_MAINTENANCE_KCAL - eaten;
     prevWeight -= ((deficit || 0) + (burnt || 0)) / WEIGHT_KCAL_PER_KG;
     rows.push({ date: d, burnt, eaten, deficit, calculated: prevWeight, entered: entries[d] ?? null });
@@ -7366,8 +7385,8 @@ async function renderWeightSection() {
     tbody.innerHTML = rows.length ? rows.map(r => `
       <tr>
         <td>${formatDietDateLabel(r.date)}</td>
-        <td>${cell(`weight-burnt-${r.date}`, r.burnt, `saveWeightBurnt('${r.date}', this.value)`)}</td>
-        <td>${r.eaten ?? '—'}</td>
+        <td>${cell(`weight-burnt-${r.date}`, r.burnt, `saveWeightCalories('${r.date}', 'burnt', this.value)`)}</td>
+        <td>${cell(`weight-eaten-${r.date}`, r.eaten, `saveWeightCalories('${r.date}', 'eatenEdit', this.value)`)}</td>
         <td>${r.deficit ?? '—'}</td>
         <td>${r.calculated.toFixed(2)}</td>
         <td>${cell(`weight-entered-${r.date}`, r.entered, `saveWeightCell('${r.date}', this.value)`)}</td>
