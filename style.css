@@ -1106,8 +1106,8 @@ textarea#fm-notes:focus {
   #tab-main > #main-monthdate-row            { order: 3; }
   #tab-main > .log-row                       { order: 4; }
   #tab-main > #main-dayentries-card          { order: 5; }
-  #tab-main > #main-summary-card             { order: 6; }
-  #tab-main > #main-typepie-card             { order: 7; }
+  #tab-main > #main-typepie-card             { order: 6; }
+  #tab-main > #main-summary-card             { order: 7; }
   #tab-main > #fm-tracker-card               { order: 8; }
   #tab-main > #main-media-container          { order: 9; }
   #tab-main > #main-notes-card               { order: 10; }

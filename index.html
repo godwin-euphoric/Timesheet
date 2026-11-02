@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=119">
+  <link rel="stylesheet" href="style.css?v=120">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -187,22 +187,6 @@
       <div id="day-entries-list"><span class="empty-inline">No entries for this date</span></div>
     </div>
 
-    <!-- Month Summary — below log controls -->
-    <div class="card" id="main-summary-card">
-      <div class="summary-card-header">
-        <div class="entries-label" id="entries-date-label" style="margin-bottom:0">Month Summary</div>
-        <button id="main-undo-btn" class="btn-undo hidden" onclick="undoMainAdjustment()">↩ Undo Adjustment</button>
-      </div>
-      <div class="table-scroll">
-        <table class="mini-table">
-          <thead><tr><th class="cb-col"></th><th>Category</th><th>Done</th><th>Target</th><th>Adjust</th><th>Pending</th></tr></thead>
-          <tbody id="entries-tbody"><tr><td colspan="6" class="empty">No categories yet</td></tr></tbody>
-        </table>
-      </div>
-      <div id="main-stats-row" class="main-stats-row"></div>
-    </div>
-
-
     <!-- Month pie charts: hours by Type, PROD / Office Prod splits, waste split -->
     <div class="card" id="main-typepie-card">
       <div class="card-title">Hours by Type</div>
@@ -224,6 +208,21 @@
           <div id="officeprod-pie"></div>
         </div>
       </div>
+    </div>
+
+    <!-- Month Summary — below log controls -->
+    <div class="card" id="main-summary-card">
+      <div class="summary-card-header">
+        <div class="entries-label" id="entries-date-label" style="margin-bottom:0">Month Summary</div>
+        <button id="main-undo-btn" class="btn-undo hidden" onclick="undoMainAdjustment()">↩ Undo Adjustment</button>
+      </div>
+      <div class="table-scroll">
+        <table class="mini-table">
+          <thead><tr><th class="cb-col"></th><th>Category</th><th>Done</th><th>Target</th><th>Adjust</th><th>Pending</th></tr></thead>
+          <tbody id="entries-tbody"><tr><td colspan="6" class="empty">No categories yet</td></tr></tbody>
+        </table>
+      </div>
+      <div id="main-stats-row" class="main-stats-row"></div>
     </div>
 
     <!-- FM Tracker Summary (shareable) -->
