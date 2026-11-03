@@ -626,13 +626,6 @@ td.sleep-cell:hover { background: #16243f !important; }
 .hwell-totals-row .hwell-row-label { color: var(--lime); }
 .hwell-total-cell { font-size: 11px; color: var(--muted); font-weight: 700; }
 
-.hwell-sleep-cell { padding: 6px 4px; }
-.hwell-sleep-input {
-  width: 42px; text-align: center; border: 1px solid var(--border); border-radius: 4px;
-  background: var(--card2); color: var(--text); font-size: 11px; padding: 3px 2px;
-}
-.hwell-sleep-input:focus { border-color: var(--primary); outline: none; }
-
 .hwell-row-drag {
   display: inline-block; width: 14px; margin-right: 4px; cursor: grab; color: var(--muted);
   font-size: 12px; vertical-align: middle; user-select: none;

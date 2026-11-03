@@ -2302,61 +2302,8 @@ function hwellBuildRow(item, section, days, mData, today) {
     <td class="hwell-row-label" title="${escHtml(item.label)}">${dragHandle}${removeBtn}${labelText}</td>${cells}</tr>`;
 }
 
-// Sleep Hours: two free-entry number rows (Prev Night / Day) instead of a plain checkbox —
-// not counted toward the Achieved total.
-function hwellBuildSleepRow(field, label, days, mData, today) {
-  const cells = days.map(d => {
-    const day = mData.days[d] || {};
-    const val = day[field] ?? '';
-    const dt  = new Date(d + 'T00:00:00');
-    const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
-    return `<td class="hwell-cell hwell-sleep-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
-      <input type="text" inputmode="decimal" class="hwell-sleep-input" placeholder="—"
-        value="${val}" onchange="onHwellSleepInput('${field}','${d}',this.value)">
-    </td>`;
-  }).join('');
-  return `<tr><td class="hwell-row-label">${label}</td>${cells}</tr>`;
-}
-
-async function onHwellSleepInput(field, dateStr, value) {
-  const month  = dateStr.slice(0, 7);
-  const mData  = await getHabitsMonthData(month);
-  const day    = habitsDayState(mData, dateStr);
-  const parsed = parseFloat(value);
-  day[field]   = value === '' || isNaN(parsed) ? '' : Math.max(0, Math.min(24, parsed));
-  await saveHabitsMonthData(month, mData);
-  await renderHwellGrid(state.habitsMonth); // reflect clamped/rejected value back into the box
-  await syncHwellSleepToMain(dateStr, day);
-}
-
-// Combines the Habits tab's Sleep Hours (Prev Night) + (Day) entries into the Main tab's
-// monthly sleep total for the "Avg Sleep (Mon)" stat chip. The Habits-tab boxes
-// are the authoritative source for that date's tracked sleep, so this overwrites rather
-// than adds to any prior value.
-async function syncHwellSleepToMain(dateStr, day) {
-  const night = parseFloat(day.sleepHoursNight) || 0;
-  const dayHrs = parseFloat(day.sleepHoursDay) || 0;
-  const total = night + dayHrs;
-  const month = dateStr.slice(0, 7);
-  const mainData = await getMonthData(month);
-  if (!mainData.sleep) mainData.sleep = {};
-  if (total > 0) mainData.sleep[dateStr] = Math.round(total * 100) / 100;
-  else delete mainData.sleep[dateStr];
-  await saveMonthData(month, mainData);
-  // Only refresh the Main tab's sleep chip live if it's actually the visible tab showing this
-  // month — otherwise it'll pick up the new data next time the user opens it (avoids an
-  // unnecessary getAllMonths() Firestore fetch on every Habits-tab keystroke).
-  const mainTabVisible = document.getElementById('tab-main')?.classList.contains('active');
-  if (mainTabVisible && state.mainMonth === month) {
-    try { await renderSleepAverages(mainData); } catch (e) { console.error('Sleep averages refresh failed', e); }
-  }
-  // Typing a value then clicking straight to the Monthly tab opens it before this save lands.
-  const monthlyTabVisible = document.getElementById('tab-monthly')?.classList.contains('active');
-  if (monthlyTabVisible && state.monthlyMonth === month) await loadMonthlyTab();
-}
-
 // Fills the Monthly sleep column for dates that have Habits sleep hours but no monthly value
-// (entries from before the sync above). Hours edited on the Monthly tab are left as they are.
+// (old entries from when the Habits grid had sleep rows). Hours edited on the Monthly tab are left as they are.
 async function fillMonthlySleepFromHabits(month, data) {
   const hData = await getHabitsMonthData(month);
   let changed = false;
@@ -2409,13 +2356,9 @@ async function renderHwellGrid(month) {
   }).join('');
   const totalsRow = `<tr class="hwell-totals-row"><td class="hwell-row-label">Achieved</td>${totalCells}</tr>`;
 
-  const sleepRows = hwellBuildSleepRow('sleepHoursNight', 'Sleep Hours (Prev Night)', days, mData, today) +
-    hwellBuildSleepRow('sleepHoursDay', 'Sleep Hours (Day)', days, mData, today);
-
   document.getElementById('hwell-grid-table').innerHTML =
     thead +
-    `<tbody>${groupRow('HABITS')}${wellnessRows}${hwellBuildAddRow('wellness', days)}` +
-    `${totalsRow}${groupRow('SLEEP')}${sleepRows}</tbody>`;
+    `<tbody>${groupRow('HABITS')}${wellnessRows}${hwellBuildAddRow('wellness', days)}${totalsRow}</tbody>`;
 }
 
 // True once any habit on the day has been marked (ticked or crossed).
