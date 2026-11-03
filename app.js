@@ -3621,6 +3621,63 @@ ${text}
   throw new Error('Gemini returned an unparseable response: ' + cleaned.slice(0, 200));
 }
 
+// Pasted chat → fills the week's column directly (no review step). Only empty cells are filled:
+// a participant who already has a value for that week is left alone, and anyone Gemini finds
+// no day number for stays blank.
+async function challenge100FillFromPaste() {
+  const ta   = document.getElementById('c100-chat-paste');
+  const text = ta.value.trim();
+  const mondayDate = document.getElementById('c100-upload-monday')?.value;
+  if (!text) { showToast('Paste the chat first'); return; }
+  if (!mondayDate) return;
+
+  await loadDietSettings();
+  if (!state.dietSettings?.geminiApiKey) {
+    showToast('Set your Gemini API key in Settings → Diet Settings first', 0);
+    return;
+  }
+
+  const userData = await getUserData();
+  // Frozen participants are excluded entirely — no new entries should ever land for them again.
+  const participants = userData.challenge100Participants.filter(n => !userData.challenge100Frozen.includes(n));
+  if (!participants.length) { showToast('Add participants first', 0); return; }
+  const isFilled = name => {
+    const v = (userData.challenge100Progress[mondayDate] || {})[name];
+    return v !== undefined && v !== null;
+  };
+  const toFill = participants.filter(n => !isFilled(n));
+  if (!toFill.length) { showToast(`Everyone already has a value for ${challenge100DateLabel(mondayDate)} — nothing to fill`); return; }
+
+  const btn = document.getElementById('c100-paste-btn');
+  const btnOriginalText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Gemini is analyzing...'; }
+
+  try {
+    const dayByName = await extractChallenge100DaysViaGemini(text, toFill, userData.challenge100CorrectionNotes);
+    const week = userData.challenge100Progress[mondayDate] || {};
+    let filled = 0;
+    toFill.forEach(name => {
+      const day = parseInt(dayByName[name], 10);
+      if (isNaN(day) || day < 0) return;
+      week[name] = day;
+      filled++;
+    });
+    if (filled) {
+      userData.challenge100Progress[mondayDate] = week;
+      await saveUserData({ challenge100Progress: userData.challenge100Progress });
+      renderChallenge100Table(userData.challenge100Participants, userData.challenge100Progress);
+    }
+    ta.value = '';
+    const kept = participants.length - toFill.length;
+    showToast(`Filled ${filled} · already filled ${kept} · not in chat ${toFill.length - filled}`, 6000);
+  } catch (e) {
+    console.error('100 Days Challenge paste fill failed', e);
+    showToast('Fill failed: ' + e.message, 0);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = btnOriginalText; }
+  }
+}
+
 async function challenge100FileSelected(input) {
   const file = input.files[0];
   const mondayDate = state.challenge100UploadTarget;

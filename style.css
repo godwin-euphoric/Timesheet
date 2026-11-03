@@ -672,6 +672,7 @@ td.sleep-cell:hover { background: #16243f !important; }
 }
 .c100-bulk-textarea:focus { outline: none; border-color: var(--primary); }
 .c100-bulk-textarea::placeholder { color: var(--muted); }
+.c100-chat-paste { min-height: 140px; margin-bottom: 10px; }
 
 .c100-table th {
   padding: 8px 12px; font-size: 11px; font-weight: 700;
