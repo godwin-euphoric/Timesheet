@@ -59,7 +59,6 @@ const state = {
   weightEntries:    null,
   weightCalories:   null,
   // 100 Days Challenge tab
-  challenge100UploadTarget: null,
   challenge100EntryMode: 'upload', // 'upload' (default) or 'manual' — controls whether the current-week column is editable
 };
 
@@ -3577,17 +3576,6 @@ async function challenge100ShareDetailSummary() {
 
 // ── WhatsApp export parsing ──────────────────────────────────────────────────
 
-function challenge100TriggerUpload(mondayDate) {
-  state.challenge100UploadTarget = mondayDate;
-  document.getElementById('challenge100-file-input').click();
-}
-
-function challenge100TriggerUploadFromSelect() {
-  const sel = document.getElementById('c100-upload-monday');
-  if (!sel || !sel.value) return;
-  challenge100TriggerUpload(sel.value);
-}
-
 // Sends the raw chat export + registered participant list to Gemini (same key/pipeline as
 // the Diet tab's callGemini) and asks it to find, per participant, the highest "Day N" they
 // mentioned anywhere in the export. Real exports use too many inconsistent formats/typos for
@@ -3678,85 +3666,7 @@ async function challenge100FillFromPaste() {
   }
 }
 
-async function challenge100FileSelected(input) {
-  const file = input.files[0];
-  const mondayDate = state.challenge100UploadTarget;
-  input.value = '';
-  if (!file || !mondayDate) return;
-  if (typeof JSZip === 'undefined') { showToast('Refresh the page and try again (zip library not loaded)', 0); return; }
-
-  await loadDietSettings();
-  if (!state.dietSettings?.geminiApiKey) {
-    showToast('Set your Gemini API key in Settings → Diet Settings first', 0);
-    return;
-  }
-
-  const btn = document.getElementById('c100-upload-btn');
-  const btnOriginalText = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Reading file...'; }
-
-  try {
-    const isPlainText = /\.txt$/i.test(file.name);
-    let text;
-
-    if (isPlainText) {
-      // Some phones share the "Export chat → Without Media" result as a .txt directly
-      // instead of zipping it — read it as-is, no unzip needed.
-      text = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload  = e => resolve(e.target.result);
-        reader.onerror = reject;
-        reader.readAsText(file);
-      });
-    } else {
-      const buf = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload  = e => resolve(e.target.result);
-        reader.onerror = reject;
-        reader.readAsArrayBuffer(file);
-      });
-      let zip;
-      try {
-        zip = await JSZip.loadAsync(buf);
-      } catch (zipErr) {
-        throw new Error(`"${file.name}" doesn't look like a valid zip file (${zipErr.message}). If your phone shared the chat as a .txt file instead of a .zip, that's fine too — just pick that file directly.`);
-      }
-      const chatFileName = Object.keys(zip.files).find(n => /\.txt$/i.test(n) && !zip.files[n].dir);
-      if (!chatFileName) throw new Error('No chat .txt file found inside the zip.');
-      text = await zip.files[chatFileName].async('string');
-    }
-
-    const userData  = await getUserData();
-    // Frozen participants are excluded entirely — no new entries should ever land for them again.
-    const participants = userData.challenge100Participants.filter(n => !userData.challenge100Frozen.includes(n));
-    if (!participants.length) { showToast('Add participants first', 0); return; }
-
-    if (btn) btn.textContent = '⏳ Gemini is analyzing...';
-    showToast('Analyzing chat with Gemini... this can take a moment — stay on this page', 6000);
-    const dayByName = await extractChallenge100DaysViaGemini(text, participants, userData.challenge100CorrectionNotes);
-
-    // Gemini's results are staged for review, not written to the table directly — see
-    // renderChallenge100ReviewPanel / challenge100ApproveReview / challenge100SaveReviewEdit.
-    const pendingForWeek = {};
-    participants.forEach(name => {
-      const day = dayByName[name];
-      pendingForWeek[name] = (day === null || day === undefined) ? null : day;
-    });
-    userData.challenge100PendingReview[mondayDate] = pendingForWeek;
-    await saveUserData({ challenge100PendingReview: userData.challenge100PendingReview });
-    renderChallenge100ReviewPanel();
-
-    const foundCount = Object.values(pendingForWeek).filter(v => v !== null).length;
-    showToast(`Gemini found updates for ${foundCount}/${participants.length} participants — review below before it's saved`, 6000);
-  } catch (e) {
-    console.error('100 Days Challenge import failed', e);
-    showToast('Upload failed: ' + e.message, 0);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = btnOriginalText; }
-  }
-}
-
-// ── Review / approve Gemini results ──────────────────────────────────────────
+// ── Review / approve Gemini results (left over from the old file upload) ─────
 
 function challenge100ReviewKey(mondayDate, encodedName) {
   return `${mondayDate}__${encodedName}`;
