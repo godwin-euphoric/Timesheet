@@ -641,12 +641,14 @@ function renderAvgBars(data) {
     const tip = b.found
       ? `${b.label}: ${b.avg} hrs/day (${b.total} hrs over ${days} days)`
       : `${b.label}: no category with this name this month`;
-    const w = b.avg > 0 ? `max(3px, ${(b.avg / max * 100).toFixed(1)}%)` : '0';
+    const h = b.avg > 0 ? `max(3px, ${(b.avg / max * 100).toFixed(1)}%)` : '0';
     return `
-    <div class="avg-bar-row" title="${escHtml(tip)}">
-      <span class="avg-bar-name">${escHtml(b.label)}</span>
-      <span class="avg-bar-track"><span class="avg-bar-fill" style="width:${w}"></span></span>
-      <span class="avg-bar-val">${b.found ? b.avg + ' h' : '—'}</span>
+    <div class="avg-col" title="${escHtml(tip)}">
+      <span class="avg-col-plot">
+        <span class="avg-col-val">${b.found ? b.avg + ' h' : '—'}</span>
+        <span class="avg-col-fill" style="height:${h}"></span>
+      </span>
+      <span class="avg-col-name">${escHtml(b.label)}</span>
     </div>`;
   }).join('');
 }

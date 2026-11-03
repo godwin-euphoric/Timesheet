@@ -2146,18 +2146,22 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
   .pie-cell .type-pie-svg { width: 130px; height: 130px; }
 }
 
-/* Daily average bars under the pies: name | bar | value */
+/* Daily average columns under the pies: value on top, bar grows up from a shared baseline, name below */
 .avg-bars-block { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
 .avg-bars-block .pie-cell-title { text-align: left; }
-#avg-bars { display: flex; flex-direction: column; gap: 6px; max-width: 760px; }
-.avg-bar-row { display: grid; grid-template-columns: 120px 1fr 64px; align-items: center; gap: 12px; padding: 3px 0; border-radius: 4px; }
-.avg-bar-row:hover { background: var(--card2); }
-.avg-bar-name { color: var(--text); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.avg-bar-track { height: 14px; }
-.avg-bar-fill { display: block; height: 100%; background: #3987e5; border-radius: 0 4px 4px 0; }
-.avg-bar-val { color: var(--text); font-size: 13px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
-@media (max-width: 420px) {
-  .avg-bar-row { grid-template-columns: 96px 1fr 52px; gap: 8px; }
+#avg-bars { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.avg-col { display: flex; flex-direction: column; border-radius: 4px; }
+.avg-col:hover { background: var(--card2); }
+.avg-col-plot { height: 200px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; border-bottom: 1px solid var(--border); padding-top: 24px; }
+.avg-col-val { color: var(--text); font-size: 13px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.avg-col-fill { display: block; flex-shrink: 0; width: 100%; max-width: 48px; background: #3987e5; border-radius: 4px 4px 0 0; }
+.avg-col-name { color: var(--text); font-size: 13px; text-align: center; padding: 8px 2px 4px; line-height: 1.25; overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  #avg-bars { gap: 4px; }
+  .avg-col-plot { height: 160px; }
+  .avg-col-val { font-size: 11px; }
+  /* Columns are too narrow for words like "Unwanted": run names bottom-to-top instead */
+  .avg-col-name { font-size: 11px; writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; align-self: center; text-align: right; padding: 4px 0 8px; }
 }
 
 /* FM - SS weekly line (own card at the top of the main tab) */
