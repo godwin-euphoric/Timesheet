@@ -579,6 +579,8 @@ td.sleep-cell:hover { background: #16243f !important; }
 
 /* Month grid (columns = every date of the month, rows = fixed checklist items) */
 #tab-habits { overflow-x: clip; }
+#tab-habits .table-scroll { scrollbar-width: none; }
+#tab-habits .table-scroll::-webkit-scrollbar { display: none; }
 .hwell-grid-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 13px; }
 .hwell-grid-table th {
   padding: 10px 12px; font-size: 11px; font-weight: 700;
@@ -2142,6 +2144,20 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 @media (max-width: 420px) {
   .pie-cell .type-pie-svg { width: 130px; height: 130px; }
+}
+
+/* Daily average bars under the pies: name | bar | value */
+.avg-bars-block { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
+.avg-bars-block .pie-cell-title { text-align: left; }
+#avg-bars { display: flex; flex-direction: column; gap: 6px; max-width: 760px; }
+.avg-bar-row { display: grid; grid-template-columns: 120px 1fr 64px; align-items: center; gap: 12px; padding: 3px 0; border-radius: 4px; }
+.avg-bar-row:hover { background: var(--card2); }
+.avg-bar-name { color: var(--text); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avg-bar-track { height: 14px; }
+.avg-bar-fill { display: block; height: 100%; background: #3987e5; border-radius: 0 4px 4px 0; }
+.avg-bar-val { color: var(--text); font-size: 13px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 420px) {
+  .avg-bar-row { grid-template-columns: 96px 1fr 52px; gap: 8px; }
 }
 
 /* FM - SS weekly line (own card at the top of the main tab) */

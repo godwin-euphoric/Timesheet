@@ -594,6 +594,63 @@ function renderTypeSplitPies(data) {
   });
 }
 
+// ── Daily average bars (month so far, today included) ─────────────────────
+// A bar sums every category whose name matches one of its names (normType),
+// so variants like "Story" / "Story Book" land in the same bar.
+const AVG_BARS = [
+  { label: 'AI Study',       names: ['aistudy'] },
+  { label: 'AI Office',      names: ['aioffice'] },
+  { label: 'FM Other',       names: ['fmother'] },
+  { label: 'FM SS',          names: ['fmss'] },
+  { label: 'Unwanted',       waste: 'Unwanted' },
+  { label: 'Fitness & Body', names: ['fitnessbody', 'fitness'] },
+  { label: 'GK',             names: ['gk'] },
+  { label: 'StoryBook',      names: ['story', 'storybook', 'storybooks'] },
+  { label: 'Movies',         names: ['movies', 'movie'] },
+];
+
+function renderAvgBars(data) {
+  const box = document.getElementById('avg-bars');
+  if (!box || !data) return;
+  const [y, m] = state.mainMonth.split('-').map(Number);
+  const now = new Date();
+  const cur = now.getFullYear() * 12 + now.getMonth(), sel = y * 12 + m - 1;
+  const days = sel < cur ? daysInMonth(y, m) : sel === cur ? now.getDate() : 0;
+  document.getElementById('avg-bars-days').textContent = days ? `${days} day${days > 1 ? 's' : ''}` : '';
+  if (!days) { box.innerHTML = `<span class="empty-inline">This month hasn't started yet</span>`; return; }
+
+  const today = todayStr();
+  const r2 = n => Math.round(n * 100) / 100;
+  const bars = AVG_BARS.map(b => {
+    let hrs = 0, found = true;
+    if (b.waste) {
+      const dates = new Set([...Object.keys(data.wastedBreakdown || {}), ...Object.keys(data.wastedEntries || {})]);
+      dates.forEach(ds => { if (ds <= today) hrs += getWastedBreakdown(data, ds)[b.waste] || 0; });
+    } else {
+      const cats = (data.categories || []).filter(c => b.names.includes(normType(c.category)));
+      found = cats.length > 0;
+      Object.entries(data.entries || {}).forEach(([ds, dayE]) => {
+        if (ds <= today) cats.forEach(c => { hrs += dayE[c.category] || 0; });
+      });
+    }
+    return { ...b, found, total: r2(hrs), avg: r2(hrs / days) };
+  }).sort((a, b) => b.avg - a.avg);
+
+  const max = Math.max(...bars.map(b => b.avg)) || 1;
+  box.innerHTML = bars.map(b => {
+    const tip = b.found
+      ? `${b.label}: ${b.avg} hrs/day (${b.total} hrs over ${days} days)`
+      : `${b.label}: no category with this name this month`;
+    const w = b.avg > 0 ? `max(3px, ${(b.avg / max * 100).toFixed(1)}%)` : '0';
+    return `
+    <div class="avg-bar-row" title="${escHtml(tip)}">
+      <span class="avg-bar-name">${escHtml(b.label)}</span>
+      <span class="avg-bar-track"><span class="avg-bar-fill" style="width:${w}"></span></span>
+      <span class="avg-bar-val">${b.found ? b.avg + ' h' : '—'}</span>
+    </div>`;
+  }).join('');
+}
+
 // ── FM - SS weekly hours line (last 12 weeks, Mon–Sun) ───────────────────
 const FMSS_WEEKS = 12;
 
@@ -764,6 +821,7 @@ async function loadMonthlySummary(data) {
   document.getElementById('productive-hours-chip').textContent = totalProductive + ' hrs';
   renderTypePie(data);
   renderTypeSplitPies(data);
+  renderAvgBars(data);
   renderFmssWeeklyLine().catch(e => console.error('FM - SS weekly chart failed', e));
 
   const tbody = document.getElementById('entries-tbody');
@@ -1150,6 +1208,7 @@ async function logWastedTime() {
 function renderWastedMonthSummary(data) {
   if (!data) return;
   renderWastePie(data);
+  renderAvgBars(data);
   const wastedEntries = data.wastedEntries || {};
   let total = 0;
   Object.values(wastedEntries).forEach(arr => arr.forEach(e => { total += e.hours || 0; }));
