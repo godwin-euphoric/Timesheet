@@ -608,6 +608,7 @@ const AVG_BARS = [
   { label: 'GK',             names: ['gk'] },
   { label: 'StoryBook',      names: ['story', 'storybook', 'storybooks'] },
   { label: 'Movies',         names: ['movies', 'movie'] },
+  { label: 'Books',          names: ['books', 'book', 'bookreading', 'reading'] },
 ];
 
 function renderAvgBars(data) {
