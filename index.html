@@ -599,6 +599,19 @@
 
   <!-- ══ GOALS (Google Sheet) ═══════════════════════════════════════════════ -->
   <div id="tab-goals" class="tab-content">
+    <div class="card hidden" id="gsheet-sheets-card">
+      <div class="planner-nav">
+        <div class="planner-sub-tabs" id="gsheet-sub-tabs"></div>
+      </div>
+      <div id="gsheet-filter-bar"></div>
+      <div class="table-scroll" style="margin-top:12px">
+        <table class="planner-table" id="gsheet-table"></table>
+      </div>
+      <div class="planner-add-btns">
+        <button class="btn-planner-add-row" onclick="gsheetAddRow()">+ Row</button>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title">🔗 Goals — Google Sheet</div>
       <p class="hint">Edits here save straight to your Google Sheet, and changes made in the sheet show up here when you open this tab or click Refresh. Formula cells (grey) are read-only here — they recalculate in the sheet.</p>
@@ -613,19 +626,6 @@
         <button class="btn-secondary" onclick="gsheetUnlink()">Unlink</button>
       </div>
       <span id="gsheet-status" class="hint" style="display:block;margin-top:6px"></span>
-    </div>
-
-    <div class="card hidden" id="gsheet-sheets-card">
-      <div class="planner-nav">
-        <div class="planner-sub-tabs" id="gsheet-sub-tabs"></div>
-      </div>
-      <div id="gsheet-filter-bar"></div>
-      <div class="table-scroll" style="margin-top:12px">
-        <table class="planner-table" id="gsheet-table"></table>
-      </div>
-      <div class="planner-add-btns">
-        <button class="btn-planner-add-row" onclick="gsheetAddRow()">+ Row</button>
-      </div>
     </div>
   </div>
 
