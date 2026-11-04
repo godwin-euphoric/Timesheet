@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=126">
+  <link rel="stylesheet" href="style.css?v=127">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -599,6 +599,14 @@
 
   <!-- ══ GOALS (Google Sheet) ═══════════════════════════════════════════════ -->
   <div id="tab-goals" class="tab-content">
+    <div id="gsheet-linked" class="gsheet-toolbar hidden">
+      <button class="btn-primary hidden" id="gsheet-connect-btn" onclick="gsheetConnect()">Connect Google</button>
+      <button class="btn-secondary" onclick="gsheetLoad()">⟳ Refresh</button>
+      <a class="btn-secondary gsheet-open-link" id="gsheet-open-link" target="_blank" rel="noopener">Open in Google Sheets ↗</a>
+      <button class="btn-secondary" onclick="gsheetUnlink()">Unlink</button>
+      <span id="gsheet-status" class="hint gsheet-status"></span>
+    </div>
+
     <div class="card hidden" id="gsheet-sheets-card">
       <div class="planner-nav">
         <div class="planner-sub-tabs" id="gsheet-sub-tabs"></div>
@@ -619,13 +627,6 @@
         <input type="text" id="gsheet-link-input" class="gsheet-link-input" placeholder="Paste the Google Sheet link">
         <button class="btn-primary" onclick="gsheetLinkFromInput()">Link Sheet</button>
       </div>
-      <div id="gsheet-linked" class="add-row hidden">
-        <button class="btn-primary hidden" id="gsheet-connect-btn" onclick="gsheetConnect()">Connect Google</button>
-        <button class="btn-secondary" onclick="gsheetLoad()">⟳ Refresh</button>
-        <a class="btn-secondary gsheet-open-link" id="gsheet-open-link" target="_blank" rel="noopener">Open in Google Sheets ↗</a>
-        <button class="btn-secondary" onclick="gsheetUnlink()">Unlink</button>
-      </div>
-      <span id="gsheet-status" class="hint" style="display:block;margin-top:6px"></span>
     </div>
   </div>
 

@@ -1387,6 +1387,8 @@ textarea#fm-notes:focus {
 
 /* Goals tab (Google Sheet) */
 .gsheet-link-input { flex: 1; min-width: 0; }
+.gsheet-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.gsheet-status { margin: 0 0 0 4px; }
 #tab-goals .table-scroll { scrollbar-color: rgba(148,163,184,0.35) transparent; }
 .gsheet-open-link { text-decoration: none; display: inline-flex; align-items: center; }
 #gsheet-table th.planner-col-th { min-width: 140px; }
