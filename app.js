@@ -250,6 +250,8 @@ auth.onAuthStateChanged(user => {
   state.userRole         = null;
   state.weightEntries    = null;
   state.weightCalories   = null;
+  state.gsheet           = null;
+  state.gsPending        = [];
 
   if (user) {
     document.getElementById('pwa-signin-overlay')?.classList.add('hidden');
@@ -369,7 +371,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, excelimport: loadExcelImportTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
+    ({ main: loadMainTab, monthly: loadMonthlyTab, yearly: loadYearlyTab, habits: loadHabitsTab, challenge100: loadChallenge100Tab, excelimport: loadExcelImportTab, goals: loadGoalsTab, planner: loadPlannerTab, settings: loadSettingsTab, regimen: loadRegimenTab, admin: loadAdminTab, health: loadHealthTab })[btn.dataset.tab]?.();
   });
 });
 
@@ -2941,6 +2943,396 @@ function endExcelImportRowResize() {
   sheet.rowHeights[ri] = ta ? ta.style.height : '';
   renderExcelImportSheetTable();
   scheduleExcelImportSave();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  GOALS TAB (live Google Sheet)
+// ══════════════════════════════════════════════════════════════════════════
+// Reads and writes a native Google Sheet through the Sheets API, so the sheet
+// stays the single source of truth: an edit here is written to the cell
+// straight away, and edits made in Google Sheets show up on the next load or
+// Refresh. Only the link (goalSheetId) is stored in Firestore.
+// Sign-in uses ID tokens, which can't call the Sheets API, so a separate
+// access token is requested with the same OAuth client (GIS token client).
+// It lasts an hour and is kept in localStorage; requesting a new one needs a
+// click (a popup), hence the Connect button. Edits made while disconnected are
+// queued and written once reconnected. Formula cells are read-only here.
+
+const GSHEET_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+
+function gsheetTokenKey() { return 'gsheet_token_' + (state.user?.uid || ''); }
+
+function gsheetToken() {
+  try {
+    const t = JSON.parse(localStorage.getItem(gsheetTokenKey()) || 'null');
+    return t && t.exp > Date.now() + 60000 ? t.token : null;
+  } catch { return null; }
+}
+
+function gsheetSaveToken(token, expiresIn) {
+  try { localStorage.setItem(gsheetTokenKey(), JSON.stringify({ token, exp: Date.now() + expiresIn * 1000 })); } catch {}
+}
+
+function gsheetClearToken() {
+  try { localStorage.removeItem(gsheetTokenKey()); } catch {}
+}
+
+function gsQuote(title) { return `'${title.replace(/'/g, "''")}'`; }
+
+function gsColName(ci) {
+  let s = '';
+  for (let n = ci + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s;
+  return s;
+}
+
+function gsColIndex(letters) {
+  return [...letters].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+}
+
+// Accepts a full Google Sheets link or a bare spreadsheet ID.
+function gsParseSheetId(text) {
+  const t = (text || '').trim();
+  const m = t.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  return /^[a-zA-Z0-9_-]{25,}$/.test(t) ? t : null;
+}
+
+async function gsApi(path, opts = {}) {
+  const token = gsheetToken();
+  if (!token) throw Object.assign(new Error('Click "Connect Google" to continue'), { code: 'auth' });
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${state.goalSheetId}${path}`, {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    gsheetClearToken();
+    throw Object.assign(new Error('Google access expired — click "Connect Google"'), { code: 'auth' });
+  }
+  if (!res.ok) {
+    const msg = body.error?.message || `HTTP ${res.status}`;
+    if (/not supported for this document/i.test(msg)) throw new Error('That file is still an .xlsx — open it in Google Sheets, use File → Save as Google Sheets, and link the new copy');
+    throw new Error(msg);
+  }
+  return body;
+}
+
+async function loadGoalsTab() {
+  const ud = await getUserData();
+  state.goalSheetId = ud.goalSheetId || null;
+  state.gsPending = state.gsPending || [];
+  renderGsheetPanel();
+  if (state.goalSheetId && gsheetToken()) await gsheetLoad();
+  else if (state.gsheet) renderGsheetSheet();
+}
+
+function renderGsheetPanel() {
+  const linked    = !!state.goalSheetId;
+  const connected = !!gsheetToken();
+  document.getElementById('gsheet-unlinked').classList.toggle('hidden', linked);
+  document.getElementById('gsheet-linked').classList.toggle('hidden', !linked);
+  document.getElementById('gsheet-connect-btn').classList.toggle('hidden', connected);
+  document.getElementById('gsheet-sheets-card').classList.toggle('hidden', !linked || !state.gsheet);
+  if (linked) document.getElementById('gsheet-open-link').href = `https://docs.google.com/spreadsheets/d/${state.goalSheetId}/edit`;
+
+  const status  = document.getElementById('gsheet-status');
+  const pending = state.gsPending?.length || 0;
+  if (!linked)          status.textContent = '';
+  else if (!connected)  status.textContent = pending
+    ? `${pending} edit${pending > 1 ? 's' : ''} not saved yet — click "Connect Google" to save ${pending > 1 ? 'them' : 'it'}.`
+    : 'Click "Connect Google" to load your sheet (needed about once an hour).';
+  else if (state.gsheet) status.textContent = `${state.gsheet.title} — synced ${new Date(state.gsheet.syncedAt).toLocaleTimeString()}`;
+  else                  status.textContent = 'Loading…';
+}
+
+function gsheetLinkFromInput() {
+  const id = gsParseSheetId(document.getElementById('gsheet-link-input').value);
+  if (!id) { showToast('That doesn\'t look like a Google Sheets link'); return; }
+  state.goalSheetId = id;
+  state.gsheet = null;
+  saveUserData({ goalSheetId: id });
+  renderGsheetPanel();
+  // Called inside the click so the browser allows Google's consent popup.
+  if (gsheetToken()) gsheetLoad(); else gsheetConnect();
+}
+
+async function gsheetUnlink() {
+  if (!confirm('Unlink this Google Sheet? The sheet itself is not changed.')) return;
+  state.goalSheetId = null;
+  state.gsheet = null;
+  state.gsPending = [];
+  await saveUserData({ goalSheetId: null });
+  renderGsheetPanel();
+}
+
+function gsheetConnect() {
+  if (!window.google?.accounts?.oauth2) { showToast('Google library still loading — try again in a moment'); return; }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_OAUTH_CLIENT_ID,
+    scope: GSHEET_SCOPE,
+    login_hint: state.user?.email || '',
+    callback: async resp => {
+      if (resp.error || !google.accounts.oauth2.hasGrantedAllScopes(resp, GSHEET_SCOPE)) {
+        showToast('Google Sheets access was not granted');
+        return;
+      }
+      gsheetSaveToken(resp.access_token, +resp.expires_in || 3600);
+      renderGsheetPanel();
+      await gsheetFlushPending();
+      await gsheetLoad();
+    },
+    error_callback: err => {
+      if (err.type !== 'popup_closed') showToast('Google connect failed: ' + (err.message || err.type), 0);
+    },
+  });
+  client.requestAccessToken();
+}
+
+// Builds a grid where rows[ri].r[ci] is the cell at row ri+1, column ci, so
+// indexes map straight to A1 references even when the data doesn't start at A1.
+function gsheetBuildGrid(vr, fr, minRows = 1, minCols = 1) {
+  const m = (vr.range || '').split('!').pop().match(/^([A-Z]+)(\d+)/);
+  const offC = m ? gsColIndex(m[1]) : 0, offR = m ? +m[2] - 1 : 0;
+  const vals = vr.values || [], forms = fr.values || [];
+  const nRows = Math.max(minRows, offR + vals.length);
+  const nCols = Math.max(minCols, offC + Math.max(0, ...vals.map(r => r.length), ...forms.map(r => r.length)));
+  const rows = [], formulas = [];
+  for (let ri = 0; ri < nRows; ri++) {
+    const v = vals[ri - offR] || [], f = forms[ri - offR] || [];
+    rows.push({ r: Array.from({ length: nCols }, (_, ci) => String(v[ci - offC] ?? '')) });
+    const fRow = [];
+    f.forEach((x, i) => { if (typeof x === 'string' && x.startsWith('=')) fRow[i + offC] = x; });
+    formulas.push(fRow);
+  }
+  return { rows, formulas };
+}
+
+async function gsheetLoad() {
+  if (!state.goalSheetId) return;
+  try {
+    const meta   = await gsApi('?fields=properties.title,sheets.properties(sheetId,title)');
+    const titles = meta.sheets.map(s => s.properties.title);
+    const ranges = titles.map(t => 'ranges=' + encodeURIComponent(gsQuote(t))).join('&');
+    const [vals, forms] = await Promise.all([
+      gsApi(`/values:batchGet?${ranges}&valueRenderOption=FORMATTED_VALUE`),
+      gsApi(`/values:batchGet?${ranges}&valueRenderOption=FORMULA`),
+    ]);
+    const prev = state.gsheet;
+    state.gsheet = {
+      title: meta.properties.title,
+      syncedAt: Date.now(),
+      sheets: meta.sheets.map((s, i) => ({
+        name: s.properties.title,
+        sheetId: s.properties.sheetId,
+        ...gsheetBuildGrid(vals.valueRanges[i], forms.valueRanges[i]),
+      })),
+    };
+    if (!prev || !state.gsheet.sheets.some(s => s.name === state.gsheetActive)) {
+      // Open on the sheet with the most rows (the main goal list) the first time.
+      state.gsheetActive = [...state.gsheet.sheets].sort((a, b) => b.rows.length - a.rows.length)[0]?.name;
+    }
+    renderGsheetPanel();
+    renderGsheetSubTabs();
+    renderGsheetSheet();
+  } catch (e) {
+    console.error(e);
+    renderGsheetPanel();
+    showToast('Google Sheet: ' + e.message, 0);
+  }
+}
+
+// Re-reads one sheet after an edit so formula results update. Cells are
+// patched in place so a cell being typed into isn't wiped by a re-render.
+const gsReloadTimers = {};
+function gsheetQueueReload(name) {
+  clearTimeout(gsReloadTimers[name]);
+  gsReloadTimers[name] = setTimeout(() => gsheetReloadSheet(name).catch(e => showToast('Google Sheet: ' + e.message)), 700);
+}
+
+async function gsheetReloadSheet(name) {
+  const r = encodeURIComponent(gsQuote(name));
+  const [v, f] = await Promise.all([
+    gsApi(`/values/${r}?valueRenderOption=FORMATTED_VALUE`),
+    gsApi(`/values/${r}?valueRenderOption=FORMULA`),
+  ]);
+  const sheet = state.gsheet?.sheets.find(s => s.name === name);
+  if (!sheet) return;
+  const grid = gsheetBuildGrid(v, f, sheet.rows.length, sheet.rows[0]?.r.length || 1);
+  const sameShape = grid.rows.length === sheet.rows.length && grid.rows[0].r.length === sheet.rows[0].r.length;
+  sheet.rows = grid.rows;
+  sheet.formulas = grid.formulas;
+  state.gsheet.syncedAt = Date.now();
+  renderGsheetPanel();
+  if (name !== state.gsheetActive) return;
+  if (!sameShape && !document.activeElement?.closest('#gsheet-table')) { renderGsheetSheet(); return; }
+  document.querySelectorAll('#gsheet-table [data-ri]').forEach(el => {
+    if (el === document.activeElement) return;
+    const ri = +el.dataset.ri, ci = +el.dataset.ci;
+    el.value = sheet.rows[ri]?.r[ci] ?? '';
+    if (el.tagName === 'TEXTAREA') autoResizeTa(el);
+  });
+}
+
+function gsheetActiveSheet() {
+  return state.gsheet?.sheets.find(s => s.name === state.gsheetActive);
+}
+
+function renderGsheetSubTabs() {
+  document.getElementById('gsheet-sub-tabs').innerHTML = state.gsheet.sheets.map(s => `
+    <button class="planner-sub-tab${s.name === state.gsheetActive ? ' active' : ''}"
+      onclick="switchGsheetSheet('${encodeURIComponent(s.name)}')">
+      <span class="planner-tab-name">${escHtml(s.name)}</span>
+    </button>`).join('');
+}
+
+function switchGsheetSheet(encodedName) {
+  state.gsheetActive = decodeURIComponent(encodedName);
+  renderGsheetSubTabs();
+  renderGsheetSheet();
+}
+
+// Column filters are view-only, keyed by sheet name (same idea as GoalTracker's).
+function gsheetFilters() {
+  state.gsheetFilters = state.gsheetFilters || {};
+  return state.gsheetFilters[state.gsheetActive] = state.gsheetFilters[state.gsheetActive] || {};
+}
+
+function renderGsheetSheet() {
+  const table     = document.getElementById('gsheet-table');
+  const filterBar = document.getElementById('gsheet-filter-bar');
+  const sheet     = gsheetActiveSheet();
+  document.getElementById('gsheet-sheets-card').classList.toggle('hidden', !sheet);
+  if (!sheet) return;
+
+  const header   = sheet.rows[0].r;
+  const dataRows = sheet.rows.slice(1); // di -> ri = di + 1 -> sheet row ri + 1
+  const filters  = gsheetFilters();
+  let visIdx = dataRows.map((_, di) => di);
+  Object.entries(filters).forEach(([ci, val]) => {
+    if (val) visIdx = visIdx.filter(di => String(dataRows[di].r[ci] || '').trim() === val);
+  });
+  const filterActive = Object.values(filters).some(Boolean);
+  const isFormula = (ri, ci) => sheet.formulas[ri]?.[ci];
+  const ro = (ri, ci) => isFormula(ri, ci) ? ` readonly title="${escHtml(isFormula(ri, ci))}"` : '';
+
+  const headCells = header.map((h, ci) => {
+    const uniqueVals = [...new Set(dataRows.map(r => String(r.r[ci] || '').trim()).filter(Boolean))].sort();
+    const activeVal  = filters[ci];
+    const filterDd = uniqueVals.length && uniqueVals.length <= 60 ? `
+      <div class="planner-col-filter-wrap">
+        <button class="btn-planner-icon planner-col-filter-btn${activeVal ? ' active' : ''}" title="Filter" onclick="toggleGsheetColFilter(event, ${ci})">⏷</button>
+        <div class="planner-col-filter-dropdown hidden" id="gscf-${ci}">
+          <button class="${!activeVal ? 'active' : ''}" data-ci="${ci}" data-val="" onclick="setGsheetColFilter(this)">All</button>
+          ${uniqueVals.map(v => `<button class="${activeVal === v ? 'active' : ''}" data-ci="${ci}" data-val="${escHtml(v)}" onclick="setGsheetColFilter(this)">${escHtml(v)}</button>`).join('')}
+        </div>
+      </div>` : '';
+    return `<th class="planner-col-th"><div class="planner-col-th-inner">
+        <input class="planner-col-name${isFormula(0, ci) ? ' gs-formula' : ''}" data-ri="0" data-ci="${ci}" value="${escHtml(h)}"
+          ${ro(0, ci)} onblur="gsheetUpdateCell(0, ${ci}, this.value)">
+        ${filterDd}
+      </div></th>`;
+  }).join('');
+
+  const bodyRows = !visIdx.length
+    ? `<tr><td colspan="${header.length + 1}" class="empty">${dataRows.length ? 'No rows match the filter' : 'No rows yet'}</td></tr>`
+    : visIdx.map(di => {
+      const ri = di + 1;
+      const cells = header.map((_, ci) => `
+        <td class="planner-cell-td"><textarea class="planner-cell${isFormula(ri, ci) ? ' gs-formula' : ''}" rows="1" data-ri="${ri}" data-ci="${ci}"
+          ${ro(ri, ci)} onblur="gsheetUpdateCell(${ri}, ${ci}, this.value)">${escHtml(dataRows[di].r[ci] || '')}</textarea></td>`).join('');
+      return `<tr><td class="gs-rownum">${ri + 1}</td>${cells}
+        <td class="planner-row-del-td"><button class="btn-planner-icon" title="Delete row ${ri + 1} in the sheet" onclick="gsheetDeleteRow(${ri})">✕</button></td></tr>`;
+    }).join('');
+
+  filterBar.innerHTML = filterActive ? `<div class="planner-filter-bar">
+      Filtered: ${visIdx.length} / ${dataRows.length} rows
+      <button class="btn-planner-sm" onclick="clearGsheetFilters()">✕ Clear filters</button>
+    </div>` : '';
+
+  table.innerHTML = `<thead><tr><th class="gs-rownum">1</th>${headCells}<th class="planner-row-del-td"></th></tr></thead><tbody>${bodyRows}</tbody>`;
+  table.querySelectorAll('textarea.planner-cell').forEach(ta => {
+    autoResizeTa(ta);
+    ta.addEventListener('input', () => autoResizeTa(ta));
+  });
+}
+
+function toggleGsheetColFilter(e, ci) {
+  e.stopPropagation();
+  document.querySelectorAll('.planner-col-filter-dropdown').forEach(d => { if (d.id !== `gscf-${ci}`) d.classList.add('hidden'); });
+  document.getElementById(`gscf-${ci}`)?.classList.toggle('hidden');
+}
+
+function setGsheetColFilter(btn) {
+  const filters = gsheetFilters();
+  if (btn.dataset.val) filters[+btn.dataset.ci] = btn.dataset.val;
+  else delete filters[+btn.dataset.ci];
+  renderGsheetSheet();
+}
+
+function clearGsheetFilters() {
+  if (state.gsheetFilters) delete state.gsheetFilters[state.gsheetActive];
+  renderGsheetSheet();
+}
+
+async function gsheetWriteCell(sheetName, ri, ci, value) {
+  const range = encodeURIComponent(`${gsQuote(sheetName)}!${gsColName(ci)}${ri + 1}`);
+  await gsApi(`/values/${range}?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: [[value]] }) });
+}
+
+function gsheetUpdateCell(ri, ci, value) {
+  const sheet = gsheetActiveSheet();
+  if (!sheet || sheet.formulas[ri]?.[ci]) return;
+  if ((sheet.rows[ri]?.r[ci] ?? '') === value) return;
+  sheet.rows[ri].r[ci] = value;
+  const edit = { sheetName: sheet.name, ri, ci, value };
+  gsheetWriteCell(edit.sheetName, ri, ci, value)
+    .then(() => gsheetQueueReload(sheet.name))
+    .catch(e => {
+      if (e.code === 'auth') {
+        state.gsPending = (state.gsPending || []).filter(p => !(p.sheetName === edit.sheetName && p.ri === ri && p.ci === ci));
+        state.gsPending.push(edit);
+        renderGsheetPanel();
+      }
+      showToast('Not saved to Google Sheet: ' + e.message, 0);
+    });
+}
+
+async function gsheetFlushPending() {
+  const pending = state.gsPending || [];
+  state.gsPending = [];
+  for (const p of pending) {
+    try { await gsheetWriteCell(p.sheetName, p.ri, p.ci, p.value); }
+    catch (e) { state.gsPending.push(p); showToast('Not saved to Google Sheet: ' + e.message, 0); }
+  }
+  if (pending.length && !state.gsPending.length) showToast(`Saved ${pending.length} queued edit${pending.length > 1 ? 's' : ''}`);
+}
+
+// A new row only exists locally until one of its cells is filled in.
+function gsheetAddRow() {
+  const sheet = gsheetActiveSheet();
+  if (!sheet) return;
+  sheet.rows.push({ r: Array(sheet.rows[0].r.length).fill('') });
+  sheet.formulas.push([]);
+  if (state.gsheetFilters) delete state.gsheetFilters[sheet.name];
+  renderGsheetSheet();
+  const last = document.querySelector('#gsheet-table tbody tr:last-child textarea');
+  last?.scrollIntoView({ block: 'center' });
+  last?.focus();
+}
+
+async function gsheetDeleteRow(ri) {
+  const sheet = gsheetActiveSheet();
+  const label = sheet.rows[ri].r.filter(Boolean).slice(0, 3).join(' · ') || 'empty row';
+  if (!confirm(`Delete row ${ri + 1} from the Google Sheet?\n\n${label}`)) return;
+  try {
+    await gsApi(':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [
+      { deleteDimension: { range: { sheetId: sheet.sheetId, dimension: 'ROWS', startIndex: ri, endIndex: ri + 1 } } },
+    ] }) });
+    await gsheetLoad();
+    showToast('Row deleted');
+  } catch (e) {
+    showToast('Google Sheet: ' + e.message, 0);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════

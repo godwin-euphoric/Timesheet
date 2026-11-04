@@ -1385,6 +1385,15 @@ textarea#fm-notes:focus {
 #excelimport-sheet-table .planner-col-th-inner { flex-wrap: wrap; }
 #excelimport-sheet-table .planner-cell { word-break: break-word; overflow-wrap: anywhere; }
 
+/* Goals tab (Google Sheet) */
+.gsheet-link-input { flex: 1; min-width: 0; }
+#tab-goals .table-scroll { scrollbar-color: rgba(148,163,184,0.35) transparent; }
+.gsheet-open-link { text-decoration: none; display: inline-flex; align-items: center; }
+#gsheet-table th.planner-col-th { min-width: 140px; }
+#gsheet-table .planner-cell { word-break: break-word; overflow-wrap: anywhere; }
+#gsheet-table .gs-formula { color: var(--text-muted, #888); background: rgba(128,128,128,0.08); cursor: default; }
+#gsheet-table .gs-rownum { width: 32px; min-width: 32px; text-align: center; font-size: 11px; color: var(--text-muted, #888); }
+
 .btn-planner-icon {
   background: none; border: none; cursor: pointer;
   color: var(--muted); font-size: 11px; padding: 2px 4px;
