@@ -2160,6 +2160,9 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .avg-col-plot { height: 200px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; border-bottom: 1px solid var(--border); padding-top: 24px; }
 .avg-col-val { color: var(--text); font-size: 13px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .avg-col-fill { display: block; flex-shrink: 0; width: 100%; max-width: 48px; background: #3987e5; border-radius: 4px 4px 0 0; }
+.avg-tone-good  { background: #22c55e; }
+.avg-tone-ai    { background: #eab308; }
+.avg-tone-waste { background: #ef4444; }
 .avg-col-name { color: var(--text); font-size: 13px; text-align: center; padding: 8px 2px 4px; line-height: 1.25; overflow-wrap: anywhere; }
 @media (max-width: 520px) {
   #avg-bars { gap: 4px; }

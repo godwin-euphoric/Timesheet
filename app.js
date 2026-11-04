@@ -598,12 +598,13 @@ function renderTypeSplitPies(data) {
 // ── Daily average bars (month so far, today included) ─────────────────────
 // A bar sums every category whose name matches one of its names (normType),
 // so variants like "Story" / "Story Book" land in the same bar.
+// tone colours the bar: wastage red, AI yellow, everything else green.
 const AVG_BARS = [
-  { label: 'AI Study',       names: ['aistudy'] },
-  { label: 'AI Office',      names: ['aioffice'] },
+  { label: 'AI Study',       names: ['aistudy'], tone: 'ai' },
+  { label: 'AI Office',      names: ['aioffice'], tone: 'ai' },
   { label: 'FM Other',       names: ['fmother'] },
   { label: 'FM SS',          names: ['fmss'] },
-  { label: 'Unwanted',       waste: 'Unwanted' },
+  { label: 'Wastage',        waste: true, tone: 'waste' },
   { label: 'Fitness & Body', names: ['fitnessbody', 'fitness'] },
   { label: 'GK',             names: ['gk'] },
   { label: 'StoryBook',      names: ['story', 'storybook', 'storybooks'] },
@@ -627,7 +628,9 @@ function renderAvgBars(data) {
     let hrs = 0, found = true;
     if (b.waste) {
       const dates = new Set([...Object.keys(data.wastedBreakdown || {}), ...Object.keys(data.wastedEntries || {})]);
-      dates.forEach(ds => { if (ds <= today) hrs += getWastedBreakdown(data, ds)[b.waste] || 0; });
+      dates.forEach(ds => {
+        if (ds <= today) { const bd = getWastedBreakdown(data, ds); WASTED_SUBS.forEach(s => { hrs += bd[s] || 0; }); }
+      });
     } else {
       const cats = (data.categories || []).filter(c => b.names.includes(normType(c.category)));
       found = cats.length > 0;
@@ -648,7 +651,7 @@ function renderAvgBars(data) {
     <div class="avg-col" title="${escHtml(tip)}">
       <span class="avg-col-plot">
         <span class="avg-col-val">${b.found ? b.avg + ' h' : '—'}</span>
-        <span class="avg-col-fill" style="height:${h}"></span>
+        <span class="avg-col-fill avg-tone-${b.tone || 'good'}" style="height:${h}"></span>
       </span>
       <span class="avg-col-name">${escHtml(b.label)}</span>
     </div>`;
