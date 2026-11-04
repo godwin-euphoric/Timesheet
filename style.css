@@ -2162,7 +2162,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .avg-col-fill { display: block; flex-shrink: 0; width: 100%; max-width: 48px; background: #3987e5; border-radius: 4px 4px 0 0; }
 .avg-tone-good  { background: #22c55e; }
 .avg-tone-ai    { background: #eab308; }
-.avg-tone-waste { background: #ef4444; }
+.avg-tone-waste { background: #991b1b; }
 .avg-col-name { color: var(--text); font-size: 13px; text-align: center; padding: 8px 2px 4px; line-height: 1.25; overflow-wrap: anywhere; }
 @media (max-width: 520px) {
   #avg-bars { gap: 4px; }

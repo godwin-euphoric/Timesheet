@@ -608,7 +608,7 @@ const AVG_BARS = [
   { label: 'Fitness & Body', names: ['fitnessbody', 'fitness'] },
   { label: 'GK',             names: ['gk'] },
   { label: 'StoryBook',      names: ['story', 'storybook', 'storybooks'] },
-  { label: 'Movies',         names: ['movies', 'movie'] },
+  { label: 'Short Film / Movies', names: ['movies', 'movie', 'shortfilm', 'shortfilms', 'sf', 'shortfilmsmovies', 'shortfilmmovies'] },
   { label: 'Books',          names: ['books', 'book', 'bookreading', 'reading'] },
 ];
 
