@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in</title>
-  <link rel="stylesheet" href="style.css?v=130">
+  <link rel="stylesheet" href="style.css?v=131">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1E1B4B">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -122,16 +122,16 @@
       <div class="stat-chip" id="sleep-avg-month-chip"><span class="sl-full">Avg Sleep (Mon)</span><span class="sl-short">Sleep (M)</span>&nbsp;&nbsp;<strong id="sleep-avg-month">—</strong><span id="sleep-miss-badge" class="sleep-miss-badge hidden"></span></div>
     </div>
 
-    <!-- Daily average bars for the month so far -->
-    <div class="card" id="main-avgbars-card">
-      <div class="pie-cell-title">Daily Average · <span id="avg-bars-days"></span></div>
-      <div id="avg-bars"></div>
-    </div>
-
-    <!-- FM - SS weekly hours line chart -->
-    <div class="card" id="main-fmssline-card">
-      <div class="pie-cell-title">FM - SS Weekly Hours · last 12 weeks</div>
-      <div id="fmss-weekly-line"></div>
+    <!-- Daily average bars + FM - SS weekly line, side by side on wide screens -->
+    <div class="main-charts-row" id="main-charts-row">
+      <div class="card" id="main-avgbars-card">
+        <div class="pie-cell-title">Daily Average · <span id="avg-bars-days"></span></div>
+        <div id="avg-bars"></div>
+      </div>
+      <div class="card" id="main-fmssline-card">
+        <div class="pie-cell-title">FM - SS Weekly Hours · last 12 weeks</div>
+        <div id="fmss-weekly-line"></div>
+      </div>
     </div>
 
     <div class="monthdate-row" id="main-monthdate-row">
