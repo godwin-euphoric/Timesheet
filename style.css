@@ -1098,6 +1098,7 @@ textarea#fm-notes:focus {
   /* ── Main tab: summary first, then both logging sections below it ────────── */
   #tab-main.active { display: flex; flex-direction: column; }
   #tab-main > .top-controls                  { order: 1; }
+  #tab-main > #main-avgbars-card             { order: 2; }
   #tab-main > #main-fmssline-card            { order: 2; }
   #tab-main > #main-monthdate-row            { order: 3; }
   #tab-main > .log-row                       { order: 4; }
@@ -2152,8 +2153,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 
 /* Daily average columns under the pies: value on top, bar grows up from a shared baseline, name below */
-.avg-bars-block { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
-.avg-bars-block .pie-cell-title { text-align: left; }
+#main-avgbars-card .pie-cell-title { text-align: left; }
 #avg-bars { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
 .avg-col { display: flex; flex-direction: column; border-radius: 4px; }
 .avg-col:hover { background: var(--card2); }
