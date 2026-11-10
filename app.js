@@ -7110,18 +7110,24 @@ async function recalcRegSummary(force = false) {
 // day's own mode criteria — surfaced here as the summary's "Day ___" line (the streak
 // concept from the Diet tab's day-count circle, which this tab intentionally omits as
 // a visual element).
+// Some completed days were never logged, so the count is pinned at a known day
+// and only days after it are counted on top.
+const REG_DAY_BASELINE = { date: '2026-11-10', day: 80 };
+
 async function calcRegSuccessDays(upToDate) {
   const target  = getCalorieTarget();
   const pTarget = getProteinTarget();
   let y = 2026, m = 6;
   const limit = upToDate || todayStr();
   const [ey, em] = limit.slice(0, 7).split('-').map(Number);
-  let count = 0;
+  const fromBaseline = limit >= REG_DAY_BASELINE.date;
+  if (fromBaseline) [y, m] = REG_DAY_BASELINE.date.slice(0, 7).split('-').map(Number);
+  let count = fromBaseline ? REG_DAY_BASELINE.day : 0;
   while (y < ey || (y === ey && m <= em)) {
     const month = `${y}-${String(m).padStart(2, '0')}`;
     const mData = await getRegMonthData(month);
     for (const [ds, d] of Object.entries(mData.days || {})) {
-      if (ds > limit) continue;
+      if (ds > limit || (fromBaseline && ds <= REG_DAY_BASELINE.date)) continue;
       const totals    = dietCalcTotals(d.foods || []);
       const junkOk    = d.junk === 'no';
       const workoutOk = (d.workouts || []).length > 0;
