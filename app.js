@@ -7335,36 +7335,28 @@ async function refreshFMTrackerStats() {
 
   const [allMonths, ud] = await Promise.all([getAllMonths(), getUserData()]);
 
-  let fmSS = 0, fmOther = 0;
+  let fmSS = 0, fmOther = 0, storyMovie = 0;
   Object.values(allMonths).forEach(data => {
     let ssName = null, otName = null;
+    const smNames = [];
     (data.categories || []).forEach(c => {
       if (/fm\s*-?\s*ss/i.test(c.category))    ssName = c.category;
       if (/fm\s*-?\s*other/i.test(c.category))  otName = c.category;
+      const kind = mediaKindFor(c.category);
+      if (kind === 'story' || kind === 'movie') smNames.push(c.category);
     });
     Object.entries(data.entries || {}).forEach(([ds, dayE]) => {
       if (ds < startDate || ds > endDate) return;
       if (ssName) fmSS   += (dayE[ssName] || 0);
       if (otName) fmOther += (dayE[otName] || 0);
+      smNames.forEach(n => { storyMovie += (dayE[n] || 0); });
     });
   });
 
-  let movies = 0, stories = 0;
-  (ud.fmLog || []).forEach(e => {
-    if (!e.date || e.date < startDate || e.date > endDate) return;
-    if (/movie/i.test(e.type || ''))  movies++;
-    if (/story/i.test(e.type || ''))  stories++;
-  });
-  (ud.mediaLog || []).forEach(e => {
-    if (!e.date || e.date < startDate || e.date > endDate) return;
-    if (e.kind === 'movie') movies++;
-    if (e.kind === 'story') stories++;
-  });
-
-  document.getElementById('fm-tracker-fmss').textContent    = Math.round(fmSS * 100) / 100 + ' hrs';
-  document.getElementById('fm-tracker-fmother').textContent = Math.round(fmOther * 100) / 100 + ' hrs';
-  document.getElementById('fm-tracker-movies').textContent  = movies;
-  document.getElementById('fm-tracker-stories').textContent = stories;
+  const fmt = h => Math.round(h * 100) / 100 + ' hrs';
+  document.getElementById('fm-tracker-fmss').textContent       = fmt(fmSS);
+  document.getElementById('fm-tracker-fmother').textContent    = fmt(fmOther);
+  document.getElementById('fm-tracker-storymovie').textContent = fmt(storyMovie);
 }
 
 async function shareFMTracker() {

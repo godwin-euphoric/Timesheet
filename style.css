@@ -2064,7 +2064,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .fm-stats-share-btn:hover { opacity: 0.85; }
 
 .fm-tracker-tiles {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
 }
 .fm-tile {
   border-radius: 12px; padding: 16px 10px 14px; text-align: center;
@@ -2083,7 +2083,7 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 }
 
 @media (max-width: 640px) {
-  .fm-tracker-tiles { grid-template-columns: repeat(2, 1fr); }
+  .fm-tracker-tiles { grid-template-columns: repeat(3, 1fr); }
   .fm-period-sep { display: none; }
   .fm-tracker-period-block input[type="date"] { flex-basis: auto; }
 }
