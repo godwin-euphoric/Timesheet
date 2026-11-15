@@ -2124,6 +2124,14 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .weight-entry-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 
+/* ══ FM Other "what was it" column (monthly table) ═══════════════════════════ */
+.fm-label-th { color: #5eead4; }
+.fm-label-cell { max-width: 180px; min-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #5eead4; font-size: 12px; text-align: left; }
+.fm-label-editable { cursor: pointer; }
+.fm-label-editable:not(.has-label)::after { content: '+'; color: var(--muted); opacity: .5; }
+.fm-label-editable:hover { background: rgba(94,234,212,0.08); }
+.fm-label-input { width: 100%; min-width: 160px; text-align: left; }
+
 /* ══ Hours by Type pie (main tab) ════════════════════════════════════════════ */
 .type-pie-wrap { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
 .type-pie-svg { width: 200px; height: 200px; flex-shrink: 0; }
@@ -2138,7 +2146,10 @@ tr:hover .mob-yr-metric-th { background: #0D1628 !important; }
 .type-pie-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Four pies in one card: all four in one row, legend under each pie; 2 per row on narrow screens */
-.pie-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 24px; }
+.pie-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 28px 24px; }
+@media (max-width: 1200px) {
+  .pie-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .pie-cell { min-width: 0; }
 .pie-cell-title { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; text-align: center; }
 .pie-cell .type-pie-wrap { flex-direction: column; flex-wrap: nowrap; align-items: center; gap: 16px; }

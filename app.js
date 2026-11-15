@@ -725,6 +725,91 @@ async function renderFmssWeeklyLine() {
     </svg>`;
 }
 
+// Suggest labels used before, so the same work keeps the same name
+async function fillFmOtherLabelSuggestions() {
+  const list = document.getElementById('fm-other-label-list');
+  if (!list) return;
+  const all = await getAllMonths();
+  const seen = new Map();
+  Object.values(all).forEach(d => Object.values(d.fmOtherNotes || {}).forEach(arr =>
+    arr.forEach(n => { if (n.label && !seen.has(n.label.toLowerCase())) seen.set(n.label.toLowerCase(), n.label); })));
+  list.innerHTML = [...seen.values()].sort().map(l => `<option value="${escHtml(l)}">`).join('');
+}
+
+// ── FM Other labels ("what was it?") ─────────────────────────────────────
+// Stored per month as fmOtherNotes[date] = [{ label, hours }]. Only labelled
+// hours are stored; the rest of the day's FM Other hours are "Not mentioned".
+const FM_NOT_MENTIONED = 'Not mentioned';
+const isFmOtherCat = c => /fm\s*-?\s*other/i.test(c || '');
+const fmR2 = n => Math.round(n * 100) / 100;
+
+function fmOtherLabelText(notes) {
+  const list = (notes || []).filter(n => n.label && n.hours > 0);
+  if (list.length === 1) return list[0].label;
+  return list.map(n => `${n.label} (${fmR2(n.hours)}h)`).join(', ');
+}
+
+// "Editing" → all the day's hours; "Editing (2h), Music" → 2h + the rest.
+function parseFmOtherLabels(text, dayHrs) {
+  const parts = (text || '').split(',').map(s => s.trim()).filter(Boolean).map(p => {
+    const m = p.match(/^(.*?)\s*\(\s*(\d+(?:\.\d+)?)\s*h?\s*\)$/i);
+    return m && m[1].trim() ? { label: m[1].trim(), hours: +m[2] } : { label: p, hours: null };
+  });
+  const fixed = parts.reduce((s, p) => s + (p.hours || 0), 0);
+  const open = parts.filter(p => p.hours === null);
+  const share = open.length ? Math.max(0, dayHrs - fixed) / open.length : 0;
+  const merged = [];
+  parts.forEach(p => {
+    const hrs = fmR2(p.hours === null ? share : p.hours);
+    if (hrs <= 0) return;
+    const ex = merged.find(n => n.label.toLowerCase() === p.label.toLowerCase());
+    if (ex) ex.hours = fmR2(ex.hours + hrs); else merged.push({ label: p.label, hours: hrs });
+  });
+  return merged;
+}
+
+// Monthly-table cell for the day's FM Other labels (editable when there are hours)
+function fmLabelCell(date, dayHrs, notes, editable, extraCls = '') {
+  const txt = fmOtherLabelText(notes);
+  const cls = `fm-label-cell${extraCls ? ' ' + extraCls : ''}${txt ? ' has-label' : ''}`;
+  if (!editable || dayHrs <= 0) return `<td class="${cls}">${escHtml(txt)}</td>`;
+  return `<td class="${cls} fm-label-editable" data-date="${date}" data-hrs="${dayHrs}" title="${escHtml(txt || 'Click to add what this was')}">${escHtml(txt)}</td>`;
+}
+
+function addFmOtherLabel(data, date, label, hrs) {
+  if (!data.fmOtherNotes) data.fmOtherNotes = {};
+  const list = data.fmOtherNotes[date] || (data.fmOtherNotes[date] = []);
+  const ex = list.find(n => n.label.toLowerCase() === label.toLowerCase());
+  if (ex) ex.hours = fmR2(ex.hours + hrs); else list.push({ label, hours: fmR2(hrs) });
+}
+
+// FM Other pie: month's FM Other hours split by label
+function renderFmOtherPie(data) {
+  const box = document.getElementById('fmother-pie');
+  if (!box) return;
+  const cat = (data.categories || []).find(c => isFmOtherCat(c.category));
+  if (!cat) { box.innerHTML = `<span class="empty-inline">No FM Other category this month</span>`; return; }
+  const sums = new Map();
+  let notMentioned = 0;
+  Object.entries(data.entries || {}).forEach(([ds, dayE]) => {
+    const total = dayE[cat.category] || 0;
+    if (total <= 0) return;
+    const notes = ((data.fmOtherNotes || {})[ds] || []).filter(n => n.label && n.hours > 0);
+    const labelled = notes.reduce((s, n) => s + n.hours, 0);
+    const scale = labelled > total ? total / labelled : 1;   // hours edited down after labelling
+    notes.forEach(n => {
+      const key = n.label.toLowerCase();
+      const g = sums.get(key) || { name: n.label, hrs: 0 };
+      g.hrs += n.hours * scale;
+      sums.set(key, g);
+    });
+    notMentioned += Math.max(0, total - labelled);
+  });
+  const groups = [...sums.values()].sort((a, b) => b.hrs - a.hrs).map(g => ({ ...g, cats: [g.name] }));
+  if (notMentioned > 0) groups.push({ name: FM_NOT_MENTIONED, hrs: notMentioned, cats: [FM_NOT_MENTIONED], other: true });
+  drawDonut(box, groups, 'FM Other hours by work this month', 'No FM Other hours logged this month');
+}
+
 // Waste pie: month's Social + Unwanted hours split by sub-category
 function renderWastePie(data) {
   const box = document.getElementById('waste-pie');
@@ -759,6 +844,8 @@ function drawDonut(box, groups, ariaLabel, emptyMsg = 'No hours logged this mont
     slices.push({ name: 'Other', hrs: rest.reduce((s, g) => s + g.hrs, 0), cats: rest.map(g => g.name), other: true });
   }
   slices.forEach((g, i) => { g.color = g.other ? TYPE_PIE_OTHER : TYPE_PIE_COLORS[fixed ? g.slot : i]; });
+  // Keep a grey "Not mentioned"-style slice last, after anything folded into Other
+  slices.sort((a, b) => (a.other && !b.other) ? 1 : (b.other && !a.other) ? -1 : 0);
 
   const r2 = n => Math.round(n * 100) / 100;
   const pct = h => Math.round(h / total * 100);
@@ -828,6 +915,7 @@ async function loadMonthlySummary(data) {
   document.getElementById('productive-hours-chip').textContent = totalProductive + ' hrs';
   renderTypePie(data);
   renderTypeSplitPies(data);
+  renderFmOtherPie(data);
   renderAvgBars(data);
   renderFmssWeeklyLine().catch(e => console.error('FM - SS weekly chart failed', e));
 
@@ -1065,6 +1153,8 @@ async function logEntry() {
   } else {
     if (!data.entries[date]) data.entries[date] = {};
     data.entries[date][category] = add(data.entries[date][category]);
+    const fmLabel = isFmOtherCat(category) ? (document.getElementById('fm-other-label')?.value || '').trim() : '';
+    if (fmLabel) addFmOtherLabel(data, date, fmLabel, hrs);
   }
   await saveMonthData(month, data);
   if (kind) await addMediaEntry(kind, mediaName, mediaBook, date);
@@ -1095,7 +1185,19 @@ function mediaKindFor(category) {
 
 function updateMediaFields() {
   const box  = document.getElementById('main-media-fields');
-  const kind = mediaKindFor(document.getElementById('main-category').value);
+  const cat  = document.getElementById('main-category').value;
+  const kind = mediaKindFor(cat);
+  if (!kind && isFmOtherCat(cat)) {
+    box.innerHTML = `
+    <div class="field-group" style="flex:1">
+      <label>What was it? <span style="text-transform:none;opacity:.7">(optional)</span></label>
+      <input type="text" id="fm-other-label" placeholder="e.g. Editing, Location scouting" list="fm-other-label-list">
+      <datalist id="fm-other-label-list"></datalist>
+    </div>`;
+    box.classList.remove('hidden');
+    fillFmOtherLabelSuggestions();
+    return;
+  }
   if (!kind) { box.innerHTML = ''; box.classList.add('hidden'); return; }
   const k = MEDIA_KINDS[kind];
   box.innerHTML = `
@@ -1581,6 +1683,13 @@ function renderMonthlyTableMobile(data) {
     }).join('');
     tr.innerHTML = `<td class="mob-cat-th">${cat}</td>${cells}`;
     tbody.appendChild(tr);
+    if (isFmOtherCat(cat)) {
+      const lt = document.createElement('tr');
+      const lcells = dates.map(di => fmLabelCell(di.ds, (entries[di.ds]||{})[cat] || 0,
+        (data.fmOtherNotes || {})[di.ds], !di.future, `mob-data-cell${di.we ? ' mob-we' : ''}`)).join('');
+      lt.innerHTML = `<td class="mob-cat-th fm-label-th">FM Other – What</td>${lcells}`;
+      tbody.appendChild(lt);
+    }
   });
 
   // Total row
@@ -1654,11 +1763,13 @@ async function renderMonthlyTable(data) {
   const hasFitness = categories.includes(FITNESS_CAT);
 
   // Two-row header: row1 has group header for Fitness (colspan=FITNESS_SUBS.length), row2 has sub-names
+  const fmNotes = data.fmOtherNotes || {};
   const headerRow1 = categories.map(c =>
     c === FITNESS_CAT
       ? `<th colspan="${FITNESS_SUBS.length}" class="fitness-group">${c}</th>`
-      : `<th rowspan="2">${c}</th>`
+      : `<th rowspan="2">${c}</th>` + (isFmOtherCat(c) ? `<th rowspan="2" class="fm-label-th">FM Other – What</th>` : '')
   ).join('');
+  const hasFmOther = categories.some(isFmOtherCat);
   const headerRow2 = hasFitness
     ? FITNESS_SUBS.map(s => `<th class="fitness-sub">${s}</th>`).join('')
     : '';
@@ -1715,7 +1826,7 @@ async function renderMonthlyTable(data) {
       const editAttrs = isEditable
         ? ` class="editable-cell${hrs > 0 ? ' cell-hrs' : ''}" data-date="${dateStr}" data-cat="${cat}" data-hrs="${hrs}"`
         : (hrs > 0 ? ' class="cell-hrs"' : '');
-      return `<td${editAttrs}>${hrs > 0 ? hrs : ''}</td>`;
+      return `<td${editAttrs}>${hrs > 0 ? hrs : ''}</td>` + (isFmOtherCat(cat) ? fmLabelCell(dateStr, hrs, fmNotes[dateStr], isEditable) : '');
     });
 
     // Add fitness total to dayTotal
@@ -1768,7 +1879,7 @@ async function renderMonthlyTable(data) {
   const totalCells = categories.map(c =>
     c === FITNESS_CAT
       ? FITNESS_SUBS.map(s => `<td>${subTotals[s] > 0 ? subTotals[s] : ''}</td>`).join('')
-      : `<td>${colTotals[c] > 0 ? colTotals[c] : ''}</td>`
+      : `<td>${colTotals[c] > 0 ? colTotals[c] : ''}</td>` + (isFmOtherCat(c) ? '<td></td>' : '')
   ).join('');
   const wastedTotalCells = WASTED_SUBS.map(s => `<td${wastedSubTotals[s] > 0 ? ' style="color:var(--red)"' : ''}>${wastedSubTotals[s] > 0 ? wastedSubTotals[s] : ''}</td>`).join('');
   const sleepTotCell = `<td${sleepColTotal > 0 ? ' style="color:#60a5fa"' : ''}>${sleepColTotal > 0 ? sleepColTotal : ''}</td>`;
@@ -1779,7 +1890,7 @@ async function renderMonthlyTable(data) {
     const bd = data.fitnessBreakdown || {};
     const gymDays = Object.values(bd).filter(d => (d.fitGYM || 0) > 0).length;
     const mmaDays = Object.values(bd).filter(d => (d.fitMMA || 0) > 0).length;
-    const colSpan = 2 + (categories.length - 1) + FITNESS_SUBS.length + 2 + 1 + WASTED_SUBS.length; // Date,Day + cats(fitness subs) + Total,Status,Sleep + wasted subs
+    const colSpan = 2 + (categories.length - 1) + FITNESS_SUBS.length + (hasFmOther ? 1 : 0) + 2 + 1 + WASTED_SUBS.length; // Date,Day + cats(fitness subs) + FM label + Total,Status,Sleep + wasted subs
     const fitTr = document.createElement('tr');
     fitTr.className = 'row-fitness-days';
     fitTr.innerHTML = `<td colspan="${colSpan}" style="text-align:center;padding:6px 12px;font-size:13px;color:#86efac;">
@@ -1794,6 +1905,8 @@ async function renderMonthlyTable(data) {
 
 function attachMonthlyEditHandler(tbody) {
   tbody.addEventListener('click', async e => {
+    const lbl = e.target.closest('td.fm-label-editable');
+    if (lbl) { if (!lbl.querySelector('input')) editFmLabelCell(lbl); return; }
     const td = e.target.closest('td.editable-cell');
     if (!td || td.querySelector('input')) return;
     const dateStr  = td.dataset.date;
@@ -1867,6 +1980,44 @@ function attachMonthlyEditHandler(tbody) {
       if (e.key === 'Enter')  input.blur();
       if (e.key === 'Escape') { committed = true; renderMonthlyTable(); }
     });
+  });
+}
+
+// Edit the FM Other labels for a day. "Editing" = all the day's hours;
+// "Editing (2h), Music" = 2h editing, the rest music; empty clears them.
+function editFmLabelCell(td) {
+  const dateStr = td.dataset.date;
+  const dayHrs  = parseFloat(td.dataset.hrs) || 0;
+  const prevTxt = td.textContent;
+  const input = document.createElement('input');
+  input.type = 'text'; input.value = prevTxt;
+  input.placeholder = 'e.g. Editing (2h), Music';
+  input.className = 'cell-edit-input fm-label-input';
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus(); input.select();
+
+  let committed = false;
+  async function commit() {
+    if (committed) return;
+    committed = true;
+    const txt = input.value.trim();
+    const month = dateStr.slice(0, 7);
+    const d = await getMonthData(month);
+    if (txt !== prevTxt.trim()) {
+      const notes = parseFmOtherLabels(txt, dayHrs);
+      if (!d.fmOtherNotes) d.fmOtherNotes = {};
+      if (notes.length) d.fmOtherNotes[dateStr] = notes;
+      else delete d.fmOtherNotes[dateStr];
+      await saveMonthData(month, d);
+      if (state.mainMonth === month) renderFmOtherPie(d);
+    }
+    await renderMonthlyTable(d);
+  }
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  input.blur();
+    if (e.key === 'Escape') { committed = true; renderMonthlyTable(); }
   });
 }
 
