@@ -2353,6 +2353,34 @@ const WELLNESS_FIXED = [
   { id: 'a12', label: 'Did meditation (5–10 min)' },
   { id: 'a13', label: 'Books / YouTube / Movie — alone in rest room' },
 ];
+// Nov 2026 list (replaces the whole habit list once — see loadHabitsTab).
+// Items that match an old one reuse its id so past ticks still show.
+const HABITS_V2 = [
+  { id: 'a8',          label: 'MS1 : Exercise' },
+  { id: 'v2_food',     label: 'MS2 : Food' },
+  { id: 'a11',         label: 'MS3 : Medicine' },
+  { id: 'v2_bath',     label: 'MS4,5 : Bath + RR' },
+  { id: 'v2_todo',     label: 'MS6 : To do List + Reg Tracker' },
+  { id: 'a3',          label: '10:30S : Diet 1800 C' },
+  { id: 'a12',         label: '10:30S : Meditation' },
+  { id: 'v2_goal',     label: '10:30S : Goal Tracker' },
+  { id: 'a5',          label: '10:30S : 3 Litre' },
+  { id: 'v2_fb',       label: 'Rules : FB once a day' },
+  { id: 'v2_insta',    label: 'Rules : Insta once a day' },
+  { id: 'a4',          label: 'Rules : No Heavy Meals' },
+  { id: 'a7',          label: 'Rules : No works in Bed, Bed is for short naps, Family Time' },
+  { id: 'v2_nap',      label: 'Rules : Bed Sleep - short nap - 20 minutes, Afternoon 30 minutes, Pending hours from last night, if night worked on productive stuffs' },
+  { id: 'a9',          label: 'Rules : Morning (Only once a day in home optional as E if not much big out work is there, small outwork can be clubbed with library)' },
+  { id: 'a1',          label: 'Rules : Yesterday Night : Slept by 11:30–12:30 pm (If Extended beyond it, Sleep in another room so you can get more sleep)' },
+  { id: 'a10',         label: 'Rules : Limited WFH office hours to once/week as E' },
+  { id: 'a13',         label: 'Rules : Rest Room : Books / YouTube (GK, Mindfind, AI) / Movie / Nothing in rest room' },
+  { id: 'v2_ts',       label: 'NightS : Timesheet' },
+  { id: 'v2_habit',    label: 'NightS : Habit' },
+  { id: 'v2_diet',     label: 'NightS : Diet Entry' },
+  { id: 'v2_wa',       label: 'NightS : WhatsApp entry' },
+  { id: 'v2_planner',  label: 'NightS : Tomorrow Planner' },
+];
+
 // Habits (formerly "Daily Wellness") is fully user-editable — the whole list lives in
 // state.habitsCustom[section] (seeded from WELLNESS_FIXED once, see loadHabitsTab),
 // so items can be renamed/deleted/reordered freely.
@@ -2393,8 +2421,22 @@ function habitsDayState(mData, dateStr) {
   return d;
 }
 
+// Only items still in the list count (marks for removed items stay stored but hidden).
 function hwellAchievedCount(day) {
-  return Object.values(day.wellness || {}).filter(v => v === true).length;
+  const w = day?.wellness || {};
+  return hwellItems('wellness').filter(i => w[i.id] === true).length;
+}
+
+// Items marked E (excused) don't count against the day.
+function hwellExcusedCount(day) {
+  const w = day?.wellness || {};
+  return hwellItems('wellness').filter(i => w[i.id] === 'E').length;
+}
+
+// Day's achieved fraction: ticks / (items − excused); null if nothing to count.
+function hwellDayFrac(day) {
+  const denom = hwellTotal() - hwellExcusedCount(day);
+  return denom > 0 ? hwellAchievedCount(day) / denom : null;
 }
 
 // ── Tab load ───────────────────────────────────────────────────────────────
@@ -2420,8 +2462,11 @@ async function loadHabitsTab() {
     wellness = wellness.filter(item => item.id !== 'a2');
     migrated = true;
   }
-  if (migrated) {
-    await saveUserData({ habitsWellnessMigrated: true, habitsSleepFieldMigrated: true, habitsCustomItems: { wellness } });
+  // One-time switch to the Nov 2026 list (HABITS_V2), replacing the old items.
+  const v2 = !ud.habitsListV2;
+  if (v2) wellness = HABITS_V2.map(i => ({ ...i }));
+  if (migrated || v2) {
+    await saveUserData({ habitsWellnessMigrated: true, habitsSleepFieldMigrated: true, habitsListV2: true, habitsCustomItems: { wellness } });
   }
   state.habitsCustom = { wellness };
   await renderHwellGrid(state.habitsMonth);
@@ -2440,9 +2485,9 @@ async function onHabitsMonthChange(month) {
 function hwellBuildRow(item, section, days, mData, today) {
   const cells = days.map(d => {
     const day  = mData.days[d] || {};
-    const val  = (day[section] || {})[item.id]; // true | 'wrong' | undefined
-    const cls  = val === true ? 'done' : val === 'wrong' ? 'wrong' : '';
-    const mark = val === true ? '✓' : val === 'wrong' ? '✗' : '';
+    const val  = (day[section] || {})[item.id]; // true | 'wrong' | 'E' | undefined
+    const cls  = val === true ? 'done' : val === 'wrong' ? 'wrong' : val === 'E' ? 'excused' : '';
+    const mark = val === true ? '✓' : val === 'wrong' ? '✗' : val === 'E' ? 'E' : '';
     const dt   = new Date(d + 'T00:00:00');
     const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
     return `<td class="hwell-cell${d === today ? ' cell-today' : ''}${isWeekend ? ' cell-weekend' : ''}">
@@ -2495,7 +2540,10 @@ async function renderHwellGrid(month) {
     const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
     const dayPct = hwellDayPct(mData.days[d]);
     const pctLbl = dayPct === null ? '' : `<br><span class="hwell-day-pct">${dayPct}%</span>`;
-    const lbl = `${String(dt.getDate()).padStart(2,'0')}<br><small>${dayNames[dt.getDay()]}</small>${pctLbl}`;
+    const fillBtn = d <= today
+      ? `<br><button type="button" class="hwell-fill-day" title="Tick every empty habit on this day" onclick="hwellFillDay('${d}')">✓</button>`
+      : '';
+    const lbl = `${String(dt.getDate()).padStart(2,'0')}<br><small>${dayNames[dt.getDay()]}</small>${pctLbl}${fillBtn}`;
     return `<th class="hwell-day-col${d === today ? ' col-today' : ''}${isWeekend ? ' col-weekend' : ''}">${lbl}</th>`;
   }).join('');
   const thead = `<thead><tr><th class="hwell-name-col">Item</th>${headCells}</tr></thead>`;
@@ -2508,7 +2556,8 @@ async function renderHwellGrid(month) {
   const totalCells = days.map(d => {
     const day   = mData.days[d];
     const count = day ? hwellAchievedCount(day) : 0;
-    return `<td class="hwell-cell hwell-total-cell${d === today ? ' cell-today' : ''}">${count}/${total}</td>`;
+    const denom = total - (day ? hwellExcusedCount(day) : 0);
+    return `<td class="hwell-cell hwell-total-cell${d === today ? ' cell-today' : ''}">${count}/${denom}</td>`;
   }).join('');
   const totalsRow = `<tr class="hwell-totals-row"><td class="hwell-row-label">Achieved</td>${totalCells}</tr>`;
 
@@ -2526,7 +2575,8 @@ function hwellDayHasMarks(day) {
 function hwellDayPct(day) {
   const total = hwellTotal();
   if (!total || !hwellDayHasMarks(day)) return null;
-  return Math.round(hwellAchievedCount(day) / total * 100);
+  const f = hwellDayFrac(day);
+  return f === null ? null : Math.round(f * 100);
 }
 
 // Averaged over the month's completed days, so unmarked past days count as 0.
@@ -2544,9 +2594,9 @@ async function renderHwellMonthAvg(month) {
   const grandTotal = hwellTotal();
   if (!completed.length || !grandTotal) { el.textContent = '—'; }
   else {
-    const sum = completed.reduce((s, ds) => s + (mData.days[ds] ? hwellAchievedCount(mData.days[ds]) : 0), 0);
-    const avg = sum / completed.length;
-    el.textContent = `${Math.round(avg / grandTotal * 100)}%`;
+    // Per-day % (excused items left out), averaged; an all-excused day doesn't count
+    const fracs = completed.map(ds => mData.days[ds] ? hwellDayFrac(mData.days[ds]) : 0).filter(f => f !== null);
+    el.textContent = fracs.length ? `${Math.round(fracs.reduce((s, f) => s + f, 0) / fracs.length * 100)}%` : '—';
   }
 }
 
@@ -2557,13 +2607,28 @@ async function toggleHwellItem(section, id, dateStr) {
   const mData = await getHabitsMonthData(month);
   const day   = habitsDayState(mData, dateStr);
   const cur   = day[section][id];
-  // Cycle: empty -> tick (true) -> wrong ('wrong') -> empty
-  if (cur === true)       day[section][id] = 'wrong';
-  else if (cur === 'wrong') delete day[section][id];
-  else                     day[section][id] = true;
+  // Cycle: empty -> tick (true) -> wrong ('wrong') -> excused ('E') -> empty
+  if (cur === true)         day[section][id] = 'wrong';
+  else if (cur === 'wrong') day[section][id] = 'E';
+  else if (cur === 'E')     delete day[section][id];
+  else                      day[section][id] = true;
   await saveHabitsMonthData(month, mData);
   await renderHwellGrid(state.habitsMonth);
   await renderHwellMonthAvg(state.habitsMonth);
+}
+
+// Header ✓: tick every habit that's still empty on the day (✗ and E are kept).
+async function hwellFillDay(dateStr) {
+  const month = dateStr.slice(0, 7);
+  const mData = await getHabitsMonthData(month);
+  const day   = habitsDayState(mData, dateStr);
+  let n = 0;
+  hwellItems('wellness').forEach(i => { if (day.wellness[i.id] === undefined) { day.wellness[i.id] = true; n++; } });
+  if (!n) { showToast('Nothing empty on this day'); return; }
+  await saveHabitsMonthData(month, mData);
+  await renderHwellGrid(state.habitsMonth);
+  await renderHwellMonthAvg(state.habitsMonth);
+  showToast(`Ticked ${n} habit${n > 1 ? 's' : ''}`);
 }
 
 // ── Custom rows (user-added, on top of the fixed Habits/Daily Wellness items) ──
@@ -3178,7 +3243,17 @@ async function loadGoalsTab() {
   state.gsPending = state.gsPending || [];
   renderGsheetPanel();
   if (state.goalSheetId && gsheetToken()) await gsheetLoad();
-  else if (state.gsheet) renderGsheetSheet();
+  else {
+    if (state.gsheet) renderGsheetSheet();
+    // Token expired (Google only issues 1-hour tokens to browser apps). If access was
+    // granted before, renew it silently — this runs inside the tab click, so the
+    // browser allows Google's popup, which closes itself without asking anything.
+    if (state.goalSheetId && gsheetGranted()) gsheetConnect(true);
+  }
+}
+
+function gsheetGranted() {
+  try { return localStorage.getItem('gsheet_granted_' + (state.user?.uid || '')) === '1'; } catch { return false; }
 }
 
 function renderGsheetPanel() {
@@ -3220,27 +3295,30 @@ async function gsheetUnlink() {
   renderGsheetPanel();
 }
 
-function gsheetConnect() {
-  if (!window.google?.accounts?.oauth2) { showToast('Google library still loading — try again in a moment'); return; }
+function gsheetConnect(silent = false) {
+  if (!window.google?.accounts?.oauth2) { if (!silent) showToast('Google library still loading — try again in a moment'); return; }
   const client = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_OAUTH_CLIENT_ID,
     scope: GSHEET_SCOPE,
     login_hint: state.user?.email || '',
     callback: async resp => {
       if (resp.error || !google.accounts.oauth2.hasGrantedAllScopes(resp, GSHEET_SCOPE)) {
-        showToast('Google Sheets access was not granted');
+        if (!silent) showToast('Google Sheets access was not granted');
         return;
       }
       gsheetSaveToken(resp.access_token, +resp.expires_in || 3600);
+      try { localStorage.setItem('gsheet_granted_' + (state.user?.uid || ''), '1'); } catch {}
       renderGsheetPanel();
       await gsheetFlushPending();
       await gsheetLoad();
     },
     error_callback: err => {
-      if (err.type !== 'popup_closed') showToast('Google connect failed: ' + (err.message || err.type), 0);
+      // Silent renewal failing (popup blocked etc.) just leaves the Connect button showing.
+      if (!silent && err.type !== 'popup_closed') showToast('Google connect failed: ' + (err.message || err.type), 0);
     },
   });
-  client.requestAccessToken();
+  // prompt '' = no consent screen when access was already granted.
+  client.requestAccessToken(silent ? { prompt: '' } : {});
 }
 
 // Builds a grid where rows[ri].r[ci] is the cell at row ri+1, column ci, so
@@ -3262,15 +3340,61 @@ function gsheetBuildGrid(vr, fr, minRows = 1, minCols = 1) {
   return { rows, formulas };
 }
 
+// Cell colours from the sheet (effectiveFormat, so conditional formatting
+// counts too). Returns { sheetTitle: colors } where colors[ri][ci] = { bg, fg }.
+// White backgrounds and black text are the sheet defaults, so they're skipped
+// and the site's own theme shows instead.
+const gsRgb = c => c ? [c.red || 0, c.green || 0, c.blue || 0].map(v => Math.round(v * 255)) : null;
+const gsCss = ([r, g, b]) => `rgb(${r},${g},${b})`;
+
+async function gsheetFetchColors(titles) {
+  const ranges = titles.map(t => 'ranges=' + encodeURIComponent(gsQuote(t))).join('&');
+  const fields = 'sheets(properties.title,data(startRow,startColumn,rowData.values.effectiveFormat(backgroundColor,textFormat.foregroundColor)))';
+  const res = await gsApi(`?${ranges}&fields=${encodeURIComponent(fields)}`);
+  const out = {};
+  (res.sheets || []).forEach(s => {
+    const colors = [];
+    (s.data || []).forEach(d => {
+      const r0 = d.startRow || 0, c0 = d.startColumn || 0;
+      (d.rowData || []).forEach((row, i) => (row.values || []).forEach((cell, j) => {
+        const f = cell.effectiveFormat;
+        if (!f) return;
+        const bg = gsRgb(f.backgroundColor);
+        const fg = gsRgb(f.textFormat?.foregroundColor);
+        const hasBg = bg && !bg.every(v => v >= 250);
+        const hasFg = fg && !fg.every(v => v <= 5);
+        if (!hasBg && !hasFg) return;
+        const c = {};
+        if (hasBg) {
+          c.bg = gsCss(bg);
+          // Readable text on the colour: keep the sheet's text colour unless it's the default black on a dark fill
+          const lum = (0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]) / 255;
+          c.fg = hasFg ? gsCss(fg) : (lum > 0.55 ? '#111' : '#fff');
+        } else c.fg = gsCss(fg);
+        (colors[r0 + i] = colors[r0 + i] || [])[c0 + j] = c;
+      }));
+    });
+    out[s.properties.title] = colors;
+  });
+  return out;
+}
+
+function gsCellStyle(sheet, ri, ci) {
+  const c = sheet.colors?.[ri]?.[ci];
+  if (!c) return '';
+  return ` style="${c.bg ? `background:${c.bg};` : ''}${c.fg ? `color:${c.fg};` : ''}"`;
+}
+
 async function gsheetLoad() {
   if (!state.goalSheetId) return;
   try {
     const meta   = await gsApi('?fields=properties.title,sheets.properties(sheetId,title)');
     const titles = meta.sheets.map(s => s.properties.title);
     const ranges = titles.map(t => 'ranges=' + encodeURIComponent(gsQuote(t))).join('&');
-    const [vals, forms] = await Promise.all([
+    const [vals, forms, colors] = await Promise.all([
       gsApi(`/values:batchGet?${ranges}&valueRenderOption=FORMATTED_VALUE`),
       gsApi(`/values:batchGet?${ranges}&valueRenderOption=FORMULA`),
+      gsheetFetchColors(titles).catch(e => { console.error('Sheet colours failed', e); return {}; }),
     ]);
     const prev = state.gsheet;
     state.gsheet = {
@@ -3280,6 +3404,7 @@ async function gsheetLoad() {
         name: s.properties.title,
         sheetId: s.properties.sheetId,
         ...gsheetBuildGrid(vals.valueRanges[i], forms.valueRanges[i]),
+        colors: colors[s.properties.title] || [],
       })),
     };
     if (!prev || !state.gsheet.sheets.some(s => s.name === state.gsheetActive)) {
@@ -3306,9 +3431,10 @@ function gsheetQueueReload(name) {
 
 async function gsheetReloadSheet(name) {
   const r = encodeURIComponent(gsQuote(name));
-  const [v, f] = await Promise.all([
+  const [v, f, colors] = await Promise.all([
     gsApi(`/values/${r}?valueRenderOption=FORMATTED_VALUE`),
     gsApi(`/values/${r}?valueRenderOption=FORMULA`),
+    gsheetFetchColors([name]).catch(() => null),
   ]);
   const sheet = state.gsheet?.sheets.find(s => s.name === name);
   if (!sheet) return;
@@ -3316,6 +3442,7 @@ async function gsheetReloadSheet(name) {
   const sameShape = grid.rows.length === sheet.rows.length && grid.rows[0].r.length === sheet.rows[0].r.length;
   sheet.rows = grid.rows;
   sheet.formulas = grid.formulas;
+  if (colors) sheet.colors = colors[name] || [];
   state.gsheet.syncedAt = Date.now();
   renderGsheetPanel();
   if (name !== state.gsheetActive) return;
@@ -3325,6 +3452,14 @@ async function gsheetReloadSheet(name) {
     const ri = +el.dataset.ri, ci = +el.dataset.ci;
     el.value = sheet.rows[ri]?.r[ci] ?? '';
     if (el.tagName === 'TEXTAREA') autoResizeTa(el);
+  });
+  // Colours can change after an edit (conditional formatting), including on the focused cell
+  document.querySelectorAll('#gsheet-table [data-ri]').forEach(el => {
+    const c = sheet.colors?.[+el.dataset.ri]?.[+el.dataset.ci];
+    el.style.background = c?.bg || '';
+    el.style.color = c?.fg || '';
+    const td = el.closest('td');
+    if (td) td.style.background = c?.bg || '';
   });
 }
 
@@ -3383,7 +3518,7 @@ function renderGsheetSheet() {
       </div>` : '';
     return `<th class="planner-col-th"><div class="planner-col-th-inner">
         <input class="planner-col-name${isFormula(0, ci) ? ' gs-formula' : ''}" data-ri="0" data-ci="${ci}" value="${escHtml(h)}"
-          ${ro(0, ci)} onblur="gsheetUpdateCell(0, ${ci}, this.value)">
+          ${ro(0, ci)}${gsCellStyle(sheet, 0, ci)} onblur="gsheetUpdateCell(0, ${ci}, this.value)">
         ${filterDd}
       </div></th>`;
   }).join('');
@@ -3393,8 +3528,8 @@ function renderGsheetSheet() {
     : visIdx.map(di => {
       const ri = di + 1;
       const cells = header.map((_, ci) => `
-        <td class="planner-cell-td"><textarea class="planner-cell${isFormula(ri, ci) ? ' gs-formula' : ''}" rows="1" data-ri="${ri}" data-ci="${ci}"
-          ${ro(ri, ci)} onblur="gsheetUpdateCell(${ri}, ${ci}, this.value)">${escHtml(dataRows[di].r[ci] || '')}</textarea></td>`).join('');
+        <td class="planner-cell-td"${(c => c?.bg ? ` style="background:${c.bg}"` : '')(sheet.colors?.[ri]?.[ci])}><textarea class="planner-cell${isFormula(ri, ci) ? ' gs-formula' : ''}" rows="1" data-ri="${ri}" data-ci="${ci}"
+          ${ro(ri, ci)}${gsCellStyle(sheet, ri, ci)} onblur="gsheetUpdateCell(${ri}, ${ci}, this.value)">${escHtml(dataRows[di].r[ci] || '')}</textarea></td>`).join('');
       return `<tr><td class="gs-rownum">${ri + 1}</td>${cells}
         <td class="planner-row-del-td"><button class="btn-planner-icon" title="Delete row ${ri + 1} in the sheet" onclick="gsheetDeleteRow(${ri})">✕</button></td></tr>`;
     }).join('');

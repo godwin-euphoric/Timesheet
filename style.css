@@ -621,6 +621,13 @@ td.sleep-cell:hover { background: #16243f !important; }
 .hwell-grid-toggle:hover { border-color: var(--primary); }
 .hwell-grid-toggle.done { background: var(--green); border-color: var(--green); }
 .hwell-grid-toggle.wrong { background: #f87171; border-color: #f87171; color: #0B1120; }
+.hwell-grid-toggle.excused { background: #fbbf24; border-color: #fbbf24; color: #0B1120; font-size: 12px; }
+.hwell-fill-day {
+  margin-top: 4px; width: 22px; height: 20px; padding: 0; border-radius: 5px;
+  border: 1px solid var(--green); background: transparent; color: var(--green);
+  font-size: 12px; font-weight: 900; line-height: 1; cursor: pointer;
+}
+.hwell-fill-day:hover { background: var(--green); color: #0B1120; }
 
 .hwell-totals-row td { border-top: 2px solid var(--border); font-weight: 700; }
 .hwell-totals-row .hwell-row-label { color: var(--lime); }
